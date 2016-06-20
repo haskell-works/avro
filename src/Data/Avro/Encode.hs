@@ -27,6 +27,8 @@ import Data.Word
 
 import Data.Avro.Schema
 
+-- | @putContainer schema obj@ Encodes the object and the schema for the
+-- object into an Avro container as defined by the Avro specification.
 -- XXX putContainer :: PutAvro a => Schema a -> a -> ByteString
 
 class PutAvro a where
@@ -72,8 +74,34 @@ instance PutAvro TL.Text where
     let bs = TL.encodeUtf8 t
     in putIntegral (BL.length bs) <> lazyByteString bs
 
+instance PutAvro ByteString where
+  putAvro bs =
+    putIntegral (BL.length bs) <> lazyByteString bs
+
 instance PutAvro String where
   putAvro s = let t = T.pack s in putAvro t
+
+instance PutAvro Double where
+  putAvro d = putAvro longVal
+   where longVal :: Word64
+         longVal | isNaN d               = 0x7ff8000000000000
+                 | isInfinite d && d > 0 = 0x7ff0000000000000
+                 | isInfinite d          = 0xfff0000000000000
+                 | otherwise = (s `shiftL` 63) .|. (e `shiftL` 52) .|. g
+         s = fromIntegral (fromEnum (signum d < 0))
+         e = fromIntegral (exponent d)
+         g = floor (0x000fffffffffffff * significand d)
+
+instance PutAvro Float where
+  putAvro d = putAvro intVal
+   where intVal :: Word32
+         intVal | isNaN d               = 0x7fc00000
+                | isInfinite d && d > 0 = 0x7f800000
+                | isInfinite d          = 0xff800000
+                | otherwise             = (s `shiftL` 31) .|. (e `shiftL` 23) .|. g
+         s = fromIntegral (fromEnum (signum d < 0))
+         e = fromIntegral (exponent d)
+         g = floor (0x007fffff * significand d)
 
 instance PutAvro a => PutAvro [a] where
   putAvro xs = putAvro (F.length xs) <> foldMap putAvro xs
@@ -86,6 +114,7 @@ instance (U.Unbox a, PutAvro a) => PutAvro (U.Vector a) where
   putAvro a = putAvro (U.length a) <> foldMap putAvro (U.toList a)
 instance PutAvro a => PutAvro (Set a) where
   putAvro a = putAvro (F.length a) <> foldMap putAvro a
+
 -- XXX more from containers
 -- XXX Unordered containers
 
