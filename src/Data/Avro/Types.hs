@@ -19,7 +19,7 @@ data Value f
       | Array (Vector (Value f)) -- ^ Dynamically enforced monomorphic type.
       | Map (HashMap Text (Value f))   -- ^ Dynamically enforced monomorphic type
       | Record (HashMap Text (Value f))
-      | Union f (Value f)
+      | Union [f] f (Value f) -- ^ Index into the union options, schema for selected option, and the actual value.
       | Fixed !ByteString
-      | Enum !Text
+      | Enum f !Text  -- ^ An enum is a pair of possible symbols given the schema and the selected Schema
   deriving (Eq, Show)

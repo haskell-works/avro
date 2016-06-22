@@ -55,12 +55,12 @@ resolveSchema e d v
 
 -- The writer's symbol must be present in the reader's enum
 resolveEnum :: DeclaredType -> DeclaredType -> T.Value Type -> Either String (T.Value Type)
-resolveEnum e d val@(T.Enum txt)
+resolveEnum e d val@(T.Enum _ txt)
    | txt `elem` symbols d = Right val
    | otherwise = Left "Decoded enum does not appear in reader's symbol list."
 
 resolveTwoUnions :: [Type] -> T.Value Type -> Either String (T.Value Type)
-resolveTwoUnions  ds (T.Union eTy val) =
+resolveTwoUnions  ds (T.Union _ eTy val) =
     resolveReaderUnion eTy ds val
 
 resolveReaderUnion :: Type -> [Type] -> T.Value Type -> Either String (T.Value Type)
@@ -68,12 +68,12 @@ resolveReaderUnion e ds val =
     let hdl [] = Left "No reader schema's in the unions match the writer's schema."
         hdl (d:rest) =
               case resolveSchema e d val of
-                Right val -> Right (T.Union d val)
+                Right v   -> Right (T.Union ds d v)
                 Left _    -> hdl rest
     in hdl ds
 
 resolveWriterUnion :: Type -> T.Value Type -> Either String (T.Value Type)
-resolveWriterUnion reader (T.Union ty val) = resolveSchema ty reader val
+resolveWriterUnion reader (T.Union _ ty val) = resolveSchema ty reader val
 
 resolveRecord :: DeclaredType -> DeclaredType -> T.Value Type -> Either String (T.Value Type)
 resolveRecord eRec dRec (T.Record fldVals)  =

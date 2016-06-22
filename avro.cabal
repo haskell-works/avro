@@ -16,6 +16,10 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
+flag dev
+  default: False
+  description: Use development GHC flags
+
 library
   exposed-modules:     Data.Avro.Schema,
                        Data.Avro.Types,
@@ -25,19 +29,21 @@ library
   -- other-modules:       
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <4.9,
-                       -- attoparsec >=0.13 && <0.14,
-                       array,
-                       fail,
-                       bytestring >=0.10 && <0.11,
                        aeson >=0.11 && <0.12,
-                       unordered-containers >=0.2 && <0.3,
-                       mtl >=2.2 && <2.3,
-                       text >=1.2 && <1.3,
-                       base16-bytestring,
-                       containers,
-                       vector,
-                       scientific,
                        array,
-                       binary
+                       array,
+                       base16-bytestring,
+                       binary,
+                       bytestring >=0.10 && <0.11,
+                       containers,
+                       fail,
+                       hashable,
+                       mtl >=2.2 && <2.3,
+                       scientific,
+                       text >=1.2 && <1.3,
+                       unordered-containers >=0.2 && <0.3,
+                       vector
   hs-source-dirs:      src
   default-language:    Haskell2010
+  if flag(dev)
+    ghc-options: -Wall -Werror

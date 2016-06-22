@@ -14,31 +14,29 @@ module Data.Avro.Schema
     Schema(..), Type(..), BasicType(..)
   , DeclaredType(..), Field(..), Order(..)
   , TypeName(..)
+  , validateSchema
   -- * Values and smart constructors for common 'Type's
   , long, int, Data.Avro.Schema.null, boolean, float, double, bytes, string, namedType
   , array, Data.Avro.Schema.map, union
+  -- * Lower level utilities
+  , buildTypeEnvironment
   ) where
 
 import           Prelude as P
 import           Control.Applicative
 import           Control.Monad.Except
 import qualified Control.Monad.Fail as MF
-import           Control.Monad.Identity
 import qualified Data.Aeson as A
 import           Data.Aeson ((.=),object,(.:?),(.:),(.!=),FromJSON(..),ToJSON(..))
 import           Data.Aeson.Types (Parser,typeMismatch)
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as Base16
-import           Data.Foldable as F
 import qualified Data.HashMap.Strict as HashMap
+import           Data.Hashable
 import           Data.Monoid ((<>))
-import           Data.Scientific (Scientific, floatingOrInteger)
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding as T
-import           Data.Text.IO as T
 import qualified Data.Vector as V
 import qualified Data.Avro.Types as Ty
 
@@ -67,6 +65,9 @@ instance Show TypeName where
 instance IsString TypeName where
   fromString = TN . fromString
 
+instance Hashable TypeName where
+  hashWithSalt s (TN t) = hashWithSalt s t
+
 -- Get the name of the type.  In the case of unions, get the name of the
 -- first value in the union schema.
 typeName :: Type -> Text
@@ -86,8 +87,8 @@ typeName (BasicType bt) =
 typeName (DeclaredType dt) =
   case dt of
      Union (x:_) -> typeName x
+     Union []    -> error "Invalid Schema used: Union of zero types." -- XXX
      _           -> unTN $ name dt
-     Union _     -> error "Impossible: Union of zero types." -- XXX
 
 -- | An enumeration of the primitive types provided by Avro
 data BasicType
@@ -160,7 +161,8 @@ instance FromJSON Schema where
   parseJSON val =
     case val of
       o@(A.Object _) -> Schema <$> parseJSON o
-      A.Array arr  -> Schema . DeclaredType . Union . V.toList <$> mapM parseJSON arr
+      A.Array arr    -> Schema . DeclaredType . Union . V.toList <$> mapM parseJSON arr
+      _              -> typeMismatch "JSON Schema" val
 
 instance ToJSON Schema where
   toJSON (Schema x) = toJSON x
@@ -206,6 +208,7 @@ instance FromJSON Type where
         s  -> fail $ "Unrecognized object type: " <> s
   parseJSON (A.Array arr) =
            DeclaredType . Union <$> mapM parseJSON (V.toList arr)
+  parseJSON foo = typeMismatch "Invalid JSON for Avro Schema" foo
 
 instance ToJSON Type where
   toJSON (BasicType bt)    = toJSON bt
@@ -303,10 +306,10 @@ instance ToJSON (Ty.Value Type) where
       Ty.Array vec       -> A.Array (V.map toJSON vec)
       Ty.Map mp          -> A.Object (HashMap.map toJSON mp)
       Ty.Record flds     -> A.Object (HashMap.map toJSON flds)
-      Ty.Union _ Ty.Null -> A.Null
-      Ty.Union ty val    -> object [ typeName ty .= val ]
+      Ty.Union _ _ Ty.Null -> A.Null
+      Ty.Union _ ty val    -> object [ typeName ty .= val ]
       Ty.Fixed bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
-      Ty.Enum txt        -> A.String txt
+      Ty.Enum _ txt      -> A.String txt
 
 data Result a = Success a | Error String
   deriving (Eq,Ord,Show)
@@ -359,7 +362,7 @@ parseAvroJSON env ty av =
           BasicType String -> return $ Ty.String s
           DeclaredType (Enum {..}) ->
               if s `elem` symbols
-                then return $ Ty.Enum s
+                then return $ Ty.Enum ty s
                 else fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
           -- XXX unions with String/NamedType/Enum?
           _ -> avroTypeMismatch ty "string"
@@ -390,10 +393,11 @@ parseAvroJSON env ty av =
                                   Nothing -> fail $ "Decode failure: No record field '" <> T.unpack (fldName f) <> "' and no default in schema."
                       Just v  -> parseAvroJSON env (fldType f) v
               Ty.Record . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
-          -- XXX unions with map or record?
+              -- XXX unions with map or record?
+          _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
                   BasicType Null -> return $ Ty.Null
-                  DeclaredType (Union us) | (BasicType Null) `elem` us -> return $ Ty.Union ty Ty.Null
+                  DeclaredType (Union us) | (BasicType Null) `elem` us -> return $ Ty.Union us (BasicType Null) Ty.Null
                   _ -> avroTypeMismatch ty "null"
 
 avroTypeMismatch :: Type -> Text -> Result a
@@ -456,4 +460,20 @@ instance FromJSON Order where
 --  first structure.
 --  * Default values can be cast/de-serialize correctly.
 validateSchema :: Schema -> Parser ()
-validateSchema sch = return () -- XXX TODO
+validateSchema _sch = return () -- XXX TODO
+
+buildTypeEnvironment :: Applicative m => (TypeName -> m Type) -> Type -> TypeName -> m Type
+buildTypeEnvironment failure from =
+    \forTy -> case HashMap.lookup forTy mp of
+                Nothing  -> failure forTy
+                Just res -> pure res
+  where
+  mp = HashMap.fromList $ go from
+  go :: Type -> [(TypeName,Type)]
+  go (BasicType b) = []
+  go ty@(DeclaredType d) =
+    case d of
+      Record {..} -> zip (name:aliases) (repeat ty) ++ concatMap go (P.map fldType fields)
+      Enum {..}   -> zip (name:aliases) (repeat ty)
+      Union {..}  -> concatMap go options
+      Fixed {..}  -> zip (name:aliases) (repeat ty)

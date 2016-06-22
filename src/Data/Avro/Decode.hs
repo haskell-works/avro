@@ -22,15 +22,13 @@ import           Data.Int
 import           Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Proxy
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Vector as V
-import           Data.Word
 
-import           Data.Avro.Schema
+import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T
 
 decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
@@ -39,6 +37,9 @@ decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFai
 getAvroOf :: Schema -> Get (T.Value Type)
 getAvroOf (Schema ty0) = go ty0
  where
+ env = S.buildTypeEnvironment envFail ty0
+ envFail t = fail $ "Named type not in schema: " ++ show t
+
  go :: Type -> Get (T.Value Type)
  go ty =
   case ty of
@@ -61,6 +62,7 @@ getAvroOf (Schema ty0) = go ty0
     Map  t  ->
       do kvs <- getKVBlocks t
          return $ T.Map (HashMap.fromList $ mconcat kvs)
+    NamedType tn -> env tn >>= go
 
  getKVBlocks :: Type -> Get [[(Text,T.Value Type)]]
  getKVBlocks t =
@@ -86,15 +88,15 @@ getAvroOf (Schema ty0) = go ty0
     Enum {..} ->
       do val <- getLong
          let resolveEnum = flip lookup (zip [0..] symbols)
-         case resolveEnum (fromIntegral val) of
-          Just e  -> return (T.Enum e)
+         case resolveEnum val of
+          Just e  -> return (T.Enum (DeclaredType dt) e)
           Nothing -> fail "Decoded Avro enumeration is outside the expected range."
     Union ts ->
       do i <- getLong
          let resolveUnion = flip lookup (zip [0..] ts)
          case resolveUnion i of
           Nothing -> fail "Decoded Avro tag is outside the expected range for a Union."
-          Just t  -> T.Union (DeclaredType dt) <$> go t
+          Just t  -> T.Union ts t <$> go t
     Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
 
 class GetAvro a where
@@ -235,26 +237,6 @@ getDouble =
 -- getRecord :: GetAvro ty => Get (AvroValue ty)
 -- getRecord = getAvro
 
--- XXX The type information is inverted here.  You might expect this
--- function to determine the type but that isn't the case as it would
--- require dependent types.  Rather, the
--- caller specifies the type and this function can fail hard if the
--- decode fails, but the tag (first element) and existentially typed
--- second value are unrelated.
-getUnion :: GetAvro ty => Get (Int64,ty)
-getUnion = (,) <$> getLong <*> getAvro
-
-getFixed :: Int -> Get ByteString
-getFixed = G.getByteString
-
-getEnum :: forall a. (Bounded a, Enum a) => Get a
-getEnum =
- do x <- fromIntegral <$> getInt
-    if x < fromEnum (minBound :: a) || x > fromEnum (maxBound :: a)
-      then fail "Decoded enum falls outside the valid range."
-      else return (toEnum $ fromIntegral x)
-
--- XXX Make this work on blocks as Avro Array's do.
 getArray :: GetAvro ty => Get [ty]
 getArray =
   do nr <- getLong
@@ -268,7 +250,6 @@ getArray =
           do rs <- replicateM (fromIntegral nr) getAvro
              (rs ++) <$> getArray
 
--- XXX Make this work on blocks as Avro Maps do.
 getMap :: GetAvro ty => Get (Map.Map Text ty)
 getMap = go Map.empty
  where

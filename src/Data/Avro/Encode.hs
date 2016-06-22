@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE FlexibleInstances    #-}
 module Data.Avro.Encode
   ( -- * High level interface
     getSchema
@@ -10,6 +11,7 @@ module Data.Avro.Encode
   , putAvro
   ) where
 
+import Prelude as P
 import Data.Array (Array)
 import Data.Ix (Ix)
 import Data.Bits
@@ -17,8 +19,9 @@ import Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import Data.ByteString.Builder
 import qualified Data.Foldable as F
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import Data.Int
-import Data.Map
 import Data.Monoid
 import Data.Set (Set)
 import Data.Text (Text)
@@ -72,6 +75,10 @@ avroInt n = AvroM (putIntegral n, int)
 avroLong :: forall a. (FiniteBits a, Integral a) => a -> AvroM
 avroLong n = AvroM (putIntegral n, long)
 
+-- Put a Haskell Int.
+putI :: Int -> Builder
+putI = putIntegral
+
 putIntegral :: forall a. (FiniteBits a, Integral a) => a -> Builder
 putIntegral n =
   let enc = (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
@@ -113,8 +120,10 @@ instance Avro TL.Text where
     in AvroM (putIntegral (BL.length bs) <> lazyByteString bs, string)
 
 instance Avro ByteString where
-  avro bs =
-    AvroM (putIntegral (BL.length bs) <> lazyByteString bs, bytes)
+  avro bs = AvroM (putIntegral (BL.length bs) <> lazyByteString bs, bytes)
+
+instance Avro B.ByteString where
+  avro bs = AvroM (putIntegral (B.length bs) <> byteString bs, bytes)
 
 instance Avro String where
   avro s = let t = T.pack s in avro t
@@ -164,46 +173,48 @@ instance Avro a => Avro (Set a) where
                  , array (getType (Proxy :: Proxy a))
                  )
 
+instance Avro a => Avro (HashMap Text a) where
+  avro hm = AvroM ( putI (F.length hm) <> foldMap putKV (HashMap.toList hm)
+                  , S.map (getType (Proxy :: Proxy a))
+                  )
+    where putKV (k,v) = putAvro k <> putAvro v
+
 -- XXX more from containers
 -- XXX Unordered containers
 
--- XXX Tuples
--- instance (Avro a, Avro b) => Avro (a,b) where
---   avro (a,b) = avro a <> avro b
--- 
--- instance (Avro a, Avro b, Avro c) => Avro (a,b,c) where
---   avro (a,b,c) = avro a <> avro b <> avro c
--- instance (Avro a, Avro b, Avro c, Avro d) => Avro (a,b,c,d) where
---   avro (a,b,c,d) = avro a <> avro b <> avro c <> avro d
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e) => Avro (a,b,c,d,e) where
---   avro (a,b,c,d,e) =
---      avro a <> avro b <> avro c <> avro d <> avro e
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e, Avro f) => Avro (a,b,c,d,e,f) where
---   avro (a,b,c,d,e,f) =
---     avro a <> avro b <> avro c <> avro d <> avro e <> avro f
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e, Avro f, Avro g) => Avro (a,b,c,d,e,f,g) where
---   avro (a,b,c,d,e,f,g) =
---     avro a <> avro b <> avro c <> avro d <> avro e <> avro f <> avro g
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e, Avro f, Avro g, Avro h) => Avro (a,b,c,d,e,f,g,h) where
---   avro (a,b,c,d,e,f,g,h) =
---     avro a <> avro b <> avro c <> avro d <> avro e <> avro f <> avro g <> avro h
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e, Avro f, Avro g, Avro h, Avro i) => Avro (a,b,c,d,e,f,g,h,i) where
---   avro (a,b,c,d,e,f,g,h,i) =
---     avro a <> avro b <> avro c <> avro d <> avro e <> avro f <> avro g <> avro h <> avro i
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e, Avro f, Avro g, Avro h, Avro i, Avro j) => Avro (a,b,c,d,e,f,g,h,i,j) where
---   avro (a,b,c,d,e,f,g,h,i,j) =
---     avro a <> avro b <> avro c <> avro d <> avro e <> avro f <> avro g <> avro h <> avro i <> avro j
--- instance (Avro a, Avro b, Avro c, Avro d, Avro e, Avro f, Avro g, Avro h, Avro i, Avro j, Avro k) => Avro (a,b,c,d,e,f,g,h,i,j,k) where
---   avro (a,b,c,d,e,f,g,h,i,j,k) =
---     avro a <> avro b <> avro c <> avro d <> avro e <> avro f <> avro g <> avro h <> avro i <> avro j <> avro k
-
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance Avro a => Avro (Maybe a) where
-  avro Nothing  = AvroM (word8 0, S.union [S.null,S.int])
-  avro (Just x) = AvroM (word8 1 <> putAvro x, S.union [S.null,S.int])
+  avro Nothing  = AvroM (putI 0             , S.union [S.null,S.int])
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.union [S.null,S.int])
 
 instance Avro () where
   avro () = AvroM (mempty, S.null)
 
 instance Avro Bool where
   avro b = AvroM (word8 $ fromIntegral $ fromEnum b, boolean)
+
+instance Avro (T.Value Type) where
+  avro v =
+    case v of
+      T.Null      -> avro ()
+      T.Boolean b -> avro b
+      T.Int i     -> avro i
+      T.Long i    -> avro i
+      T.Float f   -> avro f
+      T.Double d  -> avro d
+      T.Bytes bs  -> avro bs
+      T.String t  -> avro t
+      T.Array vec -> avro vec
+      T.Map hm    -> avro hm
+      T.Record hm -> avro hm
+      T.Union opts sel val ->
+        case lookup sel (P.zip opts [0..]) of
+          Just idx -> AvroM (putI idx <> putAvro val, S.union opts)
+          Nothing  -> error "Union encoding specifies type not found in schema"
+      T.Fixed bs  -> avro bs
+      T.Enum sch@(DeclaredType S.Enum{..}) t ->
+                case lookup t (P.zip symbols [0..]) of
+                      Nothing -> error "Enum symbol not in schema."
+                      Just ix -> AvroM ( putI ix
+                                       , sch
+                                       )
