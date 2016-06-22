@@ -5,15 +5,16 @@
 {-# LANGUAGE TupleSections       #-}
 module Data.Avro.Decode
   ( decodeAvro
+  , getAvroOf
+  -- * Lower level interface
+  , GetAvro(..)
   ) where
 
 import           Prelude as P
 import           Control.Monad (replicateM)
 import qualified Data.Array as Array
-import           Data.Avro.Schema
-import qualified Data.Avro.Types as T
 import qualified Data.Binary.Get as G
-import           Data.Binary.Get (Get)
+import           Data.Binary.Get (Get,runGetOrFail)
 import           Data.Bits
 import qualified Data.ByteString.Lazy as BL
 import           Data.ByteString (ByteString)
@@ -29,8 +30,14 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Vector as V
 import           Data.Word
 
-decodeAvro :: Schema -> Get (T.Value Type)
-decodeAvro (Schema ty0) = go ty0
+import           Data.Avro.Schema
+import qualified Data.Avro.Types as T
+
+decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
+decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
+
+getAvroOf :: Schema -> Get (T.Value Type)
+getAvroOf (Schema ty0) = go ty0
  where
  go :: Type -> Get (T.Value Type)
  go ty =
