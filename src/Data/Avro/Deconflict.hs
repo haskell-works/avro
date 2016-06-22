@@ -10,9 +10,9 @@ import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
--- | Given an encoder schema and the Avro value it produced,
--- and a desired decoder schema, produce an Avro value in the
--- form expected by the decoder if possible.
+-- | @deconflict writer reader val@ will convert a value that was
+-- encoded/decoded with the writer's schema into the form specified by the
+-- reader's schema.
 deconflict :: Schema -> Schema -> T.Value Type -> Either String (T.Value Type)
 deconflict (Schema writerType) (Schema readerType) val =
   resolveSchema writerType readerType val

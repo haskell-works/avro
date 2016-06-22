@@ -3,23 +3,29 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE OverloadedStrings   #-}
 module Data.Avro.Decode
   ( decodeAvro
-  , getAvroOf
+  , decodeContainer
   -- * Lower level interface
+  , getAvroOf
   , GetAvro(..)
   ) where
 
 import           Prelude as P
-import           Control.Monad (replicateM)
+import           Control.Monad (replicateM,when)
+import qualified Codec.Compression.Zlib as Z
+import qualified Data.Aeson as A
 import qualified Data.Array as Array
 import qualified Data.Binary.Get as G
 import           Data.Binary.Get (Get,runGetOrFail)
 import           Data.Bits
 import qualified Data.ByteString.Lazy as BL
 import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
 import           Data.List (foldl')
+import           Data.Monoid ((<>))
 import qualified Data.Map as Map
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set as Set
@@ -31,14 +37,72 @@ import qualified Data.Vector as V
 import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T
 
+-- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
 decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
+
+decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Type]])
+decodeContainer bs =
+  case runGetOrFail getContainer bs of
+    Right (_,_,a) -> Right a
+    Left (_,_,s)  -> Left s
+
+getContainer :: Get (Schema, [[T.Value Type]])
+getContainer =
+ do magic <- getFixed avroMagicSize
+    when (BL.fromStrict magic /= avroMagicBytes)
+         (fail "Invalid magic number at start of container.")
+    metadata <- getMap :: Get (Map.Map Text BL.ByteString) -- avro.schema, avro.codec
+    sync  <- BL.fromStrict <$> getFixed nrSyncBytes
+    codec <- getCodec (Map.lookup "avro.codec" metadata)
+    schema <- case Map.lookup "avro.schema" metadata of
+                Nothing -> fail "Invalid container object: no schema."
+                Just s  -> case A.eitherDecode' s of
+                              Left e -> fail ("Can not decode container schema: " <> e)
+                              Right (Schema x) -> return x
+    (Schema schema,) <$> getBlocks schema sync codec
+  where
+  nrSyncBytes :: Integral sb => sb
+  nrSyncBytes = 16
+
+  avroMagicSize :: Integral a => a
+  avroMagicSize = 4
+
+  avroMagicBytes :: BL.ByteString
+  avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
+
+  getFixed :: Int -> Get ByteString
+  getFixed = G.getByteString
+
+  getBlocks :: Type -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[T.Value Type]]
+  getBlocks ty sync decompress =
+   do nrObj    <- sFromIntegral =<< getLong
+      nrBytes  <- getLong
+      bytes    <- decompress =<< G.getLazyByteString nrBytes
+      r        <- case runGetOrFail (replicateM nrObj (getAvroOf $ Schema ty)) bytes of
+                    Right (_,_,x) -> return x
+                    Left (_,_,s)  -> fail s
+      marker   <- G.getLazyByteString nrSyncBytes
+      when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
+      e <- G.isEmpty
+      if e
+        then return [r]
+        else (r :) <$> getBlocks ty sync decompress
+
+  getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
+  getCodec code | Just "null"    <- code =
+                     return return
+                | Just "deflate" <- code =
+                     return (maybe (fail "Decompression failed.") return . Z.decompress)
+                | Just x <- code =
+                     fail ("Unrecognized codec: " <> BC.unpack x)
+                | otherwise = return return
 
 getAvroOf :: Schema -> Get (T.Value Type)
 getAvroOf (Schema ty0) = go ty0
  where
  env = S.buildTypeEnvironment envFail ty0
- envFail t = fail $ "Named type not in schema: " ++ show t
+ envFail t = fail $ "Named type not in schema: " <> show t
 
  go :: Type -> Get (T.Value Type)
  go ty =
@@ -110,6 +174,8 @@ instance GetAvro Int32 where
   getAvro = getInt
 instance GetAvro Int64 where
   getAvro = getLong
+instance GetAvro BL.ByteString where
+  getAvro = BL.fromStrict <$> getBytes
 instance GetAvro ByteString where
   getAvro = getBytes
 instance GetAvro Text where
@@ -245,10 +311,10 @@ getArray =
       | nr < 0  ->
           do _len <- getLong
              rs <- replicateM (fromIntegral (abs nr)) getAvro
-             (rs ++) <$> getArray
+             (rs <>) <$> getArray
       | otherwise ->
           do rs <- replicateM (fromIntegral nr) getAvro
-             (rs ++) <$> getArray
+             (rs <>) <$> getArray
 
 getMap :: GetAvro ty => Get (Map.Map Text ty)
 getMap = go Map.empty
@@ -260,3 +326,11 @@ getMap = go Map.empty
        else do m <- Map.fromList <$> replicateM (fromIntegral nr) getKVs
                go (Map.union m acc)
  getKVs = (,) <$> getString <*> getAvro
+
+-- Safe-ish from integral
+sFromIntegral :: forall a b m. (Monad m, Bounded a, Bounded b, Integral a, Integral b) => a -> m b
+sFromIntegral a
+  | aI > fromIntegral (maxBound :: b) ||
+    aI < fromIntegral (minBound :: b)   = fail "Integral overflow."
+  | otherwise                           = return (fromIntegral a)
+ where aI = fromIntegral a :: Integer

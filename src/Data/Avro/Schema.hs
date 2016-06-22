@@ -311,6 +311,7 @@ instance ToJSON (Ty.Value Type) where
       Ty.Fixed bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
       Ty.Enum _ txt      -> A.String txt
 
+-- XXX remove and use 'Result' from Aeson?
 data Result a = Success a | Error String
   deriving (Eq,Ord,Show)
 
@@ -350,6 +351,7 @@ instance Traversable Result where
   traverse _ (Error err) = pure (Error err)
   traverse f (Success v) = Success <$> f v
 
+-- |Parse JSON-encoded avro data.
 parseAvroJSON :: (Text -> Maybe Type) -> Type -> A.Value -> Result (Ty.Value Type)
 parseAvroJSON env (BasicType (NamedType (TN tn))) av =
   case env tn of
