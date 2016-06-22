@@ -178,7 +178,7 @@ instance FromJSON Type where
       "double"   -> return Double
       "bytes"    -> return Bytes
       "string"   -> return String
-      _          -> fail $ "Unrecognized raw string in schema: " <> T.unpack s
+      somename   -> return (NamedType (TN somename))
   parseJSON (A.Object o) =
     do ty <- o .: ("type" :: Text)
        case ty of
