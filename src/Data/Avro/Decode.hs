@@ -216,11 +216,11 @@ getBoolean =
 
 -- |Get a 32-bit int (zigzag encoded, max of 5 bytes)
 getInt :: Get Int32
-getInt = G.isolate 5 getZigZag
+getInt = getZigZag
 
 -- |Get a 64 bit int (zigzag encoded, max of 10 bytes)
 getLong :: Get Int64
-getLong = G.isolate 10 getZigZag
+getLong = getZigZag
 
 -- |Get an zigzag encoded integral value consuming bytes till the msb is 0.
 getZigZag :: (Bits i, Integral i) => Get i
