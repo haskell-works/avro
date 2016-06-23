@@ -20,7 +20,9 @@ import Data.Avro.Schema as S
 import Data.Avro.Types  as T
 import Data.Avro.Deconflict as C
 import Data.ByteString.Lazy (ByteString)
+import Data.Foldable (toList)
 import Data.Int
+import Data.Vector ()
 import Data.Word
 import Data.Monoid ((<>))
 
@@ -67,6 +69,9 @@ instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union _ _ T.Null) = pure Nothing
   fromAvro (T.Union _ _ v) = Just <$> fromAvro v
   fromAvro _ = fail "Invalid Avro value for 'Maybe a'"
+
+instance FromAvro a => FromAvro [a] where
+  fromAvro (T.Array vec) = mapM fromAvro $ toList vec
 
 instance FromAvro Text where
   fromAvro (T.String txt) = pure txt
