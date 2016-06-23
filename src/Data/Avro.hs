@@ -124,7 +124,7 @@ instance (FromAvro a) => FromAvro (HashMap.HashMap Text a) where
   fromAvro v = badValue v "HashMap Text a"
 
 badValue :: Value Type -> String -> Result a
-badValue v t = fail $ "Unexpected value when decoding for '" <> t <> ": " <> show v
+badValue v t = fail $ "Unexpected value when decoding for '" <> t <> "': " <> show v
 
 (.:) :: FromAvro a => HashMap.HashMap Text (Value Type) -> Text -> Result a
 (.:) obj key =
