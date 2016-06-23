@@ -76,9 +76,8 @@ class FromAvro a where
 instance FromAvro (Value Type) where
   fromAvro v  = pure v
 instance FromAvro Bool where
-  fromAvro (T.Int i) | i == 0 = pure False
-                     | i == 1 = pure True
-  fromAvro _                  = fail "Invalid Avro value for Bool."
+  fromAvro (T.Boolean b) = pure b
+  fromAvro v             = fail $ "Invalid Avro value for Bool:" <> show v
 instance FromAvro B.ByteString where
   fromAvro (T.Bytes b) = pure b
   fromAvro _ = fail "Invalid Avro value for ByteString"
@@ -90,11 +89,11 @@ instance FromAvro Int where
   fromAvro _          = fail "Invalid Avro value for Int64"
 instance FromAvro Int32 where
   fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro _          = fail "Invalid Avro value for Int64"
+  fromAvro v          = fail $ "Invalid Avro value for Int64" <> show v
 instance FromAvro Int64 where
   fromAvro (T.Long i) = pure i
   fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro _          = fail "Invalid Avro value for Int64"
+  fromAvro v          = fail $ "Invalid Avro value for Int64: " <> show v
 
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union _ _ T.Null) = pure Nothing
