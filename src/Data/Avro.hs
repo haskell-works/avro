@@ -20,6 +20,8 @@ import Data.Avro.Schema as S
 import Data.Avro.Types  as T
 import Data.Avro.Deconflict as C
 import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
 import Data.Foldable (toList)
 import Data.Int
 import Data.Vector ()
@@ -58,6 +60,12 @@ instance FromAvro Bool where
   fromAvro (T.Int i) | i == 0 = pure False
                      | i == 1 = pure True
   fromAvro _                  = fail "Invalid Avro value for Bool."
+instance FromAvro B.ByteString where
+  fromAvro (T.Bytes b) = pure b
+  fromAvro _ = fail "Invalid Avro value for ByteString"
+instance FromAvro BL.ByteString where
+  fromAvro (T.Bytes b) = pure (BL.fromStrict b)
+  fromAvro _ = fail "Invalid Avro value for Lazy ByteString"
 instance FromAvro Int where
   fromAvro (T.Int i)  = pure (fromIntegral i)
   fromAvro _          = fail "Invalid Avro value for Int64"
