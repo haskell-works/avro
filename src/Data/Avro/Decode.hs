@@ -200,7 +200,7 @@ instance GetAvro a => GetAvro (Maybe a) where
        case t of
         0 -> return Nothing
         1 -> Just <$> getAvro
-        _ -> fail "Invalid tag for expected {null,a} Avro union"
+        n -> fail $ "Invalid tag for expected {null,a} Avro union, received: " <> show n
 
 
 instance GetAvro a => GetAvro (Array.Array Int a) where
