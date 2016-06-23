@@ -16,10 +16,10 @@ data Value f
       | Double !Double
       | Bytes !ByteString
       | String !Text
-      | Array (Vector (Value f)) -- ^ Dynamically enforced monomorphic type.
+      | Array (Vector (Value f))       -- ^ Dynamically enforced monomorphic type.
       | Map (HashMap Text (Value f))   -- ^ Dynamically enforced monomorphic type
       | Record (HashMap Text (Value f))
-      | Union [f] f (Value f) -- ^ Index into the union options, schema for selected option, and the actual value.
+      | Union [f] f (Value f) -- ^ Set of union options, schema for selected option, and the actual value.
       | Fixed !ByteString
       | Enum f !Text  -- ^ An enum is a pair of possible symbols given the schema and the selected Schema
   deriving (Eq, Show)

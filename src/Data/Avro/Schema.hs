@@ -62,6 +62,10 @@ newtype TypeName = TN { unTN :: T.Text }
 instance Show TypeName where
   show (TN s) = show s
 
+instance Monoid TypeName where
+  mempty = TN mempty
+  mappend (TN a) (TN b) = TN (a <> b)
+
 instance IsString TypeName where
   fromString = TN . fromString
 
@@ -474,8 +478,13 @@ buildTypeEnvironment failure from =
   go :: Type -> [(TypeName,Type)]
   go (BasicType b) = []
   go ty@(DeclaredType d) =
-    case d of
-      Record {..} -> zip (name:aliases) (repeat ty) ++ concatMap go (P.map fldType fields)
-      Enum {..}   -> zip (name:aliases) (repeat ty)
-      Union {..}  -> concatMap go options
-      Fixed {..}  -> zip (name:aliases) (repeat ty)
+    let mk :: TypeName -> [TypeName] -> Maybe Text -> [(TypeName,Type)]
+        mk n as ns =
+            let unqual = n:as
+                qual   = maybe [] (\x -> P.map (mappend (TN x <> ".")) unqual) ns
+            in zip (unqual ++ qual) (repeat ty)
+    in case d of
+        Record {..} -> mk name aliases namespace ++ concatMap go (P.map fldType fields)
+        Enum {..}   -> mk name aliases namespace
+        Union {..}  -> concatMap go options
+        Fixed {..}  -> mk name aliases namespace

@@ -13,6 +13,9 @@
 * Lazily decode containers.
 * Make 'encodeContainer'
 * Dog food some more: Container decoding is manual, use the damned schema!
+* Handle namespaces properly
+  - We pollute the env with all names unqualified, we should keep each env in a namespace
+    and qualify the _query_.
 
 Consider:
 * Encoding unions in JSON is the point we need the encoder schema... right? Crazy.
