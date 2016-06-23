@@ -20,6 +20,7 @@ module Data.Avro.Schema
   , array, Data.Avro.Schema.map, union
   -- * Lower level utilities
   , buildTypeEnvironment
+  , Result(..)
   ) where
 
 import           Prelude as P

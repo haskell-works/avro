@@ -1,6 +1,7 @@
 -- | Avro encoding and decoding routines.
 module Data.Avro
   ( FromAvro(..)
+  , Result(..)
   , ToAvro(..)
   , decode
   , decodeContainer
@@ -17,11 +18,11 @@ import Data.Avro.Deconflict as C
 import Data.ByteString.Lazy (ByteString)
 import Data.Monoid ((<>))
 
-decode :: FromAvro a => Schema -> ByteString -> Either String a
+decode :: FromAvro a => Schema -> ByteString -> Result a
 decode sch bytes =
   case D.decodeAvro sch bytes of
     Right val -> fromAvro val
-    Left err  -> Left err
+    Left err  -> Error err
 
 decodeContainer :: FromAvro a => Schema -> ByteString -> [[a]]
 decodeContainer readerSchema bs =
@@ -31,12 +32,14 @@ decodeContainer readerSchema bs =
           dec x =
             case C.deconflict writerSchema readerSchema x of
               Left e   -> err e
-              Right v  -> either error id $ fromAvro v
+              Right v  -> case fromAvro v of
+                            Success x -> x
+                            Error e   -> error e
       in P.map (P.map dec) val
     Left err -> error err
 
 class FromAvro a where
-  fromAvro :: Value Type -> Either String a
+  fromAvro :: Value Type -> Result a
 
 class ToAvro a where
   toAvro :: a -> T.Value Type
