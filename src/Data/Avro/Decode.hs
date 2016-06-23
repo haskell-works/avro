@@ -160,12 +160,12 @@ getAvroOf (Schema ty0) = go ty0
          let resolveEnum = flip lookup (zip [0..] symbols)
          case resolveEnum val of
           Just e  -> return (T.Enum (DeclaredType dt) e)
-          Nothing -> fail "Decoded Avro enumeration is outside the expected range."
+          Nothing -> fail $ "Decoded Avro enumeration is outside the expected range. Value: " <> show val <> " enum name: " <> show name
     Union ts ->
       do i <- getLong
          let resolveUnion = flip lookup (zip [0..] ts)
          case resolveUnion i of
-          Nothing -> fail "Decoded Avro tag is outside the expected range for a Union."
+          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName ts)
           Just t  -> T.Union ts t <$> go t
     Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
 
