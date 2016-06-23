@@ -50,6 +50,14 @@ decodeContainer readerSchema bs =
 class FromAvro a where
   fromAvro :: Value Type -> Result a
 
+instance FromAvro (Value Type) where
+  fromAvro v  = pure v
+instance FromAvro Int where
+  fromAvro (T.Int i)  = pure (fromIntegral i)
+  fromAvro _          = fail "Invalid Avro value for Int64"
+instance FromAvro Int32 where
+  fromAvro (T.Int i)  = pure (fromIntegral i)
+  fromAvro _          = fail "Invalid Avro value for Int64"
 instance FromAvro Int64 where
   fromAvro (T.Long i) = pure i
   fromAvro (T.Int i)  = pure (fromIntegral i)
