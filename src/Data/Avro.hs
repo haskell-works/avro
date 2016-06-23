@@ -77,49 +77,54 @@ instance FromAvro (Value Type) where
   fromAvro v  = pure v
 instance FromAvro Bool where
   fromAvro (T.Boolean b) = pure b
-  fromAvro v             = fail $ "Invalid Avro value for Bool:" <> show v
+  fromAvro v             = badValue v "Bool"
 instance FromAvro B.ByteString where
   fromAvro (T.Bytes b) = pure b
-  fromAvro _ = fail "Invalid Avro value for ByteString"
+  fromAvro v          = badValue v "ByteString"
 instance FromAvro BL.ByteString where
   fromAvro (T.Bytes b) = pure (BL.fromStrict b)
-  fromAvro _ = fail "Invalid Avro value for Lazy ByteString"
+  fromAvro v          = badValue v "Lazy ByteString"
 instance FromAvro Int where
-  fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro _          = fail "Invalid Avro value for Int64"
+  fromAvro (T.Int i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
+                      = pure (fromIntegral i)
+  fromAvro v          = badValue v "Int"
 instance FromAvro Int32 where
   fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro v          = fail $ "Invalid Avro value for Int64" <> show v
+  fromAvro v          = badValue v "Int32"
 instance FromAvro Int64 where
   fromAvro (T.Long i) = pure i
   fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro v          = fail $ "Invalid Avro value for Int64: " <> show v
+  fromAvro v = badValue v "Int64"
 
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union _ _ T.Null) = pure Nothing
-  fromAvro (T.Union _ _ v) = Just <$> fromAvro v
-  fromAvro _ = fail "Invalid Avro value for 'Maybe a'"
+  fromAvro (T.Union [S.BasicType S.Null,_] _ v) = Just <$> fromAvro v
+  fromAvro v = badValue v "Maybe a"
 
 instance FromAvro a => FromAvro [a] where
   fromAvro (T.Array vec) = mapM fromAvro $ toList vec
+  fromAvro v = badValue v "[a]"
 
 instance FromAvro Text where
   fromAvro (T.String txt) = pure txt
-  fromAvro _ = fail "Invalid Avro value for Text."
+  fromAvro v = badValue v "Text"
 
 instance FromAvro TL.Text where
   fromAvro (T.String txt) = pure (TL.fromStrict txt)
-  fromAvro _ = fail "Invalid Avro value for lazy Text."
+  fromAvro v = badValue v "LazyText"
 
 instance (FromAvro a) => FromAvro (Map.Map Text a) where
   fromAvro (T.Record mp) = mapM fromAvro $ Map.fromList (HashMap.toList mp)
   fromAvro (T.Map mp)  = mapM fromAvro $ Map.fromList (HashMap.toList mp)
-  fromAvro _ = fail "Invalid Avro value for Map."
+  fromAvro v = badValue v "Map Text a"
 
 instance (FromAvro a) => FromAvro (HashMap.HashMap Text a) where
   fromAvro (T.Record mp) = mapM fromAvro mp
   fromAvro (T.Map mp)    = mapM fromAvro mp
-  fromAvro _ = fail "Invalid Avro value for HashMap."
+  fromAvro v = badValue v "HashMap Text a"
+
+badValue :: Value Type -> String -> Result a
+badValue v t = fail $ "Unexpected value when decoding for '" <> t <> ": " <> show v
 
 (.:) :: FromAvro a => HashMap.HashMap Text (Value Type) -> Text -> Result a
 (.:) obj key =
