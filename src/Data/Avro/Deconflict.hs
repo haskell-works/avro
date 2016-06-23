@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Data.Avro.Deconflict
   ( deconflict
   ) where
@@ -77,7 +78,17 @@ resolveWriterUnion reader (T.Union _ ty val) = resolveSchema ty reader val
 
 resolveRecord :: DeclaredType -> DeclaredType -> T.Value Type -> Either String (T.Value Type)
 resolveRecord eRec dRec (T.Record fldVals)  =
- resolveFields (fields eRec) (fields dRec) fldVals
+ T.Record . HashMap.fromList <$> mapM (resolveFields fldVals (fields eRec)) (fields dRec)
 
-resolveFields :: [Field] -> [Field] -> HashMap Text (T.Value Type) -> Either String (T.Value Type)
-resolveFields (ef:eFlds) (df:dFlds) = undefined
+-- For each field of the decoders, lookup the field in the hash map
+--  1) If the field exists, call 'resolveSchema'
+--  2) If the field is missing use the reader's default
+--  3) If there is no default, fail.
+--
+-- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
+resolveFields :: HashMap Text (T.Value Type) -> [Field] -> Field -> Either String (Text,T.Value Type)
+resolveFields hm eFlds d =
+  case (HashMap.lookup (fldName d) hm, fldDefault d) of
+    (Just x,_)        -> Right (fldName d, x)
+    (_,Just def)      -> Right (fldName d,def)
+    (Nothing,Nothing) -> Left $ "No field and no default for " ++ show (fldName d)
