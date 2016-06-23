@@ -54,6 +54,10 @@ class FromAvro a where
 
 instance FromAvro (Value Type) where
   fromAvro v  = pure v
+instance FromAvro Bool where
+  fromAvro (T.Int i) | i == 0 = pure False
+                     | i == 1 = pure True
+  fromAvro _                  = fail "Invalid Avro value for Bool."
 instance FromAvro Int where
   fromAvro (T.Int i)  = pure (fromIntegral i)
   fromAvro _          = fail "Invalid Avro value for Int64"
