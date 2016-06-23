@@ -19,6 +19,7 @@ module Data.Avro.Schema
   , long, int, Data.Avro.Schema.null, boolean, float, double, bytes, string, namedType
   , array, Data.Avro.Schema.map, union
   -- * Lower level utilities
+  , typeName
   , buildTypeEnvironment
   , Result(..)
   ) where
