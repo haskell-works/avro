@@ -16,6 +16,10 @@
 * Handle namespaces properly
   - We pollute the env with all names unqualified, we should keep each env in a namespace
     and qualify the _query_.
+* More 'FromAvro' and 'ToAvro' instances.
+* From/ToAvro helpers like Aesons '.:'.
+* Int values for enums in additon to text?  'fromEnum' is faster than 'read' at
+  the level of FromAvro.
 
 Consider:
 * Encoding unions in JSON is the point we need the encoder schema... right? Crazy.
