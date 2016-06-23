@@ -8,6 +8,7 @@ module Data.Avro.Decode
   ( decodeAvro
   , decodeContainer
   -- * Lower level interface
+  , decodeContainerWith
   , getAvroOf
   , GetAvro(..)
   ) where
@@ -42,13 +43,18 @@ decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
 decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
 
 decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Type]])
-decodeContainer bs =
-  case runGetOrFail getContainer bs of
+decodeContainer = decodeContainerWith getAvroOf
+
+decodeContainerWith :: (Schema -> Get a)
+                    -> BL.ByteString
+                    -> Either String (Schema, [[a]])
+decodeContainerWith schemaToGet bs =
+  case runGetOrFail (getContainerWith schemaToGet) bs of
     Right (_,_,a) -> Right a
     Left (_,_,s)  -> Left s
 
-getContainer :: Get (Schema, [[T.Value Type]])
-getContainer =
+getContainerWith :: (Schema -> Get a) -> Get (Schema, [[a]])
+getContainerWith schemaToGet =
  do magic <- getFixed avroMagicSize
     when (BL.fromStrict magic /= avroMagicBytes)
          (fail "Invalid magic number at start of container.")
@@ -60,7 +66,7 @@ getContainer =
                 Just s  -> case A.eitherDecode' s of
                               Left e -> fail ("Can not decode container schema: " <> e)
                               Right (Schema x) -> return x
-    (Schema schema,) <$> getBlocks schema sync codec
+    (Schema schema,) <$> getBlocks (schemaToGet (Schema schema)) sync codec
   where
   nrSyncBytes :: Integral sb => sb
   nrSyncBytes = 16
@@ -74,12 +80,12 @@ getContainer =
   getFixed :: Int -> Get ByteString
   getFixed = G.getByteString
 
-  getBlocks :: Type -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[T.Value Type]]
-  getBlocks ty sync decompress =
+  getBlocks :: Get a -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[a]]
+  getBlocks getValue sync decompress =
    do nrObj    <- sFromIntegral =<< getLong
       nrBytes  <- getLong
       bytes    <- decompress =<< G.getLazyByteString nrBytes
-      r        <- case runGetOrFail (replicateM nrObj (getAvroOf $ Schema ty)) bytes of
+      r        <- case runGetOrFail (replicateM nrObj getValue) bytes of
                     Right (_,_,x) -> return x
                     Left (_,_,s)  -> fail s
       marker   <- G.getLazyByteString nrSyncBytes
@@ -87,7 +93,7 @@ getContainer =
       e <- G.isEmpty
       if e
         then return [r]
-        else (r :) <$> getBlocks ty sync decompress
+        else (r :) <$> getBlocks getValue sync decompress
 
   getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
   getCodec code | Just "null"    <- code =

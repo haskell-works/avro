@@ -7,36 +7,41 @@ module Data.Avro
   , ToAvro(..)
   , decode
   , decodeContainer
+  , decodeContainerBytes
   -- , encode
   -- , encodeContainer
   ) where
 
-import Prelude as P
-import Data.Avro.Encode as E
+import           Prelude as P
 import qualified Data.Avro.Decode as D
-import qualified Data.Map as Map
-import qualified Data.HashMap.Strict as HashMap
-import Data.Avro.Schema as S
-import Data.Avro.Types  as T
-import Data.Avro.Deconflict as C
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BL
+import           Data.Avro.Deconflict as C
+import           Data.Avro.Encode as E
+import           Data.Avro.Schema as S
+import           Data.Avro.Types  as T
+import qualified Data.Binary.Get as G
 import qualified Data.ByteString as B
-import Data.Foldable (toList)
-import Data.Int
-import Data.Vector ()
-import Data.Word
-import Data.Monoid ((<>))
-
-import Data.Text (Text)
+import           Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BL
+import           Data.Foldable (toList)
+import qualified Data.HashMap.Strict as HashMap
+import           Data.Int
+import qualified Data.Map as Map
+import           Data.Monoid ((<>))
+import           Data.Text (Text)
 import qualified Data.Text.Lazy as TL
+import           Data.Vector ()
+import           Data.Word
 
+-- |Decode a lazy bytestring using a given Schema.
 decode :: FromAvro a => Schema -> ByteString -> Result a
 decode sch bytes =
   case D.decodeAvro sch bytes of
     Right val -> fromAvro val
     Left err  -> Error err
 
+-- |Decode a container and de-conflict the writer schema with a given
+-- reader-schema.  Exceptions are thrown instead of a 'Result' type to
+-- allow this function to be read lazy (to be done in some later version).
 decodeContainer :: FromAvro a => Schema -> ByteString -> [[a]]
 decodeContainer readerSchema bs =
   case D.decodeContainer bs of
@@ -50,6 +55,20 @@ decodeContainer readerSchema bs =
                             Error e   -> error e
       in P.map (P.map dec) val
     Left err -> error err
+
+-- |Like 'decodeContainer' but returns the avro-encoded bytes for each
+-- object in the container instead of the Haskell type.
+decodeContainerBytes :: ByteString -> [[ByteString]]
+decodeContainerBytes bs =
+  case D.decodeContainerWith schemaBytes bs of
+    Right (writerSchema, val) -> val
+    Left e -> error $ "Could not decode container: " <> e
+  where
+  schemaBytes sch =
+    do start <- G.bytesRead
+       end   <- G.lookAhead $ do _ <- D.getAvroOf sch
+                                 G.bytesRead
+       G.getLazyByteString (end-start)
 
 class FromAvro a where
   fromAvro :: Value Type -> Result a
