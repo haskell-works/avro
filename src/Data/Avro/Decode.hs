@@ -113,11 +113,6 @@ getAvroOf (Schema ty0) = go ty0
  go :: Type -> Get (T.Value Type)
  go ty =
   case ty of
-    BasicType bt    -> basic bt
-    DeclaredType dt -> declared dt
- basic :: BasicType -> Get (T.Value Type)
- basic bt =
-   case bt of
     Null    -> return T.Null
     Boolean -> T.Boolean <$> getAvro
     Int     -> T.Int     <$> getAvro
@@ -133,6 +128,22 @@ getAvroOf (Schema ty0) = go ty0
       do kvs <- getKVBlocks t
          return $ T.Map (HashMap.fromList $ mconcat kvs)
     NamedType tn -> env tn >>= go
+    Record {..} ->
+      do let getField (Field {..}) = (fldName,) <$> go fldType
+         T.Record . HashMap.fromList <$> mapM getField fields
+    Enum {..} ->
+      do val <- getLong
+         let resolveEnum = flip lookup (zip [0..] symbols)
+         case resolveEnum val of
+          Just e  -> return (T.Enum ty e)
+          Nothing -> fail $ "Decoded Avro enumeration is outside the expected range. Value: " <> show val <> " enum name: " <> show name
+    Union ts ->
+      do i <- getLong
+         let resolveUnion = flip lookup (zip [0..] ts)
+         case resolveUnion i of
+          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName ts)
+          Just t  -> T.Union ts t <$> go t
+    Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
 
  getKVBlocks :: Type -> Get [[(Text,T.Value Type)]]
  getKVBlocks t =
@@ -149,25 +160,6 @@ getAvroOf (Schema ty0) = go ty0
       else do vs <- replicateM (fromIntegral blockLength) (go t)
               (vs:) <$> getBlocksOf t
 
- declared :: DeclaredType -> Get (T.Value Type)
- declared dt =
-   case dt of
-    Record {..} ->
-      do let getField (Field {..}) = (fldName,) <$> go fldType
-         T.Record . HashMap.fromList <$> mapM getField fields
-    Enum {..} ->
-      do val <- getLong
-         let resolveEnum = flip lookup (zip [0..] symbols)
-         case resolveEnum val of
-          Just e  -> return (T.Enum (DeclaredType dt) e)
-          Nothing -> fail $ "Decoded Avro enumeration is outside the expected range. Value: " <> show val <> " enum name: " <> show name
-    Union ts ->
-      do i <- getLong
-         let resolveUnion = flip lookup (zip [0..] ts)
-         case resolveUnion i of
-          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName ts)
-          Just t  -> T.Union ts t <$> go t
-    Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
 
 class GetAvro a where
   getAvro :: Get a

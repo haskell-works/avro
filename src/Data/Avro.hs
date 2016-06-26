@@ -98,7 +98,7 @@ instance FromAvro Int64 where
 
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union _ _ T.Null) = pure Nothing
-  fromAvro (T.Union [S.BasicType S.Null,_] _ v) = Just <$> fromAvro v
+  fromAvro (T.Union [S.Null,_] _ v) = Just <$> fromAvro v
   fromAvro v = badValue v "Maybe a"
 
 instance FromAvro a => FromAvro [a] where

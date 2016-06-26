@@ -70,10 +70,10 @@ class Avro a where
 --   putAvro :: a -> Builder
 
 avroInt :: forall a. (FiniteBits a, Integral a) => a -> AvroM
-avroInt n = AvroM (putIntegral n, int)
+avroInt n = AvroM (putIntegral n, S.Int)
 
 avroLong :: forall a. (FiniteBits a, Integral a) => a -> AvroM
-avroLong n = AvroM (putIntegral n, long)
+avroLong n = AvroM (putIntegral n, S.Long)
 
 -- Put a Haskell Int.
 putI :: Int -> Builder
@@ -113,23 +113,23 @@ instance Avro Word64 where
 instance Avro Text where
   avro t =
     let bs = T.encodeUtf8 t
-    in AvroM (putIntegral (B.length bs) <> byteString bs, string)
+    in AvroM (putIntegral (B.length bs) <> byteString bs, S.String)
 instance Avro TL.Text where
   avro t =
     let bs = TL.encodeUtf8 t
-    in AvroM (putIntegral (BL.length bs) <> lazyByteString bs, string)
+    in AvroM (putIntegral (BL.length bs) <> lazyByteString bs, S.String)
 
 instance Avro ByteString where
-  avro bs = AvroM (putIntegral (BL.length bs) <> lazyByteString bs, bytes)
+  avro bs = AvroM (putIntegral (BL.length bs) <> lazyByteString bs, S.Bytes)
 
 instance Avro B.ByteString where
-  avro bs = AvroM (putIntegral (B.length bs) <> byteString bs, bytes)
+  avro bs = AvroM (putIntegral (B.length bs) <> byteString bs, S.Bytes)
 
 instance Avro String where
   avro s = let t = T.pack s in avro t
 
 instance Avro Double where
-  avro d = AvroM (putIntegral longVal, double)
+  avro d = AvroM (putIntegral longVal, S.Double)
    where longVal :: Word64
          longVal | isNaN d               = 0x7ff8000000000000
                  | isInfinite d && d > 0 = 0x7ff0000000000000
@@ -140,7 +140,7 @@ instance Avro Double where
          g = floor (0x000fffffffffffff * significand d)
 
 instance Avro Float where
-  avro d = AvroM (putIntegral intVal, float)
+  avro d = AvroM (putIntegral intVal, S.Float)
    where intVal :: Word32
          intVal | isNaN d               = 0x7fc00000
                 | isInfinite d && d > 0 = 0x7f800000
@@ -152,30 +152,30 @@ instance Avro Float where
 
 instance Avro a => Avro [a] where
   avro xs = AvroM ( putIntegral (F.length xs) <> foldMap putAvro xs
-                  , array (getType (Proxy :: Proxy a))
+                  , S.Array (getType (Proxy :: Proxy a))
                   )
 
 instance (Ix i, Avro a) => Avro (Array i a) where
   avro a = AvroM ( putIntegral (F.length a) <> foldMap putAvro a
-                 , array (getType (Proxy :: Proxy a))
+                 , S.Array (getType (Proxy :: Proxy a))
                  )
 instance Avro a => Avro (Vector a) where
   avro a = AvroM ( putIntegral (F.length a) <> foldMap putAvro a
-                 , array (getType (Proxy :: Proxy a))
+                 , S.Array (getType (Proxy :: Proxy a))
                  )
 instance (U.Unbox a, Avro a) => Avro (U.Vector a) where
   avro a = AvroM ( putIntegral (U.length a) <> foldMap putAvro (U.toList a)
-                 , array (getType (Proxy :: Proxy a))
+                 , S.Array (getType (Proxy :: Proxy a))
                  )
 
 instance Avro a => Avro (Set a) where
   avro a = AvroM ( putIntegral (F.length a) <> foldMap putAvro a
-                 , array (getType (Proxy :: Proxy a))
+                 , S.Array (getType (Proxy :: Proxy a))
                  )
 
 instance Avro a => Avro (HashMap Text a) where
   avro hm = AvroM ( putI (F.length hm) <> foldMap putKV (HashMap.toList hm)
-                  , S.map (getType (Proxy :: Proxy a))
+                  , S.Map (getType (Proxy :: Proxy a))
                   )
     where putKV (k,v) = putAvro k <> putAvro v
 
@@ -184,14 +184,14 @@ instance Avro a => Avro (HashMap Text a) where
 
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance Avro a => Avro (Maybe a) where
-  avro Nothing  = AvroM (putI 0             , S.union [S.null,S.int])
-  avro (Just x) = AvroM (putI 1 <> putAvro x, S.union [S.null,S.int])
+  avro Nothing  = AvroM (putI 0             , S.Union [S.Null,S.Int])
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.Union [S.Null,S.Int])
 
 instance Avro () where
-  avro () = AvroM (mempty, S.null)
+  avro () = AvroM (mempty, S.Null)
 
 instance Avro Bool where
-  avro b = AvroM (word8 $ fromIntegral $ fromEnum b, boolean)
+  avro b = AvroM (word8 $ fromIntegral $ fromEnum b, S.Boolean)
 
 instance Avro (T.Value Type) where
   avro v =
@@ -209,10 +209,10 @@ instance Avro (T.Value Type) where
       T.Record hm -> avro hm
       T.Union opts sel val ->
         case lookup sel (P.zip opts [0..]) of
-          Just idx -> AvroM (putI idx <> putAvro val, S.union opts)
+          Just idx -> AvroM (putI idx <> putAvro val, S.Union opts)
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Fixed bs  -> avro bs
-      T.Enum sch@(DeclaredType S.Enum{..}) t ->
+      T.Enum sch@(S.Enum{..}) t ->
                 case lookup t (P.zip symbols [0..]) of
                       Nothing -> error "Enum symbol not in schema."
                       Just ix -> AvroM ( putI ix
