@@ -31,7 +31,7 @@ import           Data.Aeson.Types (Parser,typeMismatch)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable
-import           Data.Monoid ((<>))
+import           Data.Monoid ((<>), First(..))
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -335,7 +335,9 @@ parseAvroJSON env ty av =
               if s `elem` symbols
                 then return $ Ty.Enum ty s
                 else fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
-          -- XXX unions with String/NamedType/Enum?
+          Union tys -> do
+            f <- tryAllTypes env tys av
+            maybe (fail $ "No match for String in union '" <> show (typeName ty) <> "'.") pure f
           _ -> avroTypeMismatch ty "string"
       A.Bool b       -> case ty of
                           Boolean -> return $ Ty.Boolean b
@@ -346,12 +348,16 @@ parseAvroJSON env ty av =
           Long   -> return $ Ty.Long   (floor i)
           Float  -> return $ Ty.Float  (realToFrac i)
           Double -> return $ Ty.Double (realToFrac i)
-          -- XXX unions with numbers?
+          Union tys -> do
+            f <- tryAllTypes env tys av
+            maybe (fail $ "No match for Number in union '" <> show (typeName ty) <> "'.") pure f
           _                   -> avroTypeMismatch ty "number"
       A.Array vec    ->
         case ty of
           Array t -> Ty.Array <$> V.mapM (parseAvroJSON env t) vec
-          -- XXX unions with arrays?
+          Union tys -> do
+            f <- tryAllTypes env tys av
+            maybe (fail $ "No match for Array in union '" <> show (typeName ty) <> "'.") pure f
           _  -> avroTypeMismatch ty "array"
       A.Object obj ->
         case ty of
@@ -364,12 +370,19 @@ parseAvroJSON env ty av =
                                   Nothing -> fail $ "Decode failure: No record field '" <> T.unpack (fldName f) <> "' and no default in schema."
                       Just v  -> parseAvroJSON env (fldType f) v
               Ty.Record . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
-              -- XXX unions with map or record?
+          Union tys -> do
+            f <- tryAllTypes env tys av
+            maybe (fail $ "No match for given record in union '" <> show (typeName ty) <> "'.") pure f
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
                   Null -> return $ Ty.Null
                   Union us | Null `elem` us -> return $ Ty.Union us Null Ty.Null
                   _ -> avroTypeMismatch ty "null"
+
+tryAllTypes :: (Text -> Maybe Type) -> [Type] -> A.Value -> Result (Maybe (Ty.Value Type))
+tryAllTypes env tys av =
+     getFirst <$> foldMap (\t -> First . Just <$> parseAvroJSON env t av) tys
+                          `catchError` (\_ -> return mempty)
 
 avroTypeMismatch :: Type -> Text -> Result a
 avroTypeMismatch expected actual =
