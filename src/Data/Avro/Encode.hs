@@ -210,8 +210,8 @@ instance Avro (T.Value Type) where
       T.Map hm    -> avro hm
       T.Record hm -> avro hm
       T.Union opts sel val | F.length opts > 0 ->
-        case lookup sel (P.zip opts [0..]) of
-          Just idx -> AvroM (putI idx <> putAvro val, S.Union (NE.fromList opts))
+        case lookup sel (P.zip (NE.toList opts) [0..]) of
+          Just idx -> AvroM (putI idx <> putAvro val, S.Union opts)
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Fixed bs  -> avro bs
       T.Enum sch@(S.Enum{..}) t ->

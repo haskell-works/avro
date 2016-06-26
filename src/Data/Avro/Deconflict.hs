@@ -8,6 +8,7 @@ import           Data.Avro.Types     as T
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List.NonEmpty as NE
+import           Data.List.NonEmpty (NonEmpty(..))
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
 import qualified Data.Text.Encoding  as Text
@@ -36,9 +37,9 @@ resolveSchema e d v
   go a@(S.Record {}) b@(S.Record {}) val
        | name a == name b = resolveRecord a b val
   go (S.Union _) (S.Union ys) val =
-       resolveTwoUnions (NE.toList ys) val
+       resolveTwoUnions ys val
   go nonUnion (S.Union ys) val =
-       resolveReaderUnion nonUnion (NE.toList ys) val
+       resolveReaderUnion nonUnion ys val
   go (S.Union _xs) nonUnion val =
        resolveWriterUnion nonUnion val
   go eTy dTy val =
@@ -59,18 +60,18 @@ resolveEnum e d val@(T.Enum _ txt)
    | txt `elem` symbols d = Right val
    | otherwise = Left "Decoded enum does not appear in reader's symbol list."
 
-resolveTwoUnions :: [Type] -> T.Value Type -> Either String (T.Value Type)
+resolveTwoUnions :: NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
 resolveTwoUnions  ds (T.Union _ eTy val) =
     resolveReaderUnion eTy ds val
 
-resolveReaderUnion :: Type -> [Type] -> T.Value Type -> Either String (T.Value Type)
+resolveReaderUnion :: Type -> NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
 resolveReaderUnion e ds val =
-    let hdl [] = Left "No reader schema's in the unions match the writer's schema."
+    let hdl [] = Left "Impossible: empty non-empty list."
         hdl (d:rest) =
               case resolveSchema e d val of
                 Right v   -> Right (T.Union ds d v)
                 Left _    -> hdl rest
-    in hdl ds
+    in hdl (NE.toList ds)
 
 resolveWriterUnion :: Type -> T.Value Type -> Either String (T.Value Type)
 resolveWriterUnion reader (T.Union _ ty val) = resolveSchema ty reader val

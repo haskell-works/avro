@@ -25,6 +25,7 @@ import qualified Data.ByteString.Lazy as BL
 import           Data.Foldable        (toList)
 import qualified Data.HashMap.Strict  as HashMap
 import           Data.Int
+import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map             as Map
 import           Data.Monoid          ((<>))
 import           Data.Text            (Text)
@@ -97,8 +98,8 @@ instance FromAvro Int64 where
   fromAvro v = badValue v "Int64"
 
 instance FromAvro a => FromAvro (Maybe a) where
-  fromAvro (T.Union _ _ T.Null) = pure Nothing
-  fromAvro (T.Union [S.Null,_] _ v) = Just <$> fromAvro v
+  fromAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
+  fromAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromAvro v
   fromAvro v = badValue v "Maybe a"
 
 instance FromAvro a => FromAvro [a] where

@@ -376,7 +376,7 @@ parseAvroJSON env ty av =
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
                   Null -> return $ Ty.Null
-                  Union us | Null `elem` NE.toList us -> return $ Ty.Union (NE.toList us) Null Ty.Null
+                  Union us | Null `elem` NE.toList us -> return $ Ty.Union us Null Ty.Null
                   _ -> avroTypeMismatch ty "null"
 
 tryAllTypes :: (Text -> Maybe Type) -> NonEmpty Type -> A.Value -> Result (Maybe (Ty.Value Type))
