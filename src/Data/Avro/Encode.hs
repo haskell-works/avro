@@ -12,27 +12,27 @@ module Data.Avro.Encode
   ) where
 
 import Prelude as P
-import Data.Array (Array)
-import Data.Ix (Ix)
-import Data.Bits
-import Data.ByteString.Lazy as BL
-import qualified Data.ByteString as B
-import Data.ByteString.Builder
-import qualified Data.Foldable as F
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
-import Data.Int
-import Data.Monoid
-import Data.Set (Set)
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as TL
+import           Data.Array              (Array)
+import           Data.Ix                 (Ix)
+import           Data.Bits
+import           Data.ByteString.Lazy    as BL
+import qualified Data.ByteString         as B
+import           Data.ByteString.Builder
+import qualified Data.Foldable           as F
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as HashMap
+import           Data.Int
+import           Data.Monoid
+import           Data.Set                (Set)
+import           Data.Text               (Text)
+import qualified Data.Text               as T
+import qualified Data.Text.Encoding      as T
+import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import Data.Vector (Vector)
-import qualified Data.Vector.Unboxed as U
-import Data.Word
-import Data.Proxy
+import           Data.Vector             (Vector)
+import qualified Data.Vector.Unboxed     as U
+import           Data.Word
+import           Data.Proxy
 
 import Data.Avro.Schema as S
 import Data.Avro.Types  as T

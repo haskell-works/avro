@@ -3,13 +3,13 @@ module Data.Avro.Deconflict
   ( deconflict
   ) where
 
-import Data.Avro.Schema as S
-import Data.Avro.Types as T
-import Data.HashMap.Strict (HashMap)
+import           Data.Avro.Schema    as S
+import           Data.Avro.Types     as T
+import           Data.HashMap.Strict (HashMap)
+import           Data.Text           (Text)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
+import qualified Data.Text           as Text
+import qualified Data.Text.Encoding  as Text
 
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the

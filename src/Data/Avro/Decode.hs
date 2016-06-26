@@ -13,27 +13,27 @@ module Data.Avro.Decode
   , GetAvro(..)
   ) where
 
-import           Prelude as P
-import           Control.Monad (replicateM,when)
-import qualified Codec.Compression.Zlib as Z
-import qualified Data.Aeson as A
-import qualified Data.Array as Array
-import qualified Data.Binary.Get as G
-import           Data.Binary.Get (Get,runGetOrFail)
+import Prelude as P
+import           Control.Monad              (replicateM,when)
+import qualified Codec.Compression.Zlib     as Z
+import qualified Data.Aeson                 as A
+import qualified Data.Array                 as Array
+import qualified Data.Binary.Get            as G
+import           Data.Binary.Get            (Get,runGetOrFail)
 import           Data.Bits
-import qualified Data.ByteString.Lazy as BL
-import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy       as BL
+import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
-import           Data.List (foldl')
-import           Data.Monoid ((<>))
-import qualified Data.Map as Map
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Set as Set
-import           Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Vector as V
+import           Data.List                  (foldl')
+import           Data.Monoid                ((<>))
+import qualified Data.Map                   as Map
+import qualified Data.HashMap.Strict        as HashMap
+import qualified Data.Set                   as Set
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Encoding         as Text
+import qualified Data.Vector                as V
 
 import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T

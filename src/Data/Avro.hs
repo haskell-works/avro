@@ -12,24 +12,24 @@ module Data.Avro
   -- , encodeContainer
   ) where
 
-import           Prelude as P
-import qualified Data.Avro.Decode as D
+import           Prelude              as P
+import qualified Data.Avro.Decode     as D
 import           Data.Avro.Deconflict as C
-import           Data.Avro.Encode as E
-import           Data.Avro.Schema as S
-import           Data.Avro.Types  as T
-import qualified Data.Binary.Get as G
-import qualified Data.ByteString as B
+import           Data.Avro.Encode     as E
+import           Data.Avro.Schema     as S
+import           Data.Avro.Types      as T
+import qualified Data.Binary.Get      as G
+import qualified Data.ByteString      as B
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
-import           Data.Foldable (toList)
-import qualified Data.HashMap.Strict as HashMap
+import           Data.Foldable        (toList)
+import qualified Data.HashMap.Strict  as HashMap
 import           Data.Int
-import qualified Data.Map as Map
-import           Data.Monoid ((<>))
-import           Data.Text (Text)
-import qualified Data.Text.Lazy as TL
-import           Data.Vector ()
+import qualified Data.Map             as Map
+import           Data.Monoid          ((<>))
+import           Data.Text            (Text)
+import qualified Data.Text.Lazy       as TL
+import           Data.Vector          ()
 import           Data.Word
 
 -- |Decode a lazy bytestring using a given Schema.
