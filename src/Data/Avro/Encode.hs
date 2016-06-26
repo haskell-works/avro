@@ -22,6 +22,8 @@ import qualified Data.Foldable           as F
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Int
+import           Data.List.NonEmpty      (NonEmpty(..))
+import qualified Data.List.NonEmpty      as NE
 import           Data.Monoid
 import           Data.Set                (Set)
 import           Data.Text               (Text)
@@ -184,8 +186,8 @@ instance Avro a => Avro (HashMap Text a) where
 
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance Avro a => Avro (Maybe a) where
-  avro Nothing  = AvroM (putI 0             , S.Union [S.Null,S.Int])
-  avro (Just x) = AvroM (putI 1 <> putAvro x, S.Union [S.Null,S.Int])
+  avro Nothing  = AvroM (putI 0             , S.Union (S.Null:|[S.Int]))
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.Union (S.Null:|[S.Int]))
 
 instance Avro () where
   avro () = AvroM (mempty, S.Null)
@@ -207,9 +209,9 @@ instance Avro (T.Value Type) where
       T.Array vec -> avro vec
       T.Map hm    -> avro hm
       T.Record hm -> avro hm
-      T.Union opts sel val ->
+      T.Union opts sel val | F.length opts > 0 ->
         case lookup sel (P.zip opts [0..]) of
-          Just idx -> AvroM (putI idx <> putAvro val, S.Union opts)
+          Just idx -> AvroM (putI idx <> putAvro val, S.Union (NE.fromList opts))
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Fixed bs  -> avro bs
       T.Enum sch@(S.Enum{..}) t ->

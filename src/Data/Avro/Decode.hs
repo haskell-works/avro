@@ -26,6 +26,7 @@ import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
 import           Data.List                  (foldl')
+import qualified Data.List.NonEmpty as NE
 import           Data.Monoid                ((<>))
 import qualified Data.Map                   as Map
 import qualified Data.HashMap.Strict        as HashMap
@@ -139,10 +140,10 @@ getAvroOf (Schema ty0) = go ty0
           Nothing -> fail $ "Decoded Avro enumeration is outside the expected range. Value: " <> show val <> " enum name: " <> show name
     Union ts ->
       do i <- getLong
-         let resolveUnion = flip lookup (zip [0..] ts)
+         let resolveUnion = flip lookup (zip [0..] $ NE.toList ts)
          case resolveUnion i of
-          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName ts)
-          Just t  -> T.Union ts t <$> go t
+          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName $ NE.toList ts)
+          Just t  -> T.Union (NE.toList ts) t <$> go t
     Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
 
  getKVBlocks :: Type -> Get [[(Text,T.Value Type)]]

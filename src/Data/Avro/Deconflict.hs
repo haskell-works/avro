@@ -6,8 +6,9 @@ module Data.Avro.Deconflict
 import           Data.Avro.Schema    as S
 import           Data.Avro.Types     as T
 import           Data.HashMap.Strict (HashMap)
-import           Data.Text           (Text)
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.List.NonEmpty as NE
+import           Data.Text           (Text)
 import qualified Data.Text           as Text
 import qualified Data.Text.Encoding  as Text
 
@@ -35,10 +36,10 @@ resolveSchema e d v
   go a@(S.Record {}) b@(S.Record {}) val
        | name a == name b = resolveRecord a b val
   go (S.Union _) (S.Union ys) val =
-       resolveTwoUnions ys val
+       resolveTwoUnions (NE.toList ys) val
   go nonUnion (S.Union ys) val =
-       resolveReaderUnion nonUnion ys val
-  go (S.Union xs) nonUnion val =
+       resolveReaderUnion nonUnion (NE.toList ys) val
+  go (S.Union _xs) nonUnion val =
        resolveWriterUnion nonUnion val
   go eTy dTy val =
     case val of

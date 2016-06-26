@@ -31,6 +31,8 @@ import           Data.Aeson.Types (Parser,typeMismatch)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable
+import           Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import           Data.Monoid ((<>), First(..))
 import           Data.String
 import           Data.Text (Text)
@@ -80,7 +82,7 @@ data Type
              , doc       :: Maybe Text
              , symbols   :: [Text]
              }
-      | Union { options  :: [Type]
+      | Union { options  :: NonEmpty Type
               }
       | Fixed { name        :: TypeName
               , namespace   :: Maybe Text
@@ -121,8 +123,7 @@ typeName bt =
     Array _  -> "array"
     Map   _  -> "map"
     NamedType (TN t) -> t
-    Union (x:_) -> typeName x
-    Union []    -> error "Invalid Schema used: Union of zero types." -- XXX
+    Union (x:|_) -> typeName x
     _           -> unTN $ name bt
 
 data Field = Field { fldName       :: Text
@@ -141,7 +142,7 @@ instance FromJSON Schema where
   parseJSON val =
     case val of
       o@(A.Object _) -> Schema <$> parseJSON o
-      A.Array arr    -> Schema . Union . V.toList <$> mapM parseJSON arr
+      A.Array arr    -> Schema . Union . NE.fromList . V.toList <$> mapM parseJSON arr
       _              -> typeMismatch "JSON Schema" val
 
 instance ToJSON Schema where
@@ -183,8 +184,8 @@ instance FromJSON Type where
                  <*> o .:? ("aliases" :: Text) .!= []
                  <*> o .:  ("size" :: Text)
         s  -> fail $ "Unrecognized object type: " <> s
-  parseJSON (A.Array arr) =
-           Union <$> mapM parseJSON (V.toList arr)
+  parseJSON (A.Array arr) | V.length arr > 0 =
+           Union . NE.fromList <$> mapM parseJSON (V.toList arr)
   parseJSON foo = typeMismatch "Invalid JSON for Avro Schema" foo
 
 instance ToJSON Type where
@@ -218,7 +219,7 @@ instance ToJSON Type where
                , "namespace" .= namespace
                , "symbols"   .= symbols
                ]
-      Union  {..} -> A.Array $ V.fromList $ P.map toJSON options
+      Union  {..} -> A.Array $ V.fromList $ P.map toJSON (NE.toList options)
       Fixed  {..} ->
         object [ "type"      .= ("fixed" :: Text)
                , "name"      .= name
@@ -280,7 +281,6 @@ instance ToJSON (Ty.Value Type) where
       Ty.Fixed bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
       Ty.Enum _ txt      -> A.String txt
 
--- XXX remove and use 'Result' from Aeson?
 data Result a = Success a | Error String
   deriving (Eq,Ord,Show)
 
@@ -376,12 +376,12 @@ parseAvroJSON env ty av =
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
                   Null -> return $ Ty.Null
-                  Union us | Null `elem` us -> return $ Ty.Union us Null Ty.Null
+                  Union us | Null `elem` NE.toList us -> return $ Ty.Union (NE.toList us) Null Ty.Null
                   _ -> avroTypeMismatch ty "null"
 
-tryAllTypes :: (Text -> Maybe Type) -> [Type] -> A.Value -> Result (Maybe (Ty.Value Type))
+tryAllTypes :: (Text -> Maybe Type) -> NonEmpty Type -> A.Value -> Result (Maybe (Ty.Value Type))
 tryAllTypes env tys av =
-     getFirst <$> foldMap (\t -> First . Just <$> parseAvroJSON env t av) tys
+     getFirst <$> foldMap (\t -> First . Just <$> parseAvroJSON env t av) (NE.toList tys)
                           `catchError` (\_ -> return mempty)
 
 avroTypeMismatch :: Type -> Text -> Result a
