@@ -7,7 +7,6 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text
 import Data.Vector
 
-type UntypedValue = Value ()
 data Value f
       = Null
       | Boolean !Bool

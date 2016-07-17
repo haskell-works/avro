@@ -4,10 +4,12 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
--- | Avro Schemas, represented here as Haskell values of type Schema,
--- provide a method to serialize values, deserialize bytestrings to values
--- and are composable such that an encoding schema and decoding schema can
--- be combined to yield a new decoder.
+-- | Avro 'Schema's, represented here as values of type 'Schema',
+-- describe the serialization and de-serialization of values.
+--
+-- In Avro schemas are compose-able such that encoding data under a schema and
+-- decoding with a variant, such as newer or older version of the original
+-- schema, can be accomplished by using the 'Data.Avro.Deconflict' module.
 module Data.Avro.Schema
   (
    -- * Schema description types
@@ -52,11 +54,8 @@ import qualified Data.Avro.Types as Ty
 data Schema = Schema Type
   deriving (Eq, Show)
 
--- |Avro types are either primitive (string, int, etc)or declared
--- (structures, unions etc).
---
--- The more complex types are records (product types), enum, union (sum
--- types), and Fixed (fixed length vector of bytes).
+-- |Avro types are considered either primitive (string, int, etc) or
+-- complex/declared (structures, unions etc).
 data Type
       =
       -- Basic types
@@ -107,7 +106,7 @@ instance IsString TypeName where
 instance Hashable TypeName where
   hashWithSalt s (TN t) = hashWithSalt s t
 
--- Get the name of the type.  In the case of unions, get the name of the
+-- |Get the name of the type.  In the case of unions, get the name of the
 -- first value in the union schema.
 typeName :: Type -> Text
 typeName bt =
@@ -418,6 +417,10 @@ instance FromJSON Order where
 validateSchema :: Schema -> Parser ()
 validateSchema _sch = return () -- XXX TODO
 
+-- | @buildTypeEnvironment schema@ builds a function mapping type names to
+-- the types declared in the traversed schema.  Notice this function does not
+-- currently handle namespaces in a correct manner, possibly allowing
+-- for bad environment lookups when used on complex schemas.
 buildTypeEnvironment :: Applicative m => (TypeName -> m Type) -> Type -> TypeName -> m Type
 buildTypeEnvironment failure from =
     \forTy -> case HashMap.lookup forTy mp of

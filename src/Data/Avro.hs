@@ -59,6 +59,10 @@ decodeContainer readerSchema bs =
 
 -- |Like 'decodeContainer' but returns the avro-encoded bytes for each
 -- object in the container instead of the Haskell type.
+--
+-- This is particularly useful when slicing up containers into one or more
+-- smaller files.  By extracting the original bytestring it is possible to
+-- avoid re-encoding data.
 decodeContainerBytes :: ByteString -> [[ByteString]]
 decodeContainerBytes bs =
   case D.decodeContainerWith schemaBytes bs of

@@ -1,11 +1,6 @@
-* Grep for XXX and fix - plenty of them.
-* Remove dead code, commented out code and explorations.
-* Recursive types - we aren't yet keeping a proper mapping of observed type names/schemas.
-  - We don't account for identical schemas across name boundaries!
+* Testing framework!
 * Don't use 'Eq' when comparing schemas for compatibility - that includes docs etc.
-* Unions should be non-empty lists.
-* Deal with 'order'
-* Collapse 'BasicType' and 'DeclaredType' into the single 'Type' data type.
+* Deal with 'order'?
 * Refactor modules.
   - Schema also has lots of instances and parsing
   - 'Types' holds value types while shema hold type types - confusing!
@@ -14,12 +9,16 @@
 * Make 'encodeContainer'
 * Dog food some more: Container decoding is manual, use the damned schema!
 * Handle namespaces properly
+  - We don't account for identical schemas across name boundaries when resolving
+    names (env)!
   - We pollute the env with all names unqualified, we should keep each env in a namespace
     and qualify the _query_.
 * More 'FromAvro' and 'ToAvro' instances.
 * From/ToAvro helpers like Aesons '.:'.
 * Int values for enums in additon to text?  'fromEnum' is faster than 'read' at
   the level of FromAvro.
+* Grep for XXX and fix - plenty of them.
+* Remove dead code, commented out code and explorations.
 
 Consider:
 * Encoding unions in JSON is the point we need the encoder schema... right? Crazy.
