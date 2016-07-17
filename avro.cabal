@@ -36,6 +36,7 @@ library
                        binary,
                        bytestring >=0.10 && <0.11,
                        containers,
+                       entropy,
                        fail,
                        hashable,
                        mtl >=2.2 && <2.3,

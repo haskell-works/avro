@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Avro.Encode
   ( -- * High level interface
     getSchema
@@ -12,10 +13,12 @@ module Data.Avro.Encode
   ) where
 
 import Prelude as P
+import qualified Data.Aeson as A
 import           Data.Array              (Array)
 import           Data.Ix                 (Ix)
 import           Data.Bits
 import           Data.ByteString.Lazy    as BL
+import           Data.ByteString.Lazy.Char8 ()
 import qualified Data.ByteString         as B
 import           Data.ByteString.Builder
 import qualified Data.Foldable           as F
@@ -35,12 +38,55 @@ import           Data.Vector             (Vector)
 import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 import           Data.Proxy
+import           System.Entropy (getEntropy)
 
 import Data.Avro.Schema as S
 import Data.Avro.Types  as T
 
 encodeAvro :: Avro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
+
+-- |Encode chunks of objects into a container, using 16 random bytes for
+-- the synchronization markers.
+encodeContainer :: Avro a => [[a]] -> IO BL.ByteString
+encodeContainer xss =
+  do sync <- getEntropy 16
+     return $ encodeContainerWithSync (BL.fromStrict sync) xss
+
+-- |Encode chunks of objects into a container, using the provided
+-- ByteString as the synchronization markers.
+encodeContainerWithSync :: Avro a => BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync syncBytes xss =
+ toLazyByteString $
+  lazyByteString avroMagicBytes <>
+  putAvro (HashMap.fromList [("avro.schema", A.encode objSchema), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
+  lazyByteString syncBytes <>
+  foldMap putBlocks xss
+ where
+  objSchema    = getSchema (P.head (P.head xss))
+  -- headerSchema :: Type A.Value
+  -- headerSchema =
+  --   case A.decode hdrSchemaStr of
+  --     Just x  -> x
+  --     Nothing -> error "Impossible internal Avro error: Failed to decode Avro header schema."
+  -- hdrSchemaStr =
+  --  "{\"type\": \"record\", \"name\": \"org.apache.avro.file.Header\",\
+  --      \\"fields\" : [ {\"name\": \"magic\", \"type\": {\"type\": \"fixed\", \"name\": \"Magic\", \"size\": 4}}\
+  --                 \, {\"name\": \"meta\", \"type\": {\"type\": \"map\", \"values\": \"bytes\"}}\
+  --                 \, {\"name\": \"sync\", \"type\": {\"type\": \"fixed\", \"name\": \"Sync\", \"size\": 16}},\
+  --                 \]\
+  --     \}"
+  putBlocks ys =
+    let nrObj    = P.length ys
+        nrBytes  = BL.length theBytes
+        theBytes = toLazyByteString $ foldMap putAvro ys
+    in putAvro nrObj <>
+       putAvro nrBytes <>
+       lazyByteString theBytes <>
+       lazyByteString syncBytes
+  avroMagicBytes :: BL.ByteString
+  avroMagicBytes = "Obj" <> BL.pack [1]
+
 
 -- XXX make an instance 'Avro Schema'
 -- Would require a schema schema...
