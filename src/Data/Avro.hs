@@ -8,17 +8,19 @@ module Data.Avro
   , decode
   , decodeContainer
   , decodeContainerBytes
-  -- , encode
-  -- , encodeContainer
+  , encode
+  , encodeContainer
+  , encodeContainerWithSync
   ) where
 
 import           Prelude              as P
 import qualified Data.Avro.Decode     as D
 import           Data.Avro.Deconflict as C
-import           Data.Avro.Encode     as E
+import qualified Data.Avro.Encode     as E
 import           Data.Avro.Schema     as S
 import           Data.Avro.Types      as T
 import qualified Data.Binary.Get      as G
+import qualified Data.Binary.Put      as P
 import qualified Data.ByteString      as B
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
@@ -56,6 +58,16 @@ decodeContainer readerSchema bs =
                             Error e   -> error e
       in P.map (P.map dec) val
     Left err -> error err
+
+encode :: ToAvro a => a -> BL.ByteString
+encode = E.encodeAvro . toAvro
+
+encodeContainer :: ToAvro a => [[a]] -> IO BL.ByteString
+encodeContainer = E.encodeContainer . map (map toAvro)
+
+encodeContainerWithSync :: ToAvro a => (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
+encodeContainerWithSync (a,b,c,d) = E.encodeContainerWithSync s . map (map toAvro)
+ where s = P.runPut $ mapM_ P.putWord64le [a,b,c,d]
 
 -- |Like 'decodeContainer' but returns the avro-encoded bytes for each
 -- object in the container instead of the Haskell type.

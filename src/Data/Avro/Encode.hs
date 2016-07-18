@@ -7,6 +7,7 @@ module Data.Avro.Encode
   ( -- * High level interface
     getSchema
   , encodeAvro
+  , encodeContainer, encodeContainerWithSync
   -- * Lower level interface
   , EncodeAvro(..)
   , putAvro
