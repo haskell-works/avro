@@ -1,4 +1,11 @@
 * Testing framework!
+    - Tasty batches
+    - Test round trip of example .avro containers
+    - Test round trip of each type.
+        - Data.Avro level To/From Avro classes
+        - Data.Avro.{Encode,Decode} level EncodeAvro/GetAvro classes
+    - Test 'deconflict' for all pathalogical deconflications
+* In-comment in-haddock tutorials and examples.
 * Don't use 'Eq' when comparing schemas for compatibility - that includes docs etc.
 * Deal with 'order'?
 * Refactor modules.
@@ -6,7 +13,6 @@
   - 'Types' holds value types while shema hold type types - confusing!
 * Make reasonable exceptions instead of using 'error'
 * Lazily decode containers.
-* Make 'encodeContainer'
 * Dog food some more: Container decoding is manual, use the damned schema!
 * Handle namespaces properly
   - We don't account for identical schemas across name boundaries when resolving
@@ -15,7 +21,7 @@
     and qualify the _query_.
 * More 'FromAvro' and 'ToAvro' instances.
 * From/ToAvro helpers like Aesons '.:'.
-* Int values for enums in additon to text?  'fromEnum' is faster than 'read' at
+* Include Int values for enums in additon to text in Value?  'fromEnum' is faster than 'read' at
   the level of FromAvro.
 * Grep for XXX and fix - plenty of them.
 * Remove dead code, commented out code and explorations.
@@ -31,3 +37,6 @@ Consider:
   perhaps yuck.
 * Prettier error messages, such as unresolvable schema's. (or, who cares,
   schemas can't be resolved deal with it?)
+* Support RPC
+* Make a .Generic module for encoding and decoding types that have generic
+  derived.
