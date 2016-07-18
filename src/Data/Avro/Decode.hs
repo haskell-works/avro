@@ -54,33 +54,44 @@ decodeContainerWith schemaToGet bs =
     Right (_,_,a) -> Right a
     Left (_,_,s)  -> Left s
 
+data ContainerHeader = ContainerHeader
+                      { syncBytes       :: BL.ByteString
+                      , decompress      :: BL.ByteString -> Get BL.ByteString
+                      , containedSchema :: Schema
+                      }
+
+nrSyncBytes :: Integral sb => sb
+nrSyncBytes = 16
+
+instance GetAvro ContainerHeader where
+  getAvro =
+   do magic <- getFixed avroMagicSize
+      when (BL.fromStrict magic /= avroMagicBytes)
+           (fail "Invalid magic number at start of container.")
+      metadata <- getMap :: Get (Map.Map Text BL.ByteString) -- avro.schema, avro.codec
+      sync  <- BL.fromStrict <$> getFixed nrSyncBytes
+      codec <- getCodec (Map.lookup "avro.codec" metadata)
+      schema <- case Map.lookup "avro.schema" metadata of
+                  Nothing -> fail "Invalid container object: no schema."
+                  Just s  -> case A.eitherDecode' s of
+                                Left e -> fail ("Can not decode container schema: " <> e)
+                                Right (Schema x) -> return x
+      return $ ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = Schema schema }
+   where avroMagicSize :: Integral a => a
+         avroMagicSize = 4
+
+         avroMagicBytes :: BL.ByteString
+         avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
+
+         getFixed :: Int -> Get ByteString
+         getFixed = G.getByteString
+
+
 getContainerWith :: (Schema -> Get a) -> Get (Schema, [[a]])
 getContainerWith schemaToGet =
- do magic <- getFixed avroMagicSize
-    when (BL.fromStrict magic /= avroMagicBytes)
-         (fail "Invalid magic number at start of container.")
-    metadata <- getMap :: Get (Map.Map Text BL.ByteString) -- avro.schema, avro.codec
-    sync  <- BL.fromStrict <$> getFixed nrSyncBytes
-    codec <- getCodec (Map.lookup "avro.codec" metadata)
-    schema <- case Map.lookup "avro.schema" metadata of
-                Nothing -> fail "Invalid container object: no schema."
-                Just s  -> case A.eitherDecode' s of
-                              Left e -> fail ("Can not decode container schema: " <> e)
-                              Right (Schema x) -> return x
-    (Schema schema,) <$> getBlocks (schemaToGet (Schema schema)) sync codec
+   do ContainerHeader {..} <- getAvro
+      (containedSchema,) <$> getBlocks (schemaToGet containedSchema) syncBytes decompress
   where
-  nrSyncBytes :: Integral sb => sb
-  nrSyncBytes = 16
-
-  avroMagicSize :: Integral a => a
-  avroMagicSize = 4
-
-  avroMagicBytes :: BL.ByteString
-  avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
-
-  getFixed :: Int -> Get ByteString
-  getFixed = G.getByteString
-
   getBlocks :: Get a -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[a]]
   getBlocks getValue sync decompress =
    do nrObj    <- sFromIntegral =<< getLong
@@ -96,8 +107,8 @@ getContainerWith schemaToGet =
         then return [r]
         else (r :) <$> getBlocks getValue sync decompress
 
-  getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
-  getCodec code | Just "null"    <- code =
+getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
+getCodec code | Just "null"    <- code =
                      return return
                 | Just "deflate" <- code =
                      return (maybe (fail "Decompression failed.") return . Z.decompress)

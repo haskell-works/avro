@@ -64,18 +64,6 @@ encodeContainerWithSync syncBytes xss =
   foldMap putBlocks xss
  where
   objSchema    = getSchema (P.head (P.head xss))
-  -- headerSchema :: Type A.Value
-  -- headerSchema =
-  --   case A.decode hdrSchemaStr of
-  --     Just x  -> x
-  --     Nothing -> error "Impossible internal Avro error: Failed to decode Avro header schema."
-  -- hdrSchemaStr =
-  --  "{\"type\": \"record\", \"name\": \"org.apache.avro.file.Header\",\
-  --      \\"fields\" : [ {\"name\": \"magic\", \"type\": {\"type\": \"fixed\", \"name\": \"Magic\", \"size\": 4}}\
-  --                 \, {\"name\": \"meta\", \"type\": {\"type\": \"map\", \"values\": \"bytes\"}}\
-  --                 \, {\"name\": \"sync\", \"type\": {\"type\": \"fixed\", \"name\": \"Sync\", \"size\": 16}},\
-  --                 \]\
-  --     \}"
   putBlocks ys =
     let nrObj    = P.length ys
         nrBytes  = BL.length theBytes

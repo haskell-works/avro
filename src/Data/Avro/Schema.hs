@@ -51,7 +51,7 @@ import qualified Data.Avro.Types as Ty
 -- N.B. It is possible to create a Haskell value (of Schema type) that is
 -- not a valid Avro schema by violating one of the above or one of the
 -- conditions called out in 'validateSchema'.
-data Schema = Schema Type
+data Schema = Schema { unSchema :: Type }
   deriving (Eq, Show)
 
 -- |Avro types are considered either primitive (string, int, etc) or
