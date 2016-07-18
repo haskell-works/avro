@@ -2,9 +2,9 @@
 -- | Avro encoding and decoding routines.
 module Data.Avro
   ( FromAvro(..)
-  , (.:)
-  , Result(..)
   , ToAvro(..)
+  , (.:)
+  , Result(..), badValue
   , decode
   , decodeContainer
   , decodeContainerBytes
@@ -31,6 +31,7 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map             as Map
 import           Data.Monoid          ((<>))
 import           Data.Text            (Text)
+import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
 import           Data.Vector          ()
 import           Data.Word
@@ -151,3 +152,19 @@ badValue v t = fail $ "Unexpected value when decoding for '" <> t <> "': " <> sh
 
 class ToAvro a where
   toAvro :: a -> T.Value Type
+instance ToAvro () where
+  toAvro a = T.Null
+instance ToAvro Int where
+  toAvro = T.Long . fromIntegral
+instance (ToAvro a) => ToAvro (Map.Map Text a) where
+  toAvro = toAvro . HashMap.fromList . Map.toList
+instance (ToAvro a) => ToAvro (HashMap.HashMap Text a) where
+  toAvro mp = T.Map $ HashMap.map toAvro mp
+instance (ToAvro a) => ToAvro (Map.Map TL.Text a) where
+  toAvro = toAvro . HashMap.fromList . map (\(k,v) -> (TL.toStrict k,v)) . Map.toList
+instance (ToAvro a) => ToAvro (HashMap.HashMap TL.Text a) where
+  toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (TL.toStrict k,v)) $ HashMap.toList mp
+instance (ToAvro a) => ToAvro (Map.Map String a) where
+  toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ Map.toList mp
+instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
+  toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ HashMap.toList mp
