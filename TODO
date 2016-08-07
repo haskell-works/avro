@@ -19,7 +19,7 @@
   - We pollute the env with all names unqualified, we should keep each env in a namespace
     and qualify the _query_.
 * More 'FromAvro' and 'ToAvro' instances.
-* More from/ToAvro helpers like Aesons '.:'.
+* More from/ToAvro helpers in the style of Aesons '.:'.
 * Grep for XXX and fix - plenty of them.
 * Remove dead code, commented out code and explorations.
 
