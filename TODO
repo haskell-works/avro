@@ -6,7 +6,6 @@
         - Data.Avro.{Encode,Decode} level EncodeAvro/GetAvro classes
     - Test 'deconflict' for all pathalogical deconflications
 * In-comment in-haddock tutorials and examples.
-* Don't use 'Eq' when comparing schemas for compatibility - that includes docs etc.
 * Deal with 'order'?
 * Refactor modules.
   - Schema also has lots of instances and parsing
@@ -20,20 +19,18 @@
   - We pollute the env with all names unqualified, we should keep each env in a namespace
     and qualify the _query_.
 * More 'FromAvro' and 'ToAvro' instances.
-* From/ToAvro helpers like Aesons '.:'.
-* Include Int values for enums in additon to text in Value?  'fromEnum' is faster than 'read' at
-  the level of FromAvro.
+* More from/ToAvro helpers like Aesons '.:'.
 * Grep for XXX and fix - plenty of them.
 * Remove dead code, commented out code and explorations.
 
 Consider:
-* Encoding unions in JSON is the point we need the encoder schema... right? Crazy.
+* Encoding unions in JSON is the reason we need the encoder schema... right? Crazy.
 * Move to closer integration with Aeson
   * Move to using Aeson 'Value' instead of Avro.Types.Value?
   * Move to using Aeson 'Result'?  I want a MonadExcept instance.
-* Use Attoparsec?
+* Use Attoparsec?  What would be the motivation away from `binary`?
 * Make a composible schema deconfliction `deconflict :: Schema -> Schema ->
-  Schema` which requires embedding the decoding routine inside the schema so
+  Schema` ... requires embedding the decoding routine inside the schema so
   perhaps yuck.
 * Prettier error messages, such as unresolvable schema's. (or, who cares,
   schemas can't be resolved deal with it?)
