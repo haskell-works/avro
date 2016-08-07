@@ -24,10 +24,52 @@
 --     encoder schema to the (potentially different) decoder's schema.
 --   * 'Data.Avro.Schema': Defines the type for Avro schema's and its JSON
 --      encoding/decoding.
+--
+-- Example decoding:
+--
+-- Let's say you have an ADT and related schema:
+--
+-- @
+-- {-# LANGUAGE OverloadedStrings #-}
+-- import qualified Data.Avro.Types as Ty
+-- import Data.Avro.Schema
+-- import Data.Avro
+-- import           Data.List.NonEmpty (NonEmpty(..))
+--
+-- data MyEnum = A | B | C | D deriving (Eq,Ord,Show,Enum,Generic)
+-- data MyStruct = MyStruct (Either MyEnum String) Int
+--
+-- meSchema :: Schema
+-- meSchema = Schema $ mkEnum "MyEnum" [] Nothing Nothing ["A","B","C","D"]
+--
+-- msSchema  :: Schema
+-- msSchema =
+--   Struct "MyStruct" Nothing [] Nothing Nothing
+--       [ fld "enumOrString" eOrS (Just $ String "The Default")
+--       , fld "int" Int (Just (Ty.Int 1))
+--       ]
+--      where
+--      fld nm ty def = Field nm [] Nothing Nothing ty def
+--      eOrS = mkUnion (meSchema :| [String])
+--
+-- instance ToAvro MyEnum where
+--     toAvro = toAvroEnum
+-- instance ToAvro MyStruct where
+--     toAvro (MyStruct ab i) =
+--      record [ "enumOrString" .= ab
+--             , "int"          .= i
+--             ]
+--
+-- main = do
+--   let val = MyStruct (Right "Hello") 1
+--   print (fromAvro (toAvro val) == Success val)
+--
+-- @
 module Data.Avro
   ( FromAvro(..)
   , ToAvro(..)
   , (.:)
+  , (.=), record
   , Result(..), badValue
   , decode
   , decodeContainer
@@ -38,6 +80,7 @@ module Data.Avro
   ) where
 
 import           Prelude              as P
+import           Control.Monad.Except as X
 import qualified Data.Avro.Decode     as D
 import           Data.Avro.Deconflict as C
 import qualified Data.Avro.Encode     as E
@@ -59,6 +102,8 @@ import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
 import           Data.Vector          ()
 import           Data.Word
+
+import GHC.Generics
 
 -- |Decode a lazy bytestring using a given Schema.
 decode :: FromAvro a => Schema -> ByteString -> Result a
@@ -117,6 +162,11 @@ class FromAvro a where
 
 instance FromAvro (Value Type) where
   fromAvro v  = pure v
+instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
+  fromAvro a =
+     (Left <$> fromAvro a) `X.catchError`
+     (\_ -> (Right <$> fromAvro a) `X.catchError`
+             (const $ badValue a "either"))
 instance FromAvro Bool where
   fromAvro (T.Boolean b) = pure b
   fromAvro v             = badValue v "Bool"
@@ -128,6 +178,8 @@ instance FromAvro BL.ByteString where
   fromAvro v          = badValue v "Lazy ByteString"
 instance FromAvro Int where
   fromAvro (T.Int i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
+                      = pure (fromIntegral i)
+  fromAvro (T.Long i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
   fromAvro v          = badValue v "Int"
 instance FromAvro Int32 where
@@ -174,12 +226,23 @@ badValue v t = fail $ "Unexpected value when decoding for '" <> t <> "': " <> sh
     Nothing -> fail $ "Requested field not available: " <> show key
     Just v  -> fromAvro v
 
+(.=)  :: ToAvro a => Text -> a -> (Text,T.Value Type)
+(.=) nm val = (nm,toAvro val)
+
+record :: Foldable f => f (Text,T.Value Type) -> T.Value Type
+record = T.Record . HashMap.fromList . toList
+
 class ToAvro a where
   toAvro :: a -> T.Value Type
 instance ToAvro () where
   toAvro a = T.Null
 instance ToAvro Int where
   toAvro = T.Long . fromIntegral
+instance ToAvro Text.Text where
+  toAvro = T.String 
+instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
+  toAvro (Left a)  = toAvro a
+  toAvro (Right b) = toAvro b
 instance (ToAvro a) => ToAvro (Map.Map Text a) where
   toAvro = toAvro . HashMap.fromList . Map.toList
 instance (ToAvro a) => ToAvro (HashMap.HashMap Text a) where
@@ -198,6 +261,6 @@ instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
 -- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type
 -- enumToAvro e = T.Enum ty (show e)
 --  where
---   ty = S.Enum nm [] Nothing Nothing (map (T.pack . show) [minBound..maxBound])
+--   ty = S.Enum nm Nothing [] Nothing (map (Text.pack . show) [minBound..maxBound])
 --   nm = datatypeName g
 --   g  = from e -- GHC generics

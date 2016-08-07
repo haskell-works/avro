@@ -78,9 +78,9 @@ instance GetAvro ContainerHeader where
       schema <- case Map.lookup "avro.schema" metadata of
                   Nothing -> fail "Invalid container object: no schema."
                   Just s  -> case A.eitherDecode' s of
-                                Left e -> fail ("Can not decode container schema: " <> e)
-                                Right (Schema x) -> return x
-      return $ ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = Schema schema }
+                                Left e  -> fail ("Can not decode container schema: " <> e)
+                                Right x -> return x
+      return $ ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
    where avroMagicSize :: Integral a => a
          avroMagicSize = 4
 
@@ -122,7 +122,7 @@ getCodec code | Just "null"    <- code =
 
 {-# INLINABLE getAvroOf #-}
 getAvroOf :: Schema -> Get (T.Value Type)
-getAvroOf (Schema ty0) = go ty0
+getAvroOf ty0 = go ty0
  where
  env = S.buildTypeEnvironment envFail ty0
  envFail t = fail $ "Named type not in schema: " <> show t

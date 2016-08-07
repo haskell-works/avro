@@ -4,7 +4,6 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StrictData #-}
 -- | Avro 'Schema's, represented here as values of type 'Schema',
 -- describe the serialization and de-serialization of values.
 --
@@ -14,7 +13,7 @@
 module Data.Avro.Schema
   (
    -- * Schema description types
-    Schema(..), Type(..)
+    Schema, Type(..)
   , Field(..), Order(..)
   , TypeName(..)
   , mkEnum, mkUnion
@@ -56,8 +55,7 @@ import Text.Show.Functions
 -- N.B. It is possible to create a Haskell value (of Schema type) that is
 -- not a valid Avro schema by violating one of the above or one of the
 -- conditions called out in 'validateSchema'.
-newtype Schema = Schema { unSchema :: Type }
-  deriving (Eq, Show)
+type Schema = Type
 
 -- |Avro types are considered either primitive (string, int, etc) or
 -- complex/declared (structures, unions etc).
@@ -75,14 +73,14 @@ data Type
       -- Declared types
       | Record { name      :: TypeName
                , namespace :: Maybe Text
-               , doc       :: Maybe Text
                , aliases   :: [TypeName]
+               , doc       :: Maybe Text
                , order     :: Maybe Order
                , fields    :: [Field]
                }
       | Enum { name      :: TypeName
-             , aliases   :: [TypeName]
              , namespace :: Maybe Text
+             , aliases   :: [TypeName]
              , doc       :: Maybe Text
              , symbols   :: [Text]
              , symbolLookup :: Int64 -> Maybe Text
@@ -114,11 +112,17 @@ instance Eq Type where
   Union a _ == Union b _ = a == b
   Fixed _ _ _ s == Fixed _ _ _ s2 = s == s2
 
+-- | @mkEnum name aliases namespace docs syms@ Constructs an `Enum` schema using
+-- the enumeration type's name, aliases (if any), namespace, documentation, and list of
+-- symbols that inhabit the enumeration.
 mkEnum :: TypeName -> [TypeName] -> Maybe Text -> Maybe Text -> [Text] -> Type
-mkEnum n as ns d ss = Enum n as ns d ss (\i -> IM.lookup (fromIntegral i) mp)
+mkEnum n as ns d ss = Enum n ns as d ss (\i -> IM.lookup (fromIntegral i) mp)
  where
  mp = IM.fromList (zip [0..] ss)
 
+-- | @mkUnion subTypes@ Defines a union of the provided subTypes.  N.B. it is
+-- invalid Avro to include another union or to have more than one of the same
+-- type as a direct member of the union.  No check is done for this condition!
 mkUnion :: NonEmpty Type -> Type
 mkUnion os = Union os (\i -> IM.lookup (fromIntegral i) mp)
  where mp = IM.fromList (zip [0..] $ NE.toList os)
@@ -137,48 +141,38 @@ instance IsString TypeName where
   fromString = TN . fromString
 
 instance Hashable TypeName where
-  hashWithSalt s (TN t) = hashWithSalt s t
+  hashWithSalt s (TN t) = hashWithSalt (hashWithSalt s ("AvroTypeName" :: Text)) t
 
 -- |Get the name of the type.  In the case of unions, get the name of the
 -- first value in the union schema.
 typeName :: Type -> Text
 typeName bt =
   case bt of
-    Null     -> "null"
-    Boolean  -> "boolean"
-    Int      -> "int"
-    Long     -> "long"
-    Float    -> "float"
-    Double   -> "double"
-    Bytes    -> "bytes"
-    String   -> "string"
-    Array _  -> "array"
-    Map   _  -> "map"
+    Null             -> "null"
+    Boolean          -> "boolean"
+    Int              -> "int"
+    Long             -> "long"
+    Float            -> "float"
+    Double           -> "double"
+    Bytes            -> "bytes"
+    String           -> "string"
+    Array _          -> "array"
+    Map   _          -> "map"
     NamedType (TN t) -> t
-    Union (x:|_) _ -> typeName x
-    _           -> unTN $ name bt
+    Union (x:|_) _   -> typeName x
+    _                -> unTN $ name bt
 
 data Field = Field { fldName       :: Text
+                   , fldAliases    :: [Text]
                    , fldDoc        :: Maybe Text
+                   , fldOrder      :: Maybe Order
                    , fldType       :: Type
                    , fldDefault    :: Maybe (Ty.Value Type)
-                   , fldOrder      :: Maybe Order
-                   , fldAliases    :: [Text]
                    }
   deriving (Eq, Show)
 
 data Order = Ascending | Descending | Ignore
   deriving (Eq, Ord, Show)
-
-instance FromJSON Schema where
-  parseJSON val =
-    case val of
-      o@(A.Object _) -> Schema <$> parseJSON o
-      A.Array arr    -> Schema . mkUnion . NE.fromList . V.toList <$> mapM parseJSON arr
-      _              -> typeMismatch "JSON Schema" val
-
-instance ToJSON Schema where
-  toJSON (Schema x) = toJSON x
 
 instance FromJSON Type where
   parseJSON (A.String s) =
@@ -200,8 +194,8 @@ instance FromJSON Type where
         "record" ->
           Record <$> o .:  ("name" :: Text)
                  <*> o .:? ("namespace" :: Text)
+                 <*> o .:? ("aliases" :: Text) .!= []
                  <*> o .:? ("doc" :: Text)
-                 <*> o .:? ("aliases" :: Text)  .!= []
                  <*> o .:? ("order" :: Text) .!= Just Ascending
                  <*> o .:  ("fields" :: Text)
         "enum"   ->
@@ -280,7 +274,7 @@ instance FromJSON Field where
                 Nothing          -> return Nothing 
        od  <- o .:? ("order" :: Text)    .!= Just Ascending
        al  <- o .:? ("aliases" :: Text)  .!= []
-       return $ Field nm doc ty def od al
+       return $ Field nm al doc od ty def
 
   parseJSON j = typeMismatch "Field " j
 

@@ -17,7 +17,7 @@ import qualified Data.Text.Encoding  as Text
 -- encoded/decoded with the writer's schema into the form specified by the
 -- reader's schema.
 deconflict :: Schema -> Schema -> T.Value Type -> Either String (T.Value Type)
-deconflict (Schema writerType) (Schema readerType) val =
+deconflict writerType readerType val =
   resolveSchema writerType readerType val
 
 resolveSchema :: Type -> Type -> T.Value Type -> Either String (T.Value Type)

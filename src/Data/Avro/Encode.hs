@@ -86,7 +86,7 @@ putAvro :: EncodeAvro a => a -> Builder
 putAvro   = fst . runAvro . avro
 
 getSchema :: forall a. EncodeAvro a => a -> Schema
-getSchema _ = Schema (getType (Proxy :: Proxy a))
+getSchema _ = getType (Proxy :: Proxy a)
 
 getType :: EncodeAvro a => Proxy a -> Type
 getType p = snd (runAvro (avro (undefined `asProxyTypeOf` p)))
