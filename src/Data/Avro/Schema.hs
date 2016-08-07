@@ -111,6 +111,7 @@ instance Eq Type where
   Enum _ _ _ _ s _ == Enum _ _ _ _ s2 _ = s == s2
   Union a _ == Union b _ = a == b
   Fixed _ _ _ s == Fixed _ _ _ s2 = s == s2
+  _ == _ = False
 
 -- | @mkEnum name aliases namespace docs syms@ Constructs an `Enum` schema using
 -- the enumeration type's name, aliases (if any), namespace, documentation, and list of
