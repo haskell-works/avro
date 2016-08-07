@@ -217,14 +217,17 @@ instance EncodeAvro a => EncodeAvro (HashMap Text a) where
 
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance EncodeAvro a => EncodeAvro (Maybe a) where
-  avro Nothing  = AvroM (putI 0             , S.Union (S.Null:|[S.Int]))
-  avro (Just x) = AvroM (putI 1 <> putAvro x, S.Union (S.Null:|[S.Int]))
+  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null:|[S.Int]))
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null:|[S.Int]))
 
 instance EncodeAvro () where
   avro () = AvroM (mempty, S.Null)
 
 instance EncodeAvro Bool where
   avro b = AvroM (word8 $ fromIntegral $ fromEnum b, S.Boolean)
+
+--------------------------------------------------------------------------------
+--  Common Intermediate Representation Encoding
 
 instance EncodeAvro (T.Value Type) where
   avro v =
@@ -242,12 +245,7 @@ instance EncodeAvro (T.Value Type) where
       T.Record hm -> avro hm
       T.Union opts sel val | F.length opts > 0 ->
         case lookup sel (P.zip (NE.toList opts) [0..]) of
-          Just idx -> AvroM (putI idx <> putAvro val, S.Union opts)
+          Just idx -> AvroM (putI idx <> putAvro val, S.mkUnion opts)
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Fixed bs  -> avro bs
-      T.Enum sch@(S.Enum{..}) t ->
-                case lookup t (P.zip symbols [0..]) of
-                      Nothing -> error "Enum symbol not in schema."
-                      Just ix -> AvroM ( putI ix
-                                       , sch
-                                       )
+      T.Enum sch@(S.Enum{..}) ix t -> AvroM (putI ix, sch)

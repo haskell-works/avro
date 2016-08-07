@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE BangPatterns        #-}
 module Data.Avro.Decode
   ( decodeAvro
   , decodeContainer
@@ -42,9 +43,11 @@ import qualified Data.Avro.Types as T
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
 decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
+{-# INLINABLE decodeAvro #-}
 
 decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Type]])
 decodeContainer = decodeContainerWith getAvroOf
+{-# INLINABLE decodeContainer #-}
 
 decodeContainerWith :: (Schema -> Get a)
                     -> BL.ByteString
@@ -53,11 +56,12 @@ decodeContainerWith schemaToGet bs =
   case runGetOrFail (getContainerWith schemaToGet) bs of
     Right (_,_,a) -> Right a
     Left (_,_,s)  -> Left s
+{-# INLINABLE decodeContainerWith #-}
 
 data ContainerHeader = ContainerHeader
-                      { syncBytes       :: BL.ByteString
+                      { syncBytes       :: !BL.ByteString
                       , decompress      :: BL.ByteString -> Get BL.ByteString
-                      , containedSchema :: Schema
+                      , containedSchema :: !Schema
                       }
 
 nrSyncBytes :: Integral sb => sb
@@ -110,12 +114,13 @@ getContainerWith schemaToGet =
 getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
 getCodec code | Just "null"    <- code =
                      return return
-                | Just "deflate" <- code =
+              | Just "deflate" <- code =
                      return (maybe (fail "Decompression failed.") return . Z.decompress)
-                | Just x <- code =
+              | Just x <- code =
                      fail ("Unrecognized codec: " <> BC.unpack x)
-                | otherwise = return return
+              | otherwise = return return
 
+{-# INLINABLE getAvroOf #-}
 getAvroOf :: Schema -> Get (T.Value Type)
 getAvroOf (Schema ty0) = go ty0
  where
@@ -145,14 +150,13 @@ getAvroOf (Schema ty0) = go ty0
          T.Record . HashMap.fromList <$> mapM getField fields
     Enum {..} ->
       do val <- getLong
-         let resolveEnum = flip lookup (zip [0..] symbols)
-         case resolveEnum val of
-          Just e  -> return (T.Enum ty e)
-          Nothing -> fail $ "Decoded Avro enumeration is outside the expected range. Value: " <> show val <> " enum name: " <> show name
-    Union ts ->
+         let sym = case symbolLookup val of
+                      Just e  -> e
+                      Nothing -> "" -- empty string for 'missing' symbols (alternative is an error or exception)
+         pure (T.Enum ty (fromIntegral val) sym)
+    Union ts unionLookup ->
       do i <- getLong
-         let resolveUnion = flip lookup (zip [0..] $ NE.toList ts)
-         case resolveUnion i of
+         case unionLookup i of
           Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName $ NE.toList ts)
           Just t  -> T.Union ts t <$> go t
     Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
@@ -164,6 +168,8 @@ getAvroOf (Schema ty0) = go ty0
       then return []
       else do vs <- replicateM (fromIntegral blockLength) ((,) <$> getString <*> go t)
               (vs:) <$> getKVBlocks t
+ {-# INLINE getKVBlocks #-}
+
  getBlocksOf :: Type -> Get [[T.Value Type]]
  getBlocksOf t =
   do blockLength <- abs <$> getLong
@@ -171,7 +177,7 @@ getAvroOf (Schema ty0) = go ty0
       then return []
       else do vs <- replicateM (fromIntegral blockLength) (go t)
               (vs:) <$> getBlocksOf t
-
+ {-# INLINE getBlocksOf #-}
 
 class GetAvro a where
   getAvro :: Get a
@@ -205,7 +211,6 @@ instance GetAvro a => GetAvro (Maybe a) where
         0 -> return Nothing
         1 -> Just <$> getAvro
         n -> fail $ "Invalid tag for expected {null,a} Avro union, received: " <> show n
-
 
 instance GetAvro a => GetAvro (Array.Array Int a) where
   getAvro =

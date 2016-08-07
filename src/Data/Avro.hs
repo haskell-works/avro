@@ -1,5 +1,29 @@
 {-# LANGUAGE FlexibleInstances #-}
 -- | Avro encoding and decoding routines.
+--
+-- This library provides a high level interface for encoding (and decoding)
+-- Haskell values in Apache's Avro serialization format.  The goal is to
+-- match Aeson's API whenever reasonable, meaning user experience with one
+-- effectively translate to the other.
+--
+-- Avro RPC is not currently supported.
+--
+-- **Library Structure**
+--
+-- The library structure includes:
+--   * This module, 'Data.Avro', providing a high-level interface via
+--     classes of 'FromAvro' and 'ToAvro' for decoding and encoding values.
+--   * 'Data.Avro.Type' define the types of Avro data, providing a common
+--      (intermediate) representation for any data that is encoded or decoded
+--      by Data.Avro.
+--   * 'Data.Avro.Encode' and 'Data.Avro.Decode': More
+--     efficient conversion capable of avoiding the intermediate representation.
+--     Also, the implementation of the en/decoding of the intermediate
+--     representation.
+--   * 'Data.Avro.Deconflict': translate decoded data from an
+--     encoder schema to the (potentially different) decoder's schema.
+--   * 'Data.Avro.Schema': Defines the type for Avro schema's and its JSON
+--      encoding/decoding.
 module Data.Avro
   ( FromAvro(..)
   , ToAvro(..)
@@ -168,3 +192,12 @@ instance (ToAvro a) => ToAvro (Map.Map String a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ Map.toList mp
 instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ HashMap.toList mp
+
+-- @enumToAvro val@ will generate an Avro encoded value of enum suitable
+-- for serialization ('encode').
+-- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type
+-- enumToAvro e = T.Enum ty (show e)
+--  where
+--   ty = S.Enum nm [] Nothing Nothing (map (T.pack . show) [minBound..maxBound])
+--   nm = datatypeName g
+--   g  = from e -- GHC generics

@@ -36,11 +36,11 @@ resolveSchema e d v
        | name a == name b && size a == size b = Right val
   go a@(S.Record {}) b@(S.Record {}) val
        | name a == name b = resolveRecord a b val
-  go (S.Union _) (S.Union ys) val =
+  go (S.Union _ _) (S.Union ys _) val =
        resolveTwoUnions ys val
-  go nonUnion (S.Union ys) val =
+  go nonUnion (S.Union ys _) val =
        resolveReaderUnion nonUnion ys val
-  go (S.Union _xs) nonUnion val =
+  go (S.Union _xs _) nonUnion val =
        resolveWriterUnion nonUnion val
   go eTy dTy val =
     case val of
@@ -56,9 +56,9 @@ resolveSchema e d v
 
 -- The writer's symbol must be present in the reader's enum
 resolveEnum :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveEnum e d val@(T.Enum _ txt)
-   | txt `elem` symbols d = Right val
-   | otherwise = Left "Decoded enum does not appear in reader's symbol list."
+resolveEnum e d val@(T.Enum _ _ _txt) = Right val
+   -- | txt `elem` symbols d = Right val
+   -- | otherwise = Left "Decoded enum does not appear in reader's symbol list."
 
 resolveTwoUnions :: NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
 resolveTwoUnions  ds (T.Union _ eTy val) =
