@@ -8,6 +8,7 @@ import           Data.List.NonEmpty (NonEmpty(..))
 data MyEnum = A | B | C | D deriving (Eq,Ord,Show,Enum)
 data MyStruct = MyStruct (Either MyEnum Text) Int deriving (Eq,Ord,Show)
 
+-- Explicit 'Schema' types can be useful for making containers
 meSchema :: Schema
 meSchema = mkEnum "MyEnum" [] Nothing Nothing ["A","B","C","D"]
 
@@ -23,11 +24,14 @@ msSchema =
 
 instance ToAvro MyEnum where
     toAvro = toAvro . fromEnum
+    schema = pure meSchema
+
 instance ToAvro MyStruct where
     toAvro (MyStruct ab i) =
      record [ "enumOrString" .= ab
             , "intvalue"     .= i
             ]
+    schema = pure msSchema
 instance FromAvro MyStruct where
     fromAvro (Ty.Record r) =
         MyStruct <$> r .: "enumOrString"

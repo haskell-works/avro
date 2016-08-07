@@ -1,4 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 -- | Avro encoding and decoding routines.
 --
 -- This library provides a high level interface for encoding (and decoding)
@@ -68,6 +71,7 @@
 module Data.Avro
   ( FromAvro(..)
   , ToAvro(..)
+  , Avro
   , (.:)
   , (.=), record
   , Result(..), badValue
@@ -97,9 +101,11 @@ import           Data.Int
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map             as Map
 import           Data.Monoid          ((<>))
+import           Data.Proxy
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
+import           Data.Tagged
 import           Data.Vector          ()
 import           Data.Word
 
@@ -157,16 +163,18 @@ decodeContainerBytes bs =
                                  G.bytesRead
        G.getLazyByteString (end-start)
 
+type Avro a = (FromAvro a, ToAvro a)
 class FromAvro a where
   fromAvro :: Value Type -> Result a
 
 instance FromAvro (Value Type) where
   fromAvro v  = pure v
-instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
-  fromAvro a =
-     (Left <$> fromAvro a) `X.catchError`
-     (\_ -> (Right <$> fromAvro a) `X.catchError`
-             (const $ badValue a "either"))
+instance (ToAvro a, ToAvro b, FromAvro a, FromAvro b) => FromAvro (Either a b) where
+  fromAvro e@(T.Union _ v x) =
+    if | v == untag (schema :: Tagged a Type) -> Left <$> fromAvro x
+       | v == untag (schema :: Tagged b Type) -> Right <$> fromAvro x
+       | otherwise -> badValue e "either"
+  fromAvro x = badValue x "either"
 instance FromAvro Bool where
   fromAvro (T.Boolean b) = pure b
   fromAvro v             = badValue v "Bool"
@@ -234,27 +242,45 @@ record = T.Record . HashMap.fromList . toList
 
 class ToAvro a where
   toAvro :: a -> T.Value Type
+  schema :: Tagged a Type
+
+schemaOf :: (ToAvro a) => a -> Type
+schemaOf = witness schema
+
 instance ToAvro () where
   toAvro a = T.Null
+  schema = Tagged S.Null
 instance ToAvro Int where
   toAvro = T.Long . fromIntegral
+  schema = Tagged S.Long
 instance ToAvro Text.Text where
-  toAvro = T.String 
+  toAvro = T.String
+  schema = Tagged S.String
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
-  toAvro (Left a)  = toAvro a
-  toAvro (Right b) = toAvro b
+  toAvro e =
+    let sch@(l:|[r]) = options (schemaOf e)
+    in case e of
+         Left a  -> T.Union sch l (toAvro a)
+         Right b -> T.Union sch r (toAvro b)
+  schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [untag (schema :: Tagged b Type)])
 instance (ToAvro a) => ToAvro (Map.Map Text a) where
   toAvro = toAvro . HashMap.fromList . Map.toList
+  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
 instance (ToAvro a) => ToAvro (HashMap.HashMap Text a) where
   toAvro mp = T.Map $ HashMap.map toAvro mp
+  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
 instance (ToAvro a) => ToAvro (Map.Map TL.Text a) where
   toAvro = toAvro . HashMap.fromList . map (\(k,v) -> (TL.toStrict k,v)) . Map.toList
+  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
 instance (ToAvro a) => ToAvro (HashMap.HashMap TL.Text a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (TL.toStrict k,v)) $ HashMap.toList mp
+  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
 instance (ToAvro a) => ToAvro (Map.Map String a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ Map.toList mp
+  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
 instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ HashMap.toList mp
+  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
 
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').
