@@ -77,8 +77,8 @@ resolveWriterUnion :: Type -> T.Value Type -> Either String (T.Value Type)
 resolveWriterUnion reader (T.Union _ ty val) = resolveSchema ty reader val
 
 resolveRecord :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveRecord eRec dRec (T.Record fldVals)  =
- T.Record . HashMap.fromList <$> mapM (resolveFields fldVals (fields eRec)) (fields dRec)
+resolveRecord eRec dRec (T.Record ty fldVals)  =
+ T.Record ty . HashMap.fromList <$> mapM (resolveFields fldVals (fields eRec)) (fields dRec)
 
 -- For each field of the decoders, lookup the field in the hash map
 --  1) If the field exists, call 'resolveSchema'

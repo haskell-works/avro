@@ -147,7 +147,7 @@ getAvroOf ty0 = go ty0
     NamedType tn -> env tn >>= go
     Record {..} ->
       do let getField (Field {..}) = (fldName,) <$> go fldType
-         T.Record . HashMap.fromList <$> mapM getField fields
+         T.Record ty . HashMap.fromList <$> mapM getField fields
     Enum {..} ->
       do val <- getLong
          let sym = case symbolLookup val of

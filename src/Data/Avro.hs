@@ -216,12 +216,12 @@ instance FromAvro TL.Text where
   fromAvro v = badValue v "LazyText"
 
 instance (FromAvro a) => FromAvro (Map.Map Text a) where
-  fromAvro (T.Record mp) = mapM fromAvro $ Map.fromList (HashMap.toList mp)
+  fromAvro (T.Record _ mp) = mapM fromAvro $ Map.fromList (HashMap.toList mp)
   fromAvro (T.Map mp)  = mapM fromAvro $ Map.fromList (HashMap.toList mp)
   fromAvro v = badValue v "Map Text a"
 
 instance (FromAvro a) => FromAvro (HashMap.HashMap Text a) where
-  fromAvro (T.Record mp) = mapM fromAvro mp
+  fromAvro (T.Record _ mp) = mapM fromAvro mp
   fromAvro (T.Map mp)    = mapM fromAvro mp
   fromAvro v = badValue v "HashMap Text a"
 
@@ -237,8 +237,8 @@ badValue v t = fail $ "Unexpected value when decoding for '" <> t <> "': " <> sh
 (.=)  :: ToAvro a => Text -> a -> (Text,T.Value Type)
 (.=) nm val = (nm,toAvro val)
 
-record :: Foldable f => f (Text,T.Value Type) -> T.Value Type
-record = T.Record . HashMap.fromList . toList
+record :: Foldable f => Type -> f (Text,T.Value Type) -> T.Value Type
+record ty = T.Record ty . HashMap.fromList . toList
 
 class ToAvro a where
   toAvro :: a -> T.Value Type

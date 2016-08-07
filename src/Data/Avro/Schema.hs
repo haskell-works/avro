@@ -292,20 +292,20 @@ instance ToJSON Field where
 instance ToJSON (Ty.Value Type) where
   toJSON av =
     case av of
-      Ty.Null            -> A.Null
-      Ty.Boolean b       -> A.Bool b
-      Ty.Int i           -> A.Number (fromIntegral i)
-      Ty.Long i          -> A.Number (fromIntegral i)
-      Ty.Float f         -> A.Number (realToFrac f)
-      Ty.Double d        -> A.Number (realToFrac d)
-      Ty.Bytes bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))
-      Ty.String t        -> A.String t
-      Ty.Array vec       -> A.Array (V.map toJSON vec)
-      Ty.Map mp          -> A.Object (HashMap.map toJSON mp)
-      Ty.Record flds     -> A.Object (HashMap.map toJSON flds)
+      Ty.Null              -> A.Null
+      Ty.Boolean b         -> A.Bool b
+      Ty.Int i             -> A.Number (fromIntegral i)
+      Ty.Long i            -> A.Number (fromIntegral i)
+      Ty.Float f           -> A.Number (realToFrac f)
+      Ty.Double d          -> A.Number (realToFrac d)
+      Ty.Bytes bs          -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))
+      Ty.String t          -> A.String t
+      Ty.Array vec         -> A.Array (V.map toJSON vec)
+      Ty.Map mp            -> A.Object (HashMap.map toJSON mp)
+      Ty.Record _ flds     -> A.Object (HashMap.map toJSON flds)
       Ty.Union _ _ Ty.Null -> A.Null
       Ty.Union _ ty val    -> object [ typeName ty .= val ]
-      Ty.Fixed bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
+      Ty.Fixed bs          -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
@@ -389,14 +389,14 @@ parseAvroJSON env ty av =
       A.Object obj ->
         case ty of
           Map mTy     -> Ty.Map <$> mapM (parseAvroJSON env mTy) obj
-          Record {..} -> -- Ty.Record <$> HashMap.mapM (parseAvroJSON env rTy) obj
+          Record {..} ->
            do let lkAndParse f =
                     case HashMap.lookup (fldName f) obj of
                       Nothing -> case fldDefault f of
                                   Just v  -> return v
                                   Nothing -> fail $ "Decode failure: No record field '" <> T.unpack (fldName f) <> "' and no default in schema."
                       Just v  -> parseAvroJSON env (fldType f) v
-              Ty.Record . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
+              Ty.Record ty . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
           Union tys _ -> do
             f <- tryAllTypes env tys av
             maybe (fail $ "No match for given record in union '" <> show (typeName ty) <> "'.") pure f

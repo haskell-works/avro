@@ -29,6 +29,7 @@ import           Data.Int
 import           Data.List.NonEmpty      (NonEmpty(..))
 import qualified Data.List.NonEmpty      as NE
 import           Data.Monoid
+import           Data.Maybe              (catMaybes)
 import           Data.Set                (Set)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
@@ -242,7 +243,10 @@ instance EncodeAvro (T.Value Type) where
       T.String t  -> avro t
       T.Array vec -> avro vec
       T.Map hm    -> avro hm
-      T.Record hm -> avro hm
+      T.Record ty hm ->
+        let bs = foldMap putAvro (catMaybes $ P.map (\f -> HashMap.lookup f hm) fs)
+            fs = P.map fldName (fields ty)
+        in AvroM (bs, ty)
       T.Union opts sel val | F.length opts > 0 ->
         case lookup sel (P.zip (NE.toList opts) [0..]) of
           Just idx -> AvroM (putI idx <> putAvro val, S.mkUnion opts)
