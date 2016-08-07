@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StrictData #-}
 -- | Avro 'Schema's, represented here as values of type 'Schema',
 -- describe the serialization and de-serialization of values.
 --
@@ -364,7 +365,7 @@ parseAvroJSON env ty av =
           String    -> return $ Ty.String s
           Enum {..} ->
               if s `elem` symbols
-                then return $ Ty.Enum ty (negate 1) s
+                then return $ Ty.Enum ty (maybe (error "IMPOSSIBLE BUG") id $ lookup s (zip symbols [0..])) s
                 else fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
           Union tys _ -> do
             f <- tryAllTypes env tys av
