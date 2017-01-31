@@ -81,6 +81,7 @@ module Data.Avro
   , encode
   , encodeContainer
   , encodeContainerWithSync
+  , schemaOf
   ) where
 
 import           Prelude              as P
