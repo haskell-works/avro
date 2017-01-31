@@ -257,6 +257,12 @@ instance ToAvro () where
 instance ToAvro Int where
   toAvro = T.Long . fromIntegral
   schema = Tagged S.Long
+instance ToAvro Int32 where
+  toAvro = T.Int
+  schema = Tagged S.Int
+instance ToAvro Int64 where
+  toAvro = T.Long
+  schema = Tagged S.Long
 instance ToAvro Text.Text where
   toAvro = T.String
   schema = Tagged S.String
