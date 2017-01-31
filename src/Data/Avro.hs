@@ -248,6 +248,9 @@ class ToAvro a where
 schemaOf :: (ToAvro a) => a -> Type
 schemaOf = witness schema
 
+instance ToAvro Bool where
+  toAvro = T.Boolean
+  schema = Tagged S.Boolean
 instance ToAvro () where
   toAvro a = T.Null
   schema = Tagged S.Null
