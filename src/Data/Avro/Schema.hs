@@ -289,12 +289,15 @@ instance FromJSON Field where
   parseJSON j = typeMismatch "Field " j
 
 instance ToJSON Field where
-  toJSON (Field {..}) =
-    object [ "name"    .= fldName
-           , "doc"     .= fldDoc
+  toJSON Field {..} =
+    let opts = catMaybes
+           [ ("order" .=)     <$> fldOrder
+           , ("doc" .=)       <$> fldDoc
+           , ("default" .=)   <$> fldDefault
+           ]
+     in object $ opts ++
+           [ "name"    .= fldName
            , "type"    .= fldType
-           , "default" .= fldDefault
-           , "order"   .= fldOrder
            , "aliases" .= fldAliases
            ]
 
