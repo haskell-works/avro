@@ -4,6 +4,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Avro.Schema
 import Data.Avro
 import Data.Text (Text)
+import Data.Map as M
 import qualified Data.Text as Text
 import           Data.List.NonEmpty (NonEmpty(..))
 
