@@ -81,6 +81,7 @@ module Data.Avro
   , encode
   , encodeContainer
   , encodeContainerWithSync
+  , schemaOf
   ) where
 
 import           Prelude              as P
@@ -197,7 +198,9 @@ instance FromAvro Int64 where
   fromAvro (T.Long i) = pure i
   fromAvro (T.Int i)  = pure (fromIntegral i)
   fromAvro v = badValue v "Int64"
-
+instance FromAvro Double where
+  fromAvro (T.Double d) = pure d
+  fromAvro v            = badValue v "Double"
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
   fromAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromAvro v
@@ -247,12 +250,24 @@ class ToAvro a where
 schemaOf :: (ToAvro a) => a -> Type
 schemaOf = witness schema
 
+instance ToAvro Bool where
+  toAvro = T.Boolean
+  schema = Tagged S.Boolean
 instance ToAvro () where
   toAvro a = T.Null
   schema = Tagged S.Null
 instance ToAvro Int where
   toAvro = T.Long . fromIntegral
   schema = Tagged S.Long
+instance ToAvro Int32 where
+  toAvro = T.Int
+  schema = Tagged S.Int
+instance ToAvro Int64 where
+  toAvro = T.Long
+  schema = Tagged S.Long
+instance ToAvro Double where
+  toAvro = T.Double
+  schema = Tagged S.Double
 instance ToAvro Text.Text where
   toAvro = T.String
   schema = Tagged S.String
@@ -281,7 +296,13 @@ instance (ToAvro a) => ToAvro (Map.Map String a) where
 instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ HashMap.toList mp
   schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
-
+instance (ToAvro a) => ToAvro (Maybe a) where
+  toAvro a =
+    let sch@(l:|[r]) = options (schemaOf a)
+    in case a of
+      Nothing -> T.Union sch S.Null (toAvro ())
+      Just v  -> T.Union sch r (toAvro v)
+  schema = Tagged $ mkUnion (S.Null:| [untag (schema :: Tagged a Type)])
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').
 -- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type

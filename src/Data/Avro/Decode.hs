@@ -115,7 +115,7 @@ getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteStrin
 getCodec code | Just "null"    <- code =
                      return return
               | Just "deflate" <- code =
-                     return (maybe (fail "Decompression failed.") return . Z.decompress)
+                     return (either (fail . show) return . Z.decompress)
               | Just x <- code =
                      fail ("Unrecognized codec: " <> BC.unpack x)
               | otherwise = return return

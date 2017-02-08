@@ -36,6 +36,7 @@ import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import           Data.Maybe (catMaybes)
 import           Data.Monoid ((<>), First(..))
 import           Data.String
 import           Data.Text (Text)
@@ -230,27 +231,35 @@ instance ToJSON Type where
       Map tn   -> object [ "type" .= ("map" :: Text), "values" .= tn ]
       NamedType (TN tn) -> A.String tn
       Record {..} ->
-        object [ "type"      .= ("record" :: Text)
+        let opts = catMaybes
+               [ ("order" .=)     <$> order
+               , ("namespace" .=) <$> namespace
+               , ("doc" .=)       <$> doc
+               ]
+         in object $ opts ++
+               [ "type"      .= ("record" :: Text)
                , "name"      .= name
                , "aliases"   .= aliases
                , "fields"    .= fields
-               , "order"     .= order
-               , "namespace" .= namespace
-               , "doc"       .= doc
                ]
       Enum   {..} ->
-        object [ "type"      .= ("enum" :: Text)
+        let opts = catMaybes
+               [ ("namespace" .=) <$> namespace
+               , ("doc" .=)       <$> doc
+               ]
+         in object $ opts ++
+               [ "type"      .= ("enum" :: Text)
                , "name"      .= name
                , "aliases"   .= aliases
-               , "doc"       .= doc
-               , "namespace" .= namespace
                , "symbols"   .= symbols
                ]
       Union  {..} -> A.Array $ V.fromList $ P.map toJSON (NE.toList options)
       Fixed  {..} ->
-        object [ "type"      .= ("fixed" :: Text)
+        let opts = catMaybes
+               [ ("namespace" .=) <$> namespace ]
+         in object $ opts ++
+               [ "type"      .= ("fixed" :: Text)
                , "name"      .= name
-               , "namespace" .= namespace
                , "aliases"   .= aliases
                , "size"      .= size
                ]
@@ -272,7 +281,7 @@ instance FromJSON Field where
        def <- case parseAvroJSON err ty <$> defM of
                 Just (Success x) -> return (Just x)
                 Just (Error e)   -> fail e
-                Nothing          -> return Nothing 
+                Nothing          -> return Nothing
        od  <- o .:? ("order" :: Text)    .!= Just Ascending
        al  <- o .:? ("aliases" :: Text)  .!= []
        return $ Field nm al doc od ty def
@@ -280,12 +289,15 @@ instance FromJSON Field where
   parseJSON j = typeMismatch "Field " j
 
 instance ToJSON Field where
-  toJSON (Field {..}) =
-    object [ "name"    .= fldName
-           , "doc"     .= fldDoc
+  toJSON Field {..} =
+    let opts = catMaybes
+           [ ("order" .=)     <$> fldOrder
+           , ("doc" .=)       <$> fldDoc
+           , ("default" .=)   <$> fldDefault
+           ]
+     in object $ opts ++
+           [ "name"    .= fldName
            , "type"    .= fldType
-           , "default" .= fldDefault
-           , "order"   .= fldOrder
            , "aliases" .= fldAliases
            ]
 
