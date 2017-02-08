@@ -291,7 +291,13 @@ instance (ToAvro a) => ToAvro (Map.Map String a) where
 instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
   toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ HashMap.toList mp
   schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
-
+instance (ToAvro a) => ToAvro (Maybe a) where
+  toAvro a =
+    let sch@(l:|[r]) = options (schemaOf a)
+    in case a of
+      Nothing -> T.Union sch S.Null (toAvro ())
+      Just v  -> T.Union sch r (toAvro v)
+  schema = Tagged $ mkUnion (S.Null:| [untag (schema :: Tagged a Type)])
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').
 -- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type
