@@ -16,6 +16,8 @@ data TypesTestMessage = TypesTestMessage
   , tmName        :: Text
   , tmTimestamp   :: Maybe Int64
   , tmForeignId   :: Maybe Int64
+  , tmCompetence  :: Maybe Double
+  , tmAttraction  :: Double
   } deriving (Show, Eq)
 
 tmSchema :: Schema
@@ -26,6 +28,8 @@ tmSchema =
         , fld "name" String Nothing
         , fld "timestamp" (mkUnion (Null :| [Long])) Nothing
         , fld "foreignId" (mkUnion (Null :| [Long])) Nothing
+        , fld "competence" (mkUnion (Null :| [Double])) Nothing
+        , fld "attraction" Double Nothing
         ]
 
 instance ToAvro TypesTestMessage where
@@ -34,6 +38,8 @@ instance ToAvro TypesTestMessage where
     , "name"        .= tmName m
     , "timestamp"   .= tmTimestamp m
     , "foreignId"   .= tmForeignId m
+    , "competence"  .= tmCompetence m
+    , "attraction"  .= tmAttraction m
     ]
   schema = pure tmSchema
 
@@ -43,6 +49,8 @@ instance FromAvro TypesTestMessage where
                      <*> r .: "name"
                      <*> r .: "timestamp"
                      <*> r .: "foreignId"
+                     <*> r .: "competence"
+                     <*> r .: "attraction"
   fromAvro v = badValue v "TypesTestMessage"
 
 message :: TypesTestMessage
@@ -51,6 +59,8 @@ message = TypesTestMessage
   , tmName       = "test-name"
   , tmTimestamp  = Just 7
   , tmForeignId  = Nothing
+  , tmCompetence = Just 7.5
+  , tmAttraction = 8.974
   }
 
 spec :: Spec

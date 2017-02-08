@@ -198,7 +198,9 @@ instance FromAvro Int64 where
   fromAvro (T.Long i) = pure i
   fromAvro (T.Int i)  = pure (fromIntegral i)
   fromAvro v = badValue v "Int64"
-
+instance FromAvro Double where
+  fromAvro (T.Double d) = pure d
+  fromAvro v            = badValue v "Double"
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
   fromAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromAvro v
@@ -263,6 +265,9 @@ instance ToAvro Int32 where
 instance ToAvro Int64 where
   toAvro = T.Long
   schema = Tagged S.Long
+instance ToAvro Double where
+  toAvro = T.Double
+  schema = Tagged S.Double
 instance ToAvro Text.Text where
   toAvro = T.String
   schema = Tagged S.String
