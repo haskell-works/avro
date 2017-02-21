@@ -57,8 +57,8 @@ resolveSchema e d v
 -- The writer's symbol must be present in the reader's enum
 resolveEnum :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
 resolveEnum e d val@(T.Enum _ _ _txt) = Right val
-   -- | txt `elem` symbols d = Right val
-   -- | otherwise = Left "Decoded enum does not appear in reader's symbol list."
+  -- --  | txt `elem` symbols d = Right val
+  -- --  | otherwise = Left "Decoded enum does not appear in reader's symbol list."
 
 resolveTwoUnions :: NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
 resolveTwoUnions  ds (T.Union _ eTy val) =

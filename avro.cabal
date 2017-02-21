@@ -4,8 +4,8 @@
 name:                avro
 version:             0.1.0.0
 synopsis:            Avro serialization support for Haskell
--- description:
-homepage:            github.com/TomMD/avro.git
+description:         Avro serialization and deserialization support for Haskell
+homepage:            https://github.com/GaloisInc/avro.git
 license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
@@ -16,8 +16,13 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
+source-repository head
+  type:     git
+  location: https://github.com/GaloisInc/avro.git
+
 flag dev
   default: False
+  manual: True
   description: Use development GHC flags
 
 library
@@ -30,19 +35,19 @@ library
   -- other-modules:
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <5.0,
-                       aeson >=0.11 && <0.12,
+                       aeson,
                        array,
                        base16-bytestring,
                        binary,
-                       bytestring >=0.10 && <0.11,
+                       bytestring,
                        containers,
                        entropy,
                        fail,
                        hashable,
-                       mtl >=2.2 && <2.3,
+                       mtl,
                        scientific,
-                       text >=1.2 && <1.3,
-                       unordered-containers >=0.2 && <0.3,
+                       text,
+                       unordered-containers,
                        vector,
                        pure-zlib,
                        semigroups,
@@ -59,22 +64,24 @@ test-suite test
   hs-source-dirs:      test
   other-modules:       Avro.ToAvroSpec
   main-is:             Spec.hs
-  ghc-options:         -Wall -threaded
+  ghc-options:         -threaded
+  if flag(dev)
+    ghc-options: -Wall -Werror
   build-depends:       base >=4.6 && < 5
                      , avro
-                     , aeson >=0.11 && <0.12
+                     , aeson
                      , array
                      , base16-bytestring
                      , binary
-                     , bytestring >=0.10 && <0.11
+                     , bytestring
                      , containers
                      , entropy
                      , fail
                      , hashable
-                     , mtl >=2.2 && <2.3
+                     , mtl
                      , scientific
-                     , text >=1.2 && <1.3
-                     , unordered-containers >=0.2 && <0.3
+                     , text
+                     , unordered-containers
                      , vector
                      , pure-zlib
                      , semigroups
