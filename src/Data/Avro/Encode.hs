@@ -13,7 +13,6 @@ module Data.Avro.Encode
   -- * Lower level interface
   , EncodeAvro(..)
   , Zag(..)
-  , Zig(..)
   , putAvro
   , putNonNegative
   ) where
@@ -31,10 +30,11 @@ import qualified Data.Foldable           as F
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Int
+import           Data.List               as DL
 import           Data.List.NonEmpty      (NonEmpty(..))
 import qualified Data.List.NonEmpty      as NE
 import           Data.Monoid
-import           Data.Maybe              (catMaybes)
+import           Data.Maybe              (catMaybes, mapMaybe)
 import           Data.Set                (Set)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
@@ -46,11 +46,11 @@ import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 import           Data.Proxy
 import           System.Entropy (getEntropy)
-import Debug.Trace
 
+import Data.Avro.Zag
+import Data.Avro.Zig
 import Data.Avro.Schema as S
 import Data.Avro.Types  as T
-
 
 encodeAvro :: EncodeAvro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
@@ -83,7 +83,6 @@ encodeContainerWithSync syncBytes xss =
        lazyByteString syncBytes
   avroMagicBytes :: BL.ByteString
   avroMagicBytes = "Obj" <> BL.pack [1]
-
 
 -- XXX make an instance 'EncodeAvro Schema'
 -- Would require a schema schema...
@@ -124,55 +123,6 @@ putNonNegative :: forall a. (FiniteBits a, Integral a) => a -> Builder
 putNonNegative n = if n .&. complement 0x7F == 0
   then word8 $ fromIntegral (n .&. 0x7f)
   else word8 (0x80 .|. (fromIntegral n .&. 0x7F)) <> putNonNegative (n `shiftR` 7)
-
-class Zag a where
-  type Za a
-  zag :: a -> Za a
-
-instance Zag Word8 where
-  type Za Word8 = Int8
-  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
-
-instance Zag Word16 where
-  type Za Word16 = Int16
-  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
-
-instance Zag Word32 where
-  type Za Word32 = Int32
-  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
-
-instance Zag Word64 where
-  type Za Word64 = Int64
-  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
-
-instance Zag Word where
-  type Za Word = Int
-  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
-
-class Zig a where
-  type Zi a
-  zig :: a -> Zi a
-
-instance Zig Int8 where
-  type Zi Int8 = Word8
-  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
-
-instance Zig Int16 where
-  type Zi Int16 = Word16
-  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
-
-instance Zig Int32 where
-  type Zi Int32 = Word32
-  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
-
-instance Zig Int64 where
-  type Zi Int64 = Word64
-  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
-
-instance Zig Int where
-  type Zi Int = Word
-  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
-
 
 instance EncodeAvro Int  where
   avro = avroInt . zig
@@ -292,12 +242,12 @@ instance EncodeAvro (T.Value Type) where
       T.Array vec -> avro vec
       T.Map hm    -> avro hm
       T.Record ty hm ->
-        let bs = foldMap putAvro (catMaybes $ P.map (\f -> HashMap.lookup f hm) fs)
+        let bs = foldMap putAvro (mapMaybe (`HashMap.lookup` hm) fs)
             fs = P.map fldName (fields ty)
         in AvroM (bs, ty)
       T.Union opts sel val | F.length opts > 0 ->
-        case lookup sel (P.zip (NE.toList opts) [0..]) of
+        case DL.elemIndex sel (NE.toList opts) of
           Just idx -> AvroM (putI idx <> putAvro val, S.mkUnion opts)
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Fixed bs  -> avro bs
-      T.Enum sch@(S.Enum{..}) ix t -> AvroM (putI ix, sch)
+      T.Enum sch@S.Enum{..} ix t -> AvroM (putI ix, sch)

@@ -7,6 +7,7 @@ module Avro.Codec.Int64Spec (spec) where
 import           Data.Avro
 import           Data.Avro.Encode
 import           Data.Avro.Schema
+import           Data.Avro.Zig
 import           Data.Bits
 import           Data.ByteString.Builder
 import           Data.Int
@@ -47,7 +48,7 @@ instance FromAvro OnlyInt64 where
     OnlyInt64  <$> r .: "onlyInt64Value"
 
 bitStringToWord8s :: String -> [Word8]
-bitStringToWord8s = reverse . map toWord . map reverse . chunksOf 8 . reverse . toBinary
+bitStringToWord8s = reverse . map (toWord . reverse) . chunksOf 8 . reverse . toBinary
   where toBinary :: String -> [Bool]
         toBinary ('1':xs) = True  : toBinary xs
         toBinary ('0':xs) = False : toBinary xs

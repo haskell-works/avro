@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE BangPatterns        #-}
+
 module Data.Avro.Decode
   ( decodeAvro
   , decodeContainer
@@ -28,8 +28,9 @@ import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
 import           Data.List                  (foldl')
 import qualified Data.List.NonEmpty as NE
-import           Data.Monoid                ((<>))
+import           Data.Maybe
 import qualified Data.Map                   as Map
+import           Data.Monoid                ((<>))
 import qualified Data.HashMap.Strict        as HashMap
 import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
@@ -37,6 +38,7 @@ import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 
+import           Data.Avro.Zag
 import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T
 
@@ -80,7 +82,7 @@ instance GetAvro ContainerHeader where
                   Just s  -> case A.eitherDecode' s of
                                 Left e  -> fail ("Can not decode container schema: " <> e)
                                 Right x -> return x
-      return $ ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
+      return ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
    where avroMagicSize :: Integral a => a
          avroMagicSize = 4
 
@@ -146,13 +148,11 @@ getAvroOf ty0 = go ty0
          return $ T.Map (HashMap.fromList $ mconcat kvs)
     NamedType tn -> env tn >>= go
     Record {..} ->
-      do let getField (Field {..}) = (fldName,) <$> go fldType
+      do let getField Field {..} = (fldName,) <$> go fldType
          T.Record ty . HashMap.fromList <$> mapM getField fields
     Enum {..} ->
       do val <- getLong
-         let sym = case symbolLookup val of
-                      Just e  -> e
-                      Nothing -> "" -- empty string for 'missing' symbols (alternative is an error or exception)
+         let sym = fromMaybe "" (symbolLookup val) -- empty string for 'missing' symbols (alternative is an error or exception)
          pure (T.Enum ty (fromIntegral val) sym)
     Union ts unionLookup ->
       do i <- getLong
@@ -242,7 +242,7 @@ getZigZag :: (Bits i, Integral i) => Get i
 getZigZag =
   do orig <- getWord8s
      let word0 = foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig)
-     return ((word0 `shiftR` 1) `xor` (negate (word0  .&. 1) ))
+     return ((word0 `shiftR` 1) `xor` negate (word0  .&. 1))
  where
    getWord8s =
     do w <- G.getWord8
@@ -270,7 +270,7 @@ getString = Text.decodeUtf8 <$> getBytes
 --
 --  If the argument is negative infinity, the result is 0xff800000.
 --
---  If the argument is NaN, the result is 0x7fc00000. 
+--  If the argument is NaN, the result is 0x7fc00000.
 getFloat :: Get Float
 getFloat =
  do f <- G.getWord32le
