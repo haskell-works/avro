@@ -27,10 +27,11 @@ flag dev
 
 library
   exposed-modules:      Data.Avro,
-                        Data.Avro.Schema,
                         Data.Avro.Decode,
                         Data.Avro.Deconflict,
                         Data.Avro.Encode,
+                        Data.Avro.EncodeRaw,
+                        Data.Avro.Schema,
                         Data.Avro.Types,
                         Data.Avro.Zag,
                         Data.Avro.Zig
@@ -69,6 +70,7 @@ test-suite test
                       , Avro.Codec.MaybeSpec
                       , Avro.Codec.TextSpec
                       , Avro.Codec.ZigZagSpec
+                      , Avro.EncodeRawSpec
                       , Avro.ToAvroSpec
 
   main-is:              Spec.hs
