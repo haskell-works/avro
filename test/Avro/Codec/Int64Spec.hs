@@ -41,6 +41,11 @@ spec = describe "Avro.Codec.Int64Spec" $ do
     let expectedBuffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
     let value = OnlyInt64 90071992547409917
     encode value `shouldBe` expectedBuffer
+  -- it "Can encode 90071992547409917L correctly" $ do
+  --   let expectedBuffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
+  --   let value = OnlyInt64 4611686018427387904
+  --   print (encode value)
+  --   encode value `shouldBe` expectedBuffer
   it "Can decode encoded Int64 values" $ do
     Q.property $ \(w :: Int64) ->
       let x = untag (schema :: Tagged OnlyInt64 Type) in

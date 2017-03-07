@@ -2,7 +2,9 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeFamilies         #-}
+
 module Data.Avro.Encode
   ( -- * High level interface
     getSchema
@@ -10,6 +12,7 @@ module Data.Avro.Encode
   , encodeContainer, encodeContainerWithSync
   -- * Lower level interface
   , EncodeAvro(..)
+  , Zig(..)
   , putAvro
   ) where
 
@@ -104,7 +107,7 @@ class EncodeAvro a where
 --   putAvro :: a -> Builder
 
 avroInt :: forall a. (FiniteBits a, Integral a) => a -> AvroM
-avroInt n = AvroM (putIntegral n, S.Int)
+avroInt n = AvroM (varEncode n, S.Int)
 
 avroLong :: forall a. (FiniteBits a, Integral a) => a -> AvroM
 avroLong n = AvroM (putIntegral n, S.Long)
@@ -114,28 +117,52 @@ putI :: Int -> Builder
 putI = putIntegral
 
 putIntegral :: forall a. (FiniteBits a, Integral a) => a -> Builder
-putIntegral n =
-  let enc = (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
-  in if enc == 0 then word8 0
-                 else varEncode enc
- where
- varEncode :: a -> Builder
- varEncode 0 = mempty
- varEncode e =
-  word8 (gt e (e .&. 0x7f)) <> varEncode (e `shiftR` 7)
- gt x | x >= 0x80 = (`setBit` 7) . fromIntegral
-      | otherwise = fromIntegral
+putIntegral = varEncode
+  -- let enc = (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
+  -- in if enc == 0 then word8 0
+  --                else varEncode enc
+
+
+varEncode :: forall a. (FiniteBits a, Integral a) => a -> Builder
+varEncode n | n .&. complement 0x7F == 0 = word8 $ fromIntegral n
+            | otherwise = word8 (0x80 .|. (fromIntegral n .&. 0x7F)) <>
+                           varEncode (n `shiftR` 7)
+
+class Zig a where
+  type Z a
+  zig :: a -> Z a
+
+instance Zig Int8 where
+  type Z Int8 = Word8
+  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
+
+instance Zig Int16 where
+  type Z Int16 = Word16
+  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
+
+instance Zig Int32 where
+  type Z Int32 = Word32
+  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
+
+instance Zig Int64 where
+  type Z Int64 = Word64
+  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
+
+instance Zig Int where
+  type Z Int = Word
+  zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
+
 
 instance EncodeAvro Int  where
-  avro = avroInt
+  avro = avroInt . zig
 instance EncodeAvro Int8  where
-  avro = avroInt
+  avro = avroInt . zig
 instance EncodeAvro Int16  where
-  avro = avroInt
+  avro = avroInt . zig
 instance EncodeAvro Int32  where
-  avro = avroInt
+  avro = avroInt . zig
 instance EncodeAvro Int64  where
-  avro = avroInt
+  avro = avroInt . zig
 instance EncodeAvro Word8 where
   avro = avroInt
 instance EncodeAvro Word16 where
@@ -147,17 +174,17 @@ instance EncodeAvro Word64 where
 instance EncodeAvro Text where
   avro t =
     let bs = T.encodeUtf8 t
-    in AvroM (putIntegral (B.length bs) <> byteString bs, S.String)
+    in AvroM (varEncode (zig (B.length bs)) <> byteString bs, S.String)
 instance EncodeAvro TL.Text where
   avro t =
     let bs = TL.encodeUtf8 t
-    in AvroM (putIntegral (BL.length bs) <> lazyByteString bs, S.String)
+    in AvroM (varEncode (zig (BL.length bs)) <> lazyByteString bs, S.String)
 
 instance EncodeAvro ByteString where
-  avro bs = AvroM (putIntegral (BL.length bs) <> lazyByteString bs, S.Bytes)
+  avro bs = AvroM (varEncode (zig (BL.length bs)) <> lazyByteString bs, S.Bytes)
 
 instance EncodeAvro B.ByteString where
-  avro bs = AvroM (putIntegral (B.length bs) <> byteString bs, S.Bytes)
+  avro bs = AvroM (varEncode (zig (B.length bs)) <> byteString bs, S.Bytes)
 
 instance EncodeAvro String where
   avro s = let t = T.pack s in avro t
@@ -185,25 +212,25 @@ instance EncodeAvro Float where
          g = floor (0x007fffff * significand d)
 
 instance EncodeAvro a => EncodeAvro [a] where
-  avro xs = AvroM ( putIntegral (F.length xs) <> foldMap putAvro xs
+  avro xs = AvroM ( varEncode (zig (F.length xs)) <> foldMap putAvro xs
                   , S.Array (getType (Proxy :: Proxy a))
                   )
 
 instance (Ix i, EncodeAvro a) => EncodeAvro (Array i a) where
-  avro a = AvroM ( putIntegral (F.length a) <> foldMap putAvro a
+  avro a = AvroM ( varEncode (zig (F.length a)) <> foldMap putAvro a
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 instance EncodeAvro a => EncodeAvro (Vector a) where
-  avro a = AvroM ( putIntegral (F.length a) <> foldMap putAvro a
+  avro a = AvroM ( varEncode (zig (F.length a)) <> foldMap putAvro a
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 instance (U.Unbox a, EncodeAvro a) => EncodeAvro (U.Vector a) where
-  avro a = AvroM ( putIntegral (U.length a) <> foldMap putAvro (U.toList a)
+  avro a = AvroM ( varEncode (zig (U.length a)) <> foldMap putAvro (U.toList a)
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 
 instance EncodeAvro a => EncodeAvro (Set a) where
-  avro a = AvroM ( putIntegral (F.length a) <> foldMap putAvro a
+  avro a = AvroM ( varEncode (zig (F.length a)) <> foldMap putAvro a
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 
