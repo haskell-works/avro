@@ -36,6 +36,7 @@ instance FromAvro OnlyText where
 spec :: Spec
 spec = describe "Avro.Codec.TextSpec" $ do
   it "Can decode \"This is an unit test\"" $ do
+    -- The '(' here is the length (ASCII value) of the string
     let expectedBuffer = "(This is an unit test"
     let value = OnlyText "This is an unit test"
     encode value `shouldBe` expectedBuffer
