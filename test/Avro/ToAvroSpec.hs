@@ -70,42 +70,7 @@ message = TypesTestMessage
   , tmAttraction = 8.974
   }
 
-newtype OnlyInt64 = OnlyInt64
-  { onlyInt64Value :: Int64
-  } deriving (Show, Eq)
-
-onlyInt64Schema :: Schema
-onlyInt64Schema =
-  let fld nm = Field nm [] Nothing Nothing
-   in Record "OnlyInt64" (Just "test.contract") [] Nothing Nothing
-        [ fld "onlyInt64Value"    Long Nothing
-        ]
-
-instance ToAvro OnlyInt64 where
-  toAvro sa = record onlyInt64Schema
-    [ "onlyInt64Value" .= onlyInt64Value sa
-    ]
-  schema = pure onlyInt64Schema
-
-instance FromAvro OnlyInt64 where
-  fromAvro (AT.Record _ r) =
-    OnlyInt64  <$> r .: "onlyInt64Value"
-
-exampleOnlyInt64Value :: OnlyInt64
-exampleOnlyInt64Value = OnlyInt64
-  { onlyInt64Value    = minBound
-  }
-
 spec :: Spec
 spec = describe "Kafka.IntegrationSpec" $ do
-    -- it "sends messages to test topic" $ do
-    --   let x = untag (schema :: Tagged OnlyInt64 Type)
-    --   decode x (encode exampleOnlyInt64Value) `shouldBe` Success exampleOnlyInt64Value
-    -- it "foo" $ do
-    --   let expectedBuffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
-    --   let value = OnlyInt64 90071992547409917
-    --   encode value `shouldBe` expectedBuffer
-    it "property" $ do
-      Q.property $ \(w :: Int64) ->
-        let x = untag (schema :: Tagged OnlyInt64 Type) in
-          decode x (encode (OnlyInt64 w)) == Success (OnlyInt64 w)
+  it "sends messages to test topic" $ do
+    fromAvro (toAvro message) `shouldBe` pure message
