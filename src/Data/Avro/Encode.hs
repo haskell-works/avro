@@ -12,8 +12,10 @@ module Data.Avro.Encode
   , encodeContainer, encodeContainerWithSync
   -- * Lower level interface
   , EncodeAvro(..)
+  , Zag(..)
   , Zig(..)
   , putAvro
+  , putNonNegative
   ) where
 
 import Prelude as P
@@ -44,9 +46,11 @@ import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 import           Data.Proxy
 import           System.Entropy (getEntropy)
+import Debug.Trace
 
 import Data.Avro.Schema as S
 import Data.Avro.Types  as T
+
 
 encodeAvro :: EncodeAvro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
@@ -118,31 +122,55 @@ putI = putNonNegative
 
 putNonNegative :: forall a. (FiniteBits a, Integral a) => a -> Builder
 putNonNegative n = if n .&. complement 0x7F == 0
-  then word8 $ fromIntegral n
+  then word8 $ fromIntegral (n .&. 0x7f)
   else word8 (0x80 .|. (fromIntegral n .&. 0x7F)) <> putNonNegative (n `shiftR` 7)
 
+class Zag a where
+  type Za a
+  zag :: a -> Za a
+
+instance Zag Word8 where
+  type Za Word8 = Int8
+  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
+
+instance Zag Word16 where
+  type Za Word16 = Int16
+  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
+
+instance Zag Word32 where
+  type Za Word32 = Int32
+  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
+
+instance Zag Word64 where
+  type Za Word64 = Int64
+  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
+
+instance Zag Word where
+  type Za Word = Int
+  zag n = fromIntegral $ (n `shiftR` 1) `xor` negate (n .&. 0x1)
+
 class Zig a where
-  type Z a
-  zig :: a -> Z a
+  type Zi a
+  zig :: a -> Zi a
 
 instance Zig Int8 where
-  type Z Int8 = Word8
+  type Zi Int8 = Word8
   zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
 
 instance Zig Int16 where
-  type Z Int16 = Word16
+  type Zi Int16 = Word16
   zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
 
 instance Zig Int32 where
-  type Z Int32 = Word32
+  type Zi Int32 = Word32
   zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
 
 instance Zig Int64 where
-  type Z Int64 = Word64
+  type Zi Int64 = Word64
   zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
 
 instance Zig Int where
-  type Z Int = Word
+  type Zi Int = Word
   zig n = fromIntegral $ (n `shiftL` 1) `xor` (n `shiftR` (finiteBitSize n - 1))
 
 

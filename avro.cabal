@@ -81,6 +81,7 @@ test-suite test
                       , bytestring
                       , containers
                       , entropy
+                      , extra
                       , fail
                       , hashable
                       , mtl
