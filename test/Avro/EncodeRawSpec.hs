@@ -24,7 +24,7 @@ bitStringToWord8s = reverse . map (toWord . reverse) . chunksOf 8 . reverse . to
         toWord = toWord' 0
 
 spec :: Spec
-spec = describe "Avro.Codec.BuildSpec" $ do
+spec = describe "Avro.EncodeRawSpec" $ do
   it "Can encodeRaw (                  0 :: Word64)" $ toLazyByteString (encodeRaw (                  0 :: Word64)) `shouldBe` BL.pack (bitStringToWord8s "                                                                                 00000000" )
   it "Can encodeRaw (                  1 :: Word64)" $ toLazyByteString (encodeRaw (                  1 :: Word64)) `shouldBe` BL.pack (bitStringToWord8s "                                                                                 00000001" )
   it "Can encodeRaw (                  2 :: Word64)" $ toLazyByteString (encodeRaw (                  2 :: Word64)) `shouldBe` BL.pack (bitStringToWord8s "                                                                                 00000010" )

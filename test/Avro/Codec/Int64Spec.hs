@@ -71,40 +71,9 @@ spec = describe "Avro.Codec.Int64Spec" $ do
     let buffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
     let expectedValue = OnlyInt64 90071992547409917
     decode x buffer `shouldBe` Success expectedValue
-
-----
-  it "Can encode 90071992547409917L correctly" $ do
-    let expectedBuffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
-    let value = OnlyInt64 4611686018427387904
-    print (encode value)
-    print (prettyPrint "\250\255\255\255\255\255\255\191\STX")
-    print (prettyPrint "\128\128\128\128\128\128\128\128\128\SOH")
-    encode value `shouldBe` expectedBuffer
-----
-
   it "Can decode encoded Int64 values" $ do
-    Q.property $ \(w :: Int64) ->
-      let x = untag (schema :: Tagged OnlyInt64 Type) in
-        if w == 4611686018427387904 || w == 4611686018427387905
-          then decode x (encode (OnlyInt64 w)) == Success (OnlyInt64 (-w))
-          else do
-            case decode x (encode (OnlyInt64 w)) of
-              Success (OnlyInt64 !v) -> if v == w
-                then True
-                else trace (">> " ++ show v ++ " /= " ++ show w) False
-
--- ----
---   it "Can encode 4611686018427387904L correctly" $ do
---     let expectedBuffer = BL.pack (bitStringToWord8s "10000001 10000000 10000000 10000000 10000000 10000000 10000000 10000000 10000000 00000000")
---     let value = OnlyInt64 4611686018427387904
---     encode value `shouldBe` expectedBuffer
---
---   it "Can decode 90071992547409917L correctly" $ do
---     let x = untag (schema :: Tagged OnlyInt64 Type)
---     let buffer = BL.pack (bitStringToWord8s "10000001 10000000 10000000 10000000 10000000 10000000 10000000 10000000 10000000 00000000")
---     let expectedValue = OnlyInt64 4611686018427387904
---     decode x buffer `shouldBe` Success expectedValue
-----
+    let x = untag (schema :: Tagged OnlyInt64 Type)
+    Q.property $ \(w :: Int64) -> decode x (encode (OnlyInt64 w)) == Success (OnlyInt64 w)
 
   it "Can decode 129L" $ do
     let w = 129 :: Int64

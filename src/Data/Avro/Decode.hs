@@ -38,6 +38,7 @@ import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 
+import           Data.Avro.DecodeRaw
 import           Data.Avro.Zag
 import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T
@@ -238,17 +239,8 @@ getLong :: Get Int64
 getLong = getZigZag
 
 -- |Get an zigzag encoded integral value consuming bytes till the msb is 0.
-getZigZag :: (Bits i, Integral i) => Get i
-getZigZag =
-  do orig <- getWord8s
-     let word0 = foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig)
-     return ((word0 `shiftR` 1) `xor` negate (word0  .&. 1))
- where
-   getWord8s =
-    do w <- G.getWord8
-       let msb = w `testBit` 7
-       (w .&. 0x7F :) <$> if msb then getWord8s
-                                 else return []
+getZigZag :: (Bits i, Integral i, DecodeRaw i) => Get i
+getZigZag = decodeRaw
 
 getBytes :: Get ByteString
 getBytes =
