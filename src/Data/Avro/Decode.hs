@@ -21,6 +21,7 @@ import qualified Data.Aeson                 as A
 import qualified Data.Array                 as Array
 import qualified Data.Binary.Get            as G
 import           Data.Binary.Get            (Get,runGetOrFail)
+import           Data.Binary.IEEE754        as IEEE
 import           Data.Bits
 import qualified Data.ByteString.Lazy       as BL
 import           Data.ByteString            (ByteString)
@@ -264,17 +265,7 @@ getString = Text.decodeUtf8 <$> getBytes
 --
 --  If the argument is NaN, the result is 0x7fc00000.
 getFloat :: Get Float
-getFloat =
- do f <- G.getWord32le
-    let dec | f == 0x7f800000 = 1 / 0
-            | f == 0xff800000 = negate 1 /0
-            | f == 0x7fc00000 = 0 / 0
-            | otherwise =
-                let s = if f .&. 0x80000000 == 0 then id else negate
-                    e = (f .&. 0x7f800000) `shiftR` 23
-                    m = f .&. 0x007fffff
-                in s (fromIntegral m * 2^e)
-    return dec
+getFloat = IEEE.wordToFloat <$> G.getWord32le
 
 -- As in Java:
 --  Bit 63 (the bit that is selected by the mask 0x8000000000000000L)
@@ -292,17 +283,7 @@ getFloat =
 --
 --  If the argument is NaN, the result is 0x7ff8000000000000L
 getDouble :: Get Double
-getDouble =
- do f <- G.getWord64le
-    let dec | f == 0x7ff0000000000000 = 1 / 0
-            | f == 0xfff0000000000000 = negate 1 / 0
-            | f == 0x7ff8000000000000 = 0 / 0
-            | otherwise =
-                let s = if f .&. 0x8000000000000000 == 0 then id else negate
-                    e = (f .&. 0x7ff0000000000000) `shiftR` 52
-                    m = f .&. 0x000fffffffffffff
-                in s (fromIntegral m * 2^e)
-    return dec
+getDouble = IEEE.wordToDouble <$> G.getWord64le
 
 --------------------------------------------------------------------------------
 --  Complex AvroValue Getters

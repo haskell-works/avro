@@ -45,6 +45,7 @@ library
                        binary,
                        bytestring,
                        containers,
+                       data-binary-ieee754,
                        entropy,
                        fail,
                        hashable,

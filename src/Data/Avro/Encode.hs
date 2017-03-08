@@ -22,6 +22,7 @@ import           Data.Array              (Array)
 import           Data.Ix                 (Ix)
 import           Data.Bits
 import           Data.ByteString.Lazy    as BL
+import qualified Data.Binary.IEEE754     as IEEE
 import           Data.ByteString.Lazy.Char8 ()
 import qualified Data.ByteString         as B
 import           Data.ByteString.Builder
@@ -156,26 +157,10 @@ instance EncodeAvro String where
   avro s = let t = T.pack s in avro t
 
 instance EncodeAvro Double where
-  avro d = AvroM (encodeRaw longVal, S.Double)
-   where longVal :: Word64
-         longVal | isNaN d               = 0x7ff8000000000000
-                 | isInfinite d && d > 0 = 0x7ff0000000000000
-                 | isInfinite d          = 0xfff0000000000000
-                 | otherwise = (s `shiftL` 63) .|. (e `shiftL` 52) .|. g
-         s = fromIntegral (fromEnum (signum d < 0))
-         e = fromIntegral (exponent d)
-         g = floor (0x000fffffffffffff * significand d)
+  avro d = AvroM (word64LE (IEEE.doubleToWord d), S.Double)
 
 instance EncodeAvro Float where
-  avro d = AvroM (encodeRaw intVal, S.Float)
-   where intVal :: Word32
-         intVal | isNaN d               = 0x7fc00000
-                | isInfinite d && d > 0 = 0x7f800000
-                | isInfinite d          = 0xff800000
-                | otherwise             = (s `shiftL` 31) .|. (e `shiftL` 23) .|. g
-         s = fromIntegral (fromEnum (signum d < 0))
-         e = fromIntegral (exponent d)
-         g = floor (0x007fffff * significand d)
+  avro d = AvroM (word32LE (IEEE.floatToWord d), S.Float)
 
 instance EncodeAvro a => EncodeAvro [a] where
   avro xs = AvroM ( encodeRaw (F.length xs) <> foldMap putAvro xs

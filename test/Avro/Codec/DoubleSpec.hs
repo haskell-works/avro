@@ -35,15 +35,20 @@ instance FromAvro OnlyDouble where
 
 spec :: Spec
 spec = describe "Avro.Codec.DoubleSpec" $ do
-  it "Can decode 3.1415926" $ do
-    let expectedBuffer = "\164\216\165\180\218\159\164\SYN"
-    let value = OnlyDouble 3.1415926
+  it "Can decode 0.89" $ do
+    let expectedBuffer = BL.pack [123, 20, -82, 71, -31, 122, -20, 63]
+    let value = OnlyDouble 0.89
     encode value `shouldBe` expectedBuffer
 
   it "Can decode -2.0" $ do
-    let expectedBuffer = "\128\128\128\128\128\128\128\252\255\SOH"
+    let expectedBuffer = BL.pack [0, 0, 0, 0, 0, 0, 0, -64]
     let value = OnlyDouble (-2.0)
     encode value `shouldBe` expectedBuffer
+
+  it "Can decode 1.0" $ do
+    let expectedBuffer = [0, 0, 0, 0, 0, 0, -16, 63]
+    let value = OnlyDouble 1.0
+    BL.unpack (encode value) `shouldBe` expectedBuffer
 
   it "Can decode encoded Double values" $ do
     Q.property $ \(d :: Double) ->
