@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Avro.ToAvroSpec
 where
 
@@ -8,8 +10,13 @@ import           Data.Text
 import           Data.Avro.Schema
 import qualified Data.Avro.Types as AT
 import           Data.List.NonEmpty (NonEmpty(..))
-
+import           Data.Tagged
+import           Data.Word
+import qualified Data.ByteString.Lazy as BL
 import Test.Hspec
+import qualified Test.QuickCheck as Q
+
+{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
 data TypesTestMessage = TypesTestMessage
   { tmId          :: Int64
@@ -65,5 +72,5 @@ message = TypesTestMessage
 
 spec :: Spec
 spec = describe "Kafka.IntegrationSpec" $ do
-    it "sends messages to test topic" $ do
-      fromAvro (toAvro message) `shouldBe` pure message
+  it "sends messages to test topic" $ do
+    fromAvro (toAvro message) `shouldBe` pure message

@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE BangPatterns        #-}
+
 module Data.Avro.Decode
   ( decodeAvro
   , decodeContainer
@@ -21,6 +21,7 @@ import qualified Data.Aeson                 as A
 import qualified Data.Array                 as Array
 import qualified Data.Binary.Get            as G
 import           Data.Binary.Get            (Get,runGetOrFail)
+import           Data.Binary.IEEE754        as IEEE
 import           Data.Bits
 import qualified Data.ByteString.Lazy       as BL
 import           Data.ByteString            (ByteString)
@@ -28,8 +29,9 @@ import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
 import           Data.List                  (foldl')
 import qualified Data.List.NonEmpty as NE
-import           Data.Monoid                ((<>))
+import           Data.Maybe
 import qualified Data.Map                   as Map
+import           Data.Monoid                ((<>))
 import qualified Data.HashMap.Strict        as HashMap
 import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
@@ -37,6 +39,8 @@ import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 
+import           Data.Avro.DecodeRaw
+import           Data.Avro.Zag
 import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T
 
@@ -80,7 +84,7 @@ instance GetAvro ContainerHeader where
                   Just s  -> case A.eitherDecode' s of
                                 Left e  -> fail ("Can not decode container schema: " <> e)
                                 Right x -> return x
-      return $ ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
+      return ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
    where avroMagicSize :: Integral a => a
          avroMagicSize = 4
 
@@ -146,13 +150,11 @@ getAvroOf ty0 = go ty0
          return $ T.Map (HashMap.fromList $ mconcat kvs)
     NamedType tn -> env tn >>= go
     Record {..} ->
-      do let getField (Field {..}) = (fldName,) <$> go fldType
+      do let getField Field {..} = (fldName,) <$> go fldType
          T.Record ty . HashMap.fromList <$> mapM getField fields
     Enum {..} ->
       do val <- getLong
-         let sym = case symbolLookup val of
-                      Just e  -> e
-                      Nothing -> "" -- empty string for 'missing' symbols (alternative is an error or exception)
+         let sym = fromMaybe "" (symbolLookup val) -- empty string for 'missing' symbols (alternative is an error or exception)
          pure (T.Enum ty (fromIntegral val) sym)
     Union ts unionLookup ->
       do i <- getLong
@@ -238,17 +240,8 @@ getLong :: Get Int64
 getLong = getZigZag
 
 -- |Get an zigzag encoded integral value consuming bytes till the msb is 0.
-getZigZag :: (Bits i, Integral i) => Get i
-getZigZag =
-  do orig <- getWord8s
-     let word0 = foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig)
-     return ((word0 `shiftR` 1) `xor` (negate (word0  .&. 1) ))
- where
-   getWord8s =
-    do w <- G.getWord8
-       let msb = w `testBit` 7
-       (w .&. 0x7F :) <$> if msb then getWord8s
-                                 else return []
+getZigZag :: (Bits i, Integral i, DecodeRaw i) => Get i
+getZigZag = decodeRaw
 
 getBytes :: Get ByteString
 getBytes =
@@ -270,19 +263,9 @@ getString = Text.decodeUtf8 <$> getBytes
 --
 --  If the argument is negative infinity, the result is 0xff800000.
 --
---  If the argument is NaN, the result is 0x7fc00000. 
+--  If the argument is NaN, the result is 0x7fc00000.
 getFloat :: Get Float
-getFloat =
- do f <- G.getWord32le
-    let dec | f == 0x7f800000 = 1 / 0
-            | f == 0xff800000 = negate 1 /0
-            | f == 0x7fc00000 = 0 / 0
-            | otherwise =
-                let s = if f .&. 0x80000000 == 0 then id else negate
-                    e = (f .&. 0x7f800000) `shiftR` 23
-                    m = f .&. 0x007fffff
-                in s (fromIntegral m * 2^e)
-    return dec
+getFloat = IEEE.wordToFloat <$> G.getWord32le
 
 -- As in Java:
 --  Bit 63 (the bit that is selected by the mask 0x8000000000000000L)
@@ -300,17 +283,7 @@ getFloat =
 --
 --  If the argument is NaN, the result is 0x7ff8000000000000L
 getDouble :: Get Double
-getDouble =
- do f <- G.getWord64le
-    let dec | f == 0x7ff0000000000000 = 1 / 0
-            | f == 0xfff0000000000000 = negate 1 / 0
-            | f == 0x7ff8000000000000 = 0 / 0
-            | otherwise =
-                let s = if f .&. 0x8000000000000000 == 0 then id else negate
-                    e = (f .&. 0x7ff0000000000000) `shiftR` 52
-                    m = f .&. 0x000fffffffffffff
-                in s (fromIntegral m * 2^e)
-    return dec
+getDouble = IEEE.wordToDouble <$> G.getWord64le
 
 --------------------------------------------------------------------------------
 --  Complex AvroValue Getters
