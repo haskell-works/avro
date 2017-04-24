@@ -7,19 +7,17 @@ import           Data.Avro
 import           Data.Avro.Schema
 import qualified Data.Avro.Types      as AT
 import qualified Data.ByteString.Lazy as BL
-import           Data.Tagged
 import           Test.Hspec
-import qualified Test.QuickCheck      as Q
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
 data ChildType = ChildType
-  {childValue1  :: Int
+  { childValue1 :: Int
   , childValue2 :: Int
   } deriving (Show, Eq)
 
 data ParentType = ParentType
-  {parentValue1  :: Int
+  { parentValue1 :: Int
   , parentValue2 :: [ChildType]
   } deriving (Show, Eq)
 
@@ -67,7 +65,8 @@ instance FromAvro ParentType where
 spec :: Spec
 spec = describe "Avro.Codec.NestedSpec" $ do
   it "Can encode/decode nested structures" $ do
-    let parent = ParentType 3 [ChildType 4 5]
+    let parent = ParentType 0 [ChildType 1 2, ChildType 3 4]
     let parentEncoded = encode parent
+
     let parentDecoded = decode parentTypeSchema parentEncoded
     parentDecoded `shouldBe` Success parent

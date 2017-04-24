@@ -172,7 +172,7 @@ instance (Ix i, EncodeAvro a) => EncodeAvro (Array i a) where
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 instance EncodeAvro a => EncodeAvro (Vector a) where
-  avro a = AvroM ( encodeRaw (F.length a) <> foldMap putAvro a
+  avro a = AvroM ( encodeRaw (F.length a) <> foldMap putAvro a <> word8 0
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 instance (U.Unbox a, EncodeAvro a) => EncodeAvro (U.Vector a) where
