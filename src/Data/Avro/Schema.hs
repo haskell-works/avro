@@ -480,4 +480,5 @@ buildTypeEnvironment failure from =
         Enum {..}   -> mk name aliases namespace
         Union {..}  -> concatMap go options
         Fixed {..}  -> mk name aliases namespace
+        Array {..}  -> go item
         _           -> []
