@@ -86,6 +86,7 @@ module Data.Avro
 
 import           Prelude              as P
 import           Control.Monad.Except as X
+import           Control.Arrow        (first)
 import qualified Data.Avro.Decode     as D
 import           Data.Avro.Deconflict as C
 import qualified Data.Avro.Encode     as E
@@ -107,7 +108,7 @@ import           Data.Text            (Text)
 import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
 import           Data.Tagged
-import           Data.Vector          ()
+import qualified Data.Vector          as V
 import           Data.Word
 
 import GHC.Generics
@@ -169,7 +170,7 @@ class FromAvro a where
   fromAvro :: Value Type -> Result a
 
 instance FromAvro (Value Type) where
-  fromAvro v  = pure v
+  fromAvro = pure
 instance (ToAvro a, ToAvro b, FromAvro a, FromAvro b) => FromAvro (Either a b) where
   fromAvro e@(T.Union _ v x) =
     if | v == untag (schema :: Tagged a Type) -> Left <$> fromAvro x
@@ -280,22 +281,22 @@ instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [untag (schema :: Tagged b Type)])
 instance (ToAvro a) => ToAvro (Map.Map Text a) where
   toAvro = toAvro . HashMap.fromList . Map.toList
-  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
+  schema = wrapTag S.Map (schema :: Tagged a Type)
 instance (ToAvro a) => ToAvro (HashMap.HashMap Text a) where
-  toAvro mp = T.Map $ HashMap.map toAvro mp
-  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
+  toAvro = T.Map . HashMap.map toAvro
+  schema = wrapTag S.Map (schema :: Tagged a Type)
 instance (ToAvro a) => ToAvro (Map.Map TL.Text a) where
-  toAvro = toAvro . HashMap.fromList . map (\(k,v) -> (TL.toStrict k,v)) . Map.toList
-  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
+  toAvro = toAvro . HashMap.fromList . map (first TL.toStrict) . Map.toList
+  schema = wrapTag S.Map (schema :: Tagged a Type)
 instance (ToAvro a) => ToAvro (HashMap.HashMap TL.Text a) where
-  toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (TL.toStrict k,v)) $ HashMap.toList mp
-  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
+  toAvro = toAvro . HashMap.fromList . map (first TL.toStrict) . HashMap.toList
+  schema = wrapTag S.Map (schema :: Tagged a Type)
 instance (ToAvro a) => ToAvro (Map.Map String a) where
-  toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ Map.toList mp
-  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
+  toAvro = toAvro . HashMap.fromList . map (first Text.pack) . Map.toList
+  schema = wrapTag S.Map (schema :: Tagged a Type)
 instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
-  toAvro mp = toAvro $ HashMap.fromList $ map (\(k,v) -> (Text.pack k,v)) $ HashMap.toList mp
-  schema = Tagged (S.Map (untag (schema :: Tagged a Type)))
+  toAvro = toAvro . HashMap.fromList . map (first Text.pack) . HashMap.toList
+  schema = wrapTag S.Map (schema :: Tagged a Type)
 instance (ToAvro a) => ToAvro (Maybe a) where
   toAvro a =
     let sch@(l:|[r]) = options (schemaOf a)
@@ -303,6 +304,14 @@ instance (ToAvro a) => ToAvro (Maybe a) where
       Nothing -> T.Union sch S.Null (toAvro ())
       Just v  -> T.Union sch r (toAvro v)
   schema = Tagged $ mkUnion (S.Null:| [untag (schema :: Tagged a Type)])
+instance (ToAvro a) => ToAvro [a] where
+  toAvro = T.Array . V.fromList . (toAvro <$>)
+  schema = wrapTag S.Array (schema :: Tagged a Type)
+
+wrapTag :: (Type -> Type) -> Tagged a Type -> Tagged b Type
+wrapTag f = Tagged . f . untag
+{-# INLINE wrapTag #-}
+
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').
 -- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type
