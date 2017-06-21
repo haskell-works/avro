@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE OverloadedStrings     #-}
 module Data.Avro.TH
 ( deriveAvro
 , deriveFromAvro
@@ -6,10 +7,9 @@ module Data.Avro.TH
 where
 
 import           Control.Monad              (join)
-import           Data.Aeson                 (decode, eitherDecode)
+import           Data.Aeson                 (eitherDecode)
 import qualified Data.Aeson                 as J
 import           Data.Avro                  hiding (decode, encode)
-import qualified Data.Avro                  as A
 import           Data.Avro.Schema           as S
 import qualified Data.Avro.Types            as AT
 import           Data.ByteString            (ByteString)
@@ -34,8 +34,8 @@ deriveAvro p = do
   mbSchema <- runIO $ decodeSchema p
   case mbSchema of
     Left err     -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
-    Right schema -> do
-      let recs = getAllRecords schema
+    Right sch -> do
+      let recs = getAllRecords sch
       types <- traverse genType recs
       fromAvros <- traverse genFromAvro recs
       toAvros <- traverse genToAvro recs
@@ -49,17 +49,17 @@ deriveFromAvro p = do
   mbSchema <- runIO $ decodeSchema p
   case mbSchema of
     Left err     -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
-    Right schema -> do
-      let recs = getAllRecords schema
+    Right sch -> do
+      let recs = getAllRecords sch
       types <- traverse genType recs
       fromAvros <- traverse genFromAvro recs
       return $ join types <> join fromAvros
 
 genFromAvro :: Schema -> Q [Dec]
-genFromAvro (S.Record (TN name) _ _ _ _ fs) =
-  [d| instance FromAvro $(conT . mkTextName $ name) where
-        fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName name) fs) r
-        fromAvro r               = $( [|\v -> badValue v $(mkTextLit name)|] ) r
+genFromAvro (S.Record (TN n) _ _ _ _ fs) =
+  [d| instance FromAvro $(conT . mkTextName $ n) where
+        fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName n) fs) r
+        fromAvro r               = $( [|\v -> badValue v $(mkTextLit n)|] ) r
   |]
 genFromAvro _                             = return []
 
@@ -68,13 +68,13 @@ genFromAvroFieldsExp n (x:xs) =
   [| \r ->
     $(let extract fld = [| r .: T.pack $(mkTextLit (fldName fld))|]
           ctor = [| $(conE n) <$> $(extract x) |]
-      in foldl (\exp fld -> [| $exp <*> $(extract fld) |]) ctor xs
+      in foldl (\expr fld -> [| $expr <*> $(extract fld) |]) ctor xs
      )
   |]
 
 genToAvro :: Schema -> Q [Dec]
-genToAvro s@(Record (TN name) _ _ _ _ fs) = do
-  let sname = mkTextName (mkSchemaValueName name)
+genToAvro s@(Record (TN n) _ _ _ _ fs) = do
+  let sname = mkTextName (mkSchemaValueName n)
   sdef <- schemaDef sname
   idef <- toAvroInstance sname
   pure (sdef <> idef)
@@ -84,12 +84,12 @@ genToAvro s@(Record (TN name) _ _ _ _ fs) = do
           $(varP sname) = fromMaybe undefined (J.decode (LBSC8.pack $(mkLit (LBSC8.unpack $ J.encode s)))) :: Schema
       |]
     toAvroInstance sname =
-      [d| instance ToAvro $(conT . mkTextName $ name) where
-            toAvro = $(genToAvroFieldsExp name sname fs)
+      [d| instance ToAvro $(conT . mkTextName $ n) where
+            toAvro = $(genToAvroFieldsExp sname)
             schema = pure $(varE sname)
       |]
-    genToAvroFieldsExp prefix sname fs = [| \r -> record $(varE sname)
-        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE . mkTextName $ mkFieldTextName prefix fld) r |]
+    genToAvroFieldsExp sname = [| \r -> record $(varE sname)
+        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE . mkTextName $ mkFieldTextName n fld) r |]
           in listE $ assign <$> fs
         )
       |]
@@ -103,10 +103,10 @@ getAllRecords (S.Union (_ :| _:_:_) _)  = error "Unions with more than 2 element
 getAllRecords _                       = []
 
 genType :: Schema -> Q [Dec]
-genType (S.Record (TN name) _ _ _ _ fs) = do
-  fields <- traverse (mkField name) fs
-  let dname = mkTextName $ mkDataTypeName name
-  return [DataD [] dname [] Nothing [RecC dname fields] []]
+genType (S.Record (TN n) _ _ _ _ fs) = do
+  flds <- traverse (mkField n) fs
+  let dname = mkTextName $ mkDataTypeName n
+  return [DataD [] dname [] Nothing [RecC dname flds] []]
 genType _ = return []
 
 mkSchemaValueName :: Text -> Text
@@ -153,10 +153,14 @@ updateFirst f t =
 decodeSchema :: FilePath -> IO (Either String Schema)
 decodeSchema p = eitherDecode <$> LBS.readFile p
 
+defaultBang :: Bang
 defaultBang = Bang NoSourceUnpackedness NoSourceStrictness
 
 mkTextName :: Text -> Name
 mkTextName = mkName . T.unpack
 
+mkLit :: String -> ExpQ
 mkLit = litE . StringL
+
+mkTextLit :: Text -> ExpQ
 mkTextLit = litE . StringL . T.unpack
