@@ -109,7 +109,7 @@ genType :: Schema -> Q [Dec]
 genType (S.Record (TN n) _ _ _ _ fs) = do
   flds <- traverse (mkField n) fs
   let dname = mkTextName $ mkDataTypeName n
-  pure [newDataType dname flds]
+  sequenceA [genDataType dname flds]
 genType _ = pure []
 
 sanitiseName :: Text -> Text
@@ -161,11 +161,15 @@ updateFirst f t =
 decodeSchema :: FilePath -> IO (Either String Schema)
 decodeSchema p = eitherDecode <$> LBS.readFile p
 
-newDataType :: Name -> [VarStrictType] -> Dec
+genDataType :: Name -> [VarStrictType] -> Q Dec
 #if MIN_VERSION_template_haskell(2,11,0)
-newDataType dn flds = DataD [] dn [] Nothing [RecC dn flds] []
+genDataType dn flds = do
+  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  pure $ DataD [] dn [] Nothing [RecC dn flds] ders
 #else
-newDataType dn flds = DataD [] dn [] [RecC dn flds] []
+genDataType dn flds = do
+  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  pure $ DataD [] dn [] [RecC dn flds] ders
 #endif
 
 defaultStrictness :: Strict
