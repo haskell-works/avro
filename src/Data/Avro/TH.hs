@@ -1,5 +1,7 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE OverloadedStrings     #-}
+
 module Data.Avro.TH
 ( deriveAvro
 , deriveFromAvro
@@ -39,7 +41,7 @@ deriveAvro p = do
       types <- traverse genType recs
       fromAvros <- traverse genFromAvro recs
       toAvros <- traverse genToAvro recs
-      return $ join types <> join fromAvros <> join toAvros
+      pure $ join types <> join fromAvros <> join toAvros
 
 -- | Derives "read only" Avro from a given schema file.
 -- Generates data types and FromAvro.
@@ -53,7 +55,7 @@ deriveFromAvro p = do
       let recs = getAllRecords sch
       types <- traverse genType recs
       fromAvros <- traverse genFromAvro recs
-      return $ join types <> join fromAvros
+      pure $ join types <> join fromAvros
 
 genFromAvro :: Schema -> Q [Dec]
 genFromAvro (S.Record (TN n) _ _ _ _ fs) =
@@ -61,7 +63,7 @@ genFromAvro (S.Record (TN n) _ _ _ _ fs) =
         fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName n) fs) r
         fromAvro r               = $( [|\v -> badValue v $(mkTextLit n)|] ) r
   |]
-genFromAvro _                             = return []
+genFromAvro _                             = pure []
 
 genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
 genFromAvroFieldsExp n (x:xs) =
@@ -106,8 +108,8 @@ genType :: Schema -> Q [Dec]
 genType (S.Record (TN n) _ _ _ _ fs) = do
   flds <- traverse (mkField n) fs
   let dname = mkTextName $ mkDataTypeName n
-  return [DataD [] dname [] Nothing [RecC dname flds] []]
-genType _ = return []
+  pure [newDataType dname flds]
+genType _ = pure []
 
 mkSchemaValueName :: Text -> Text
 mkSchemaValueName r = "schema'" <> r
@@ -120,11 +122,11 @@ mkFieldTextName :: Text -> Field -> Text
 mkFieldTextName dn fld =
   updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
 
-mkField :: Text -> Field -> Q VarBangType
+mkField :: Text -> Field -> Q VarStrictType
 mkField prefix field = do
   ftype <- mkFieldTypeName (fldType field)
   let fName = mkName $ T.unpack (mkFieldTextName prefix field)
-  return (fName, defaultBang, ftype)
+  pure (fName, defaultStrictness, ftype)
 
 mkFieldTypeName :: S.Type -> Q TH.Type
 mkFieldTypeName t = case t of
@@ -153,8 +155,19 @@ updateFirst f t =
 decodeSchema :: FilePath -> IO (Either String Schema)
 decodeSchema p = eitherDecode <$> LBS.readFile p
 
-defaultBang :: Bang
-defaultBang = Bang NoSourceUnpackedness NoSourceStrictness
+newDataType :: Name -> [VarStrictType] -> Dec
+#if MIN_VERSION_template_haskell(2,11,0)
+newDataType dn flds = DataD [] dn [] Nothing [RecC dn flds] []
+#else
+newDataType dn flds = DataD [] dn [] [RecC dn flds] []
+#endif
+
+defaultStrictness :: Strict
+#if MIN_VERSION_template_haskell(2,11,0)
+defaultStrictness = Bang NoSourceUnpackedness NoSourceStrictness
+#else
+defaultStrictness = NotStrict
+#endif
 
 mkTextName :: Text -> Name
 mkTextName = mkName . T.unpack
