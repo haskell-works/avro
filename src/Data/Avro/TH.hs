@@ -10,6 +10,7 @@ where
 
 import           Control.Monad              (join)
 import           Data.Aeson                 (eitherDecode)
+import           Data.Char                  (isAlphaNum)
 import qualified Data.Aeson                 as J
 import           Data.Avro                  hiding (decode, encode)
 import           Data.Avro.Schema           as S
@@ -111,15 +112,20 @@ genType (S.Record (TN n) _ _ _ _ fs) = do
   pure [newDataType dname flds]
 genType _ = pure []
 
+sanitiseName :: Text -> Text
+sanitiseName =
+  let valid c = isAlphaNum c || c == '\'' || c == '_'
+  in T.concat . T.split (not . valid)
+
 mkSchemaValueName :: Text -> Text
 mkSchemaValueName r = "schema'" <> r
 
 mkDataTypeName :: Text -> Text
 mkDataTypeName =
-  updateFirst T.toUpper . T.takeWhileEnd (/='.')
+  sanitiseName . updateFirst T.toUpper . T.takeWhileEnd (/='.')
 
 mkFieldTextName :: Text -> Field -> Text
-mkFieldTextName dn fld =
+mkFieldTextName dn fld = sanitiseName $
   updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
 
 mkField :: Text -> Field -> Q VarStrictType
