@@ -78,6 +78,7 @@ test-suite test
                       , Avro.Codec.TextSpec
                       , Avro.Codec.ZigZagSpec
                       , Avro.EncodeRawSpec
+                      , Avro.THSpec
                       , Avro.ToAvroSpec
 
   main-is:              Spec.hs
