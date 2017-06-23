@@ -13,7 +13,7 @@ maintainer:          tommd@galois.com
 -- copyright:
 category:            Data
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+extra-source-files:  ChangeLog.md, test/data/reused.avsc, test/data/small.avsc
 cabal-version:       >=1.10
 
 source-repository head
@@ -78,7 +78,8 @@ test-suite test
                       , Avro.Codec.TextSpec
                       , Avro.Codec.ZigZagSpec
                       , Avro.EncodeRawSpec
-                      , Avro.THSpec
+                      , Avro.SchemaSpec
+                      , Avro.THSimpleSpec
                       , Avro.ToAvroSpec
 
   main-is:              Spec.hs

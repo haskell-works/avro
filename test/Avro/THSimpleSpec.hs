@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell, StandaloneDeriving     #-}
-module Avro.THSpec
+module Avro.THSimpleSpec
 where
 
 import           Data.Avro

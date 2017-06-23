@@ -17,7 +17,7 @@ import           Data.Avro.Schema           as S
 import qualified Data.Avro.Types            as AT
 import           Data.ByteString            (ByteString)
 import           Data.Int
-import           Data.List.NonEmpty
+import           Data.List.NonEmpty         (NonEmpty( (:|) ))
 import           Data.Map                   (Map)
 import           Data.Maybe                 (fromMaybe)
 import           Data.Semigroup             ((<>))
@@ -33,30 +33,28 @@ import qualified Data.Text                  as T
 -- Generates data types, FromAvro and ToAvro instances.
 deriveAvro :: FilePath -> Q [Dec]
 deriveAvro p = do
-  qAddDependentFile p
-  mbSchema <- runIO $ decodeSchema p
-  case mbSchema of
-    Left err     -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
-    Right sch -> do
-      let recs = getAllRecords sch
-      types <- traverse genType recs
-      fromAvros <- traverse genFromAvro recs
-      toAvros <- traverse genToAvro recs
-      pure $ join types <> join fromAvros <> join toAvros
+  recs <- readSchema p
+  types <- traverse genType recs
+  fromAvros <- traverse genFromAvro recs
+  toAvros <- traverse genToAvro recs
+  pure $ join types <> join fromAvros <> join toAvros
 
 -- | Derives "read only" Avro from a given schema file.
 -- Generates data types and FromAvro.
 deriveFromAvro :: FilePath -> Q [Dec]
 deriveFromAvro p = do
+  recs <- readSchema p
+  types <- traverse genType recs
+  fromAvros <- traverse genFromAvro recs
+  pure $ join types <> join fromAvros
+
+readSchema :: FilePath -> Q [Schema]
+readSchema p = do
   qAddDependentFile p
   mbSchema <- runIO $ decodeSchema p
   case mbSchema of
     Left err     -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
-    Right sch -> do
-      let recs = getAllRecords sch
-      types <- traverse genType recs
-      fromAvros <- traverse genFromAvro recs
-      pure $ join types <> join fromAvros
+    Right sch    -> pure $ extractRecords sch
 
 genFromAvro :: Schema -> Q [Dec]
 genFromAvro (S.Record (TN n) _ _ _ _ fs) =
@@ -82,9 +80,10 @@ genToAvro s@(Record (TN n) _ _ _ _ fs) = do
   idef <- toAvroInstance sname
   pure (sdef <> idef)
   where
-    schemaDef sname =
+    schemaDef sname = setName sname $
       [d|
-          $(varP sname) = fromMaybe undefined (J.decode (LBSC8.pack $(mkLit (LBSC8.unpack $ J.encode s)))) :: Schema
+          x :: Schema
+          x = fromMaybe undefined (J.decode (LBSC8.pack $(mkLit (LBSC8.unpack $ J.encode s))))
       |]
     toAvroInstance sname =
       [d| instance ToAvro $(conT . mkTextName $ n) where
@@ -97,13 +96,15 @@ genToAvro s@(Record (TN n) _ _ _ _ fs) = do
         )
       |]
 
-getAllRecords :: Schema -> [Schema]
-getAllRecords r@(S.Record _ _ _ _ _ fs) = r : (fs >>= (getAllRecords . fldType))
-getAllRecords (S.Array t)               = getAllRecords t
-getAllRecords (S.Union (t1 :| [t2]) _)  = getAllRecords t1 <> getAllRecords t2
-getAllRecords (S.Map t)                 = getAllRecords t
-getAllRecords (S.Union (_ :| _:_:_) _)  = error "Unions with more than 2 elements are not yet supported"
-getAllRecords _                       = []
+-- | A hack around TemplateHaskell limitation:
+-- It is currently not possible to splice variable name in QQ.
+-- This function allows to replace hardcoded name into the specified one.
+setName :: Name -> Q [Dec] -> Q [Dec]
+setName = fmap . map . sn
+  where
+    sn n (SigD _ t) = SigD n t
+    sn n (ValD (VarP _) x y) = ValD (VarP n) x y
+    sn _ d = d
 
 genType :: Schema -> Q [Dec]
 genType (S.Record (TN n) _ _ _ _ fs) = do
@@ -146,6 +147,7 @@ mkFieldTypeName t = case t of
   S.Union (Null :| [x]) _       -> [t| Maybe $(mkFieldTypeName x) |] -- AppT (ConT $ mkName "Maybe") (mkFieldTypeName x)
   S.Union (x :| [Null]) _       -> [t| Maybe $(mkFieldTypeName x) |] --AppT (ConT $ mkName "Maybe") (mkFieldTypeName x)
   S.Union (x :| [y]) _          -> [t| Either $(mkFieldTypeName x) $(mkFieldTypeName y) |] -- AppT (AppT (ConT (mkName "Either")) (mkFieldTypeName x)) (mkFieldTypeName y)
+  S.Union (_ :| _) _            -> error "Unions with more than 2 elements are not yet supported"
   S.Record (TN x) _ _ _ _ _     -> [t| $(conT . mkTextName . mkDataTypeName $ x) |]
   S.Map x                       -> [t| Map Text $(mkFieldTypeName x) |] --AppT (AppT (ConT (mkName "Map")) (ConT $ mkName "Text")) (mkFieldTypeName x)
   S.Array x                     -> [t| [$(mkFieldTypeName x)] |]--AppT (ConT $ Text "[]") (mkFieldTypeName x)
@@ -168,8 +170,8 @@ genDataType dn flds = do
   pure $ DataD [] dn [] Nothing [RecC dn flds] ders
 #else
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
-  pure $ DataD [] dn [] [RecC dn flds] ders
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
 #endif
 
 defaultStrictness :: Strict

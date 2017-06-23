@@ -1,0 +1,37 @@
+{
+  "type": "record",
+  "name": "ReusedWrapper",
+  "namespace": "Boo",
+  "fields": [
+    {
+      "name": "full",
+      "type": {
+        "type": "record",
+        "name": "ReusedChild",
+        "fields": [
+          {
+            "name": "data",
+            "type": "int"
+          }
+        ]
+      }
+    },
+    {
+      "name": "inner",
+      "type": {
+        "type": "record",
+        "name": "ContainerChild",
+        "fields": [
+          {
+            "name": "fstIncluded",
+            "type": "ReusedChild"
+          },
+          {
+            "name": "sndIncluded",
+            "type": "ReusedChild"
+          }
+        ]
+      }
+    }
+  ]
+}
