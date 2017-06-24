@@ -5,7 +5,7 @@ module Avro.THReusedSpec
 where
 
 import           Data.Avro
-import           Data.Avro.TH
+import           Data.Avro.Deriving
 
 import Test.Hspec
 

@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-module Data.Avro.TH
+module Data.Avro.Deriving
 ( deriveAvro
 , deriveFromAvro
 )
@@ -176,7 +176,7 @@ genDataType dn flds = do
 
 defaultStrictness :: Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-defaultStrictness = Bang NoSourceUnpackedness NoSourceStrictness
+defaultStrictness = Bang SourceUnpack SourceStrict
 #else
 defaultStrictness = NotStrict
 #endif
