@@ -79,6 +79,7 @@ test-suite test
                       , Avro.Codec.ZigZagSpec
                       , Avro.EncodeRawSpec
                       , Avro.SchemaSpec
+                      , Avro.THReusedSpec
                       , Avro.THSimpleSpec
                       , Avro.ToAvroSpec
 
