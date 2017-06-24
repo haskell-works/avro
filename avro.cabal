@@ -30,11 +30,11 @@ library
                         Data.Avro.Decode,
                         Data.Avro.DecodeRaw,
                         Data.Avro.Deconflict,
+                        Data.Avro.Deriving,
                         Data.Avro.Encode,
                         Data.Avro.EncodeRaw,
                         Data.Avro.Schema,
                         Data.Avro.Types,
-                        Data.Avro.TH,
                         Data.Avro.Zag,
                         Data.Avro.Zig
   -- other-modules:
