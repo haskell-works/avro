@@ -13,7 +13,7 @@ maintainer:          tommd@galois.com
 -- copyright:
 category:            Data
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+extra-source-files:  ChangeLog.md, test/data/reused.avsc, test/data/small.avsc
 cabal-version:       >=1.10
 
 source-repository head
@@ -34,6 +34,7 @@ library
                         Data.Avro.EncodeRaw,
                         Data.Avro.Schema,
                         Data.Avro.Types,
+                        Data.Avro.TH,
                         Data.Avro.Zag,
                         Data.Avro.Zig
   -- other-modules:
@@ -56,7 +57,8 @@ library
                        vector,
                        pure-zlib,
                        semigroups,
-                       tagged
+                       tagged,
+                       template-haskell
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2
@@ -76,6 +78,9 @@ test-suite test
                       , Avro.Codec.TextSpec
                       , Avro.Codec.ZigZagSpec
                       , Avro.EncodeRawSpec
+                      , Avro.SchemaSpec
+                      , Avro.THReusedSpec
+                      , Avro.THSimpleSpec
                       , Avro.ToAvroSpec
 
   main-is:              Spec.hs
@@ -102,5 +107,6 @@ test-suite test
                       , pure-zlib
                       , semigroups
                       , tagged
+                      , template-haskell
                       , hspec
                       , QuickCheck
