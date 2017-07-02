@@ -15,12 +15,19 @@ deriveAvro "test/data/reused.avsc"
 
 spec :: Spec
 spec = describe "Avro.THReusedSpec: Schema with named types" $ do
-  it "should do roundtrip" $ do
-    let msg = ReusedWrapper
-              { reusedWrapperFull  = ReusedChild 42
-              , reusedWrapperInner = ContainerChild
-                                     { containerChildFstIncluded = ReusedChild 100
-                                     , containerChildSndIncluded = ReusedChild 200
-                                     }
-              }
-    fromAvro (toAvro msg) `shouldBe` pure msg
+  let container = ContainerChild
+                  { containerChildFstIncluded = ReusedChild 100
+                  , containerChildSndIncluded = ReusedChild 200
+                  }
+  let wrapper = ReusedWrapper
+                { reusedWrapperFull  = ReusedChild 42
+                , reusedWrapperInner = container
+                }
+  it "wrapper should do roundtrip" $
+    fromAvro (toAvro wrapper)         `shouldBe` pure wrapper
+
+  it "child should do rundtrip" $
+    fromAvro (toAvro container)       `shouldBe` pure container
+
+  it "innermost element should do roundtrip" $
+    fromAvro (toAvro (ReusedChild 7)) `shouldBe` pure (ReusedChild 7)

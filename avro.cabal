@@ -13,7 +13,7 @@ maintainer:          tommd@galois.com
 -- copyright:
 category:            Data
 build-type:          Simple
-extra-source-files:  ChangeLog.md, test/data/reused.avsc, test/data/small.avsc
+extra-source-files:  ChangeLog.md, test/data/reused.avsc, test/data/small.avsc, test/data/enums.avsc
 cabal-version:       >=1.10
 
 source-repository head
@@ -37,7 +37,7 @@ library
                         Data.Avro.Types,
                         Data.Avro.Zag,
                         Data.Avro.Zig
-  -- other-modules:
+  other-modules:        Data.Avro.Deriving.NormSchema
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <5.0,
                        aeson,
@@ -78,7 +78,7 @@ test-suite test
                       , Avro.Codec.TextSpec
                       , Avro.Codec.ZigZagSpec
                       , Avro.EncodeRawSpec
-                      , Avro.SchemaSpec
+                      , Avro.THEnumSpec
                       , Avro.THReusedSpec
                       , Avro.THSimpleSpec
                       , Avro.ToAvroSpec

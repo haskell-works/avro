@@ -85,7 +85,6 @@ module Data.Avro
   ) where
 
 import           Prelude              as P
-import           Control.Monad.Except as X
 import           Control.Arrow        (first)
 import qualified Data.Avro.Decode     as D
 import           Data.Avro.Deconflict as C
@@ -103,15 +102,12 @@ import           Data.Int
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map             as Map
 import           Data.Monoid          ((<>))
-import           Data.Proxy
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
 import           Data.Tagged
 import qualified Data.Vector          as V
 import           Data.Word
-
-import GHC.Generics
 
 -- |Decode a lazy bytestring using a given Schema.
 decode :: FromAvro a => Schema -> ByteString -> Result a
@@ -217,7 +213,7 @@ instance FromAvro Text where
 
 instance FromAvro TL.Text where
   fromAvro (T.String txt) = pure (TL.fromStrict txt)
-  fromAvro v = badValue v "LazyText"
+  fromAvro v = badValue v "Lazy Text"
 
 instance (FromAvro a) => FromAvro (Map.Map Text a) where
   fromAvro (T.Record _ mp) = mapM fromAvro $ Map.fromList (HashMap.toList mp)
@@ -255,7 +251,7 @@ instance ToAvro Bool where
   toAvro = T.Boolean
   schema = Tagged S.Boolean
 instance ToAvro () where
-  toAvro a = T.Null
+  toAvro _ = T.Null
   schema = Tagged S.Null
 instance ToAvro Int where
   toAvro = T.Long . fromIntegral
@@ -272,6 +268,15 @@ instance ToAvro Double where
 instance ToAvro Text.Text where
   toAvro = T.String
   schema = Tagged S.String
+instance ToAvro TL.Text where
+  toAvro = T.String . TL.toStrict
+  schema = Tagged S.String
+instance ToAvro B.ByteString where
+  toAvro = T.Bytes
+  schema = Tagged S.Bytes
+instance ToAvro BL.ByteString where
+  toAvro = T.Bytes . BL.toStrict
+  schema = Tagged S.Bytes
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   toAvro e =
     let sch@(l:|[r]) = options (schemaOf e)

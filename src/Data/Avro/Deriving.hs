@@ -4,6 +4,7 @@
 
 module Data.Avro.Deriving
 ( deriveAvro
+, deriveAvro'
 , deriveFromAvro
 )
 where
@@ -24,6 +25,8 @@ import           Data.Semigroup             ((<>))
 import           Language.Haskell.TH        as TH
 import           Language.Haskell.TH.Syntax
 
+import Data.Avro.Deriving.NormSchema
+
 import qualified Data.ByteString.Lazy       as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBSC8
 import           Data.Text                  (Text)
@@ -32,35 +35,43 @@ import qualified Data.Text                  as T
 -- | Derives Avro from a given schema file.
 -- Generates data types, FromAvro and ToAvro instances.
 deriveAvro :: FilePath -> Q [Dec]
-deriveAvro p = do
-  recs <- readSchema p
-  types <- traverse genType recs
-  fromAvros <- traverse genFromAvro recs
-  toAvros <- traverse genToAvro recs
+deriveAvro p = readSchema p >>= deriveAvro'
+
+deriveAvro' :: Schema -> Q [Dec]
+deriveAvro' s = do
+  let schemas = extractDerivables s
+  types <- traverse genType schemas
+  fromAvros <- traverse genFromAvro schemas
+  toAvros <- traverse genToAvro schemas
   pure $ join types <> join fromAvros <> join toAvros
 
 -- | Derives "read only" Avro from a given schema file.
 -- Generates data types and FromAvro.
 deriveFromAvro :: FilePath -> Q [Dec]
 deriveFromAvro p = do
-  recs <- readSchema p
-  types <- traverse genType recs
-  fromAvros <- traverse genFromAvro recs
+  schemas <- extractDerivables <$> readSchema p
+  types <- traverse genType schemas
+  fromAvros <- traverse genFromAvro schemas
   pure $ join types <> join fromAvros
 
-readSchema :: FilePath -> Q [Schema]
+readSchema :: FilePath -> Q Schema
 readSchema p = do
   qAddDependentFile p
   mbSchema <- runIO $ decodeSchema p
   case mbSchema of
     Left err     -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
-    Right sch    -> pure $ extractRecords sch
+    Right sch    -> pure sch
 
 genFromAvro :: Schema -> Q [Dec]
-genFromAvro (S.Record (TN n) _ _ _ _ fs) =
-  [d| instance FromAvro $(conT . mkTextName $ n) where
-        fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName n) fs) r
-        fromAvro r               = $( [|\v -> badValue v $(mkTextLit n)|] ) r
+genFromAvro (S.Enum n _ _ _ _ _) =
+  [d| instance FromAvro $(conT $ mkDataTypeName n) where
+        fromAvro (AT.Enum _ i _) = $([| pure . toEnum|]) i
+        fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ unTN n)|] ) value
+  |]
+genFromAvro (S.Record n _ _ _ _ fs) =
+  [d| instance FromAvro $(conT $ mkDataTypeName n) where
+        fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName $ unTN n) fs) r
+        fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ unTN n)|] ) value
   |]
 genFromAvro _                             = pure []
 
@@ -74,27 +85,46 @@ genFromAvroFieldsExp n (x:xs) =
   |]
 
 genToAvro :: Schema -> Q [Dec]
-genToAvro s@(Record (TN n) _ _ _ _ fs) = do
-  let sname = mkTextName (mkSchemaValueName n)
-  sdef <- schemaDef sname
+genToAvro s@(Enum n _ _ _ vs _) = do
+  let sname = mkSchemaValueName n
+  sdef <- schemaDef sname s
   idef <- toAvroInstance sname
   pure (sdef <> idef)
   where
-    schemaDef sname = setName sname $
-      [d|
-          x :: Schema
-          x = fromMaybe undefined (J.decode (LBSC8.pack $(mkLit (LBSC8.unpack $ J.encode s))))
-      |]
+    conP' = flip conP [] . mkAdtCtorName n
     toAvroInstance sname =
-      [d| instance ToAvro $(conT . mkTextName $ n) where
+      [d| instance ToAvro $(conT $ mkDataTypeName n) where
+            schema = pure $(varE sname)
+            toAvro = $([| \x ->
+              let convert = AT.Enum $(varE sname) (fromEnum $([|x|]))
+              in $(caseE [|x|] ((\v -> match (conP' v)
+                               (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> vs))
+              |])
+      |]
+
+genToAvro s@(Record n _ _ _ _ fs) = do
+  let sname = mkSchemaValueName n
+  sdef <- schemaDef sname s
+  idef <- toAvroInstance sname
+  pure (sdef <> idef)
+  where
+    toAvroInstance sname =
+      [d| instance ToAvro $(conT $ mkDataTypeName n) where
             toAvro = $(genToAvroFieldsExp sname)
             schema = pure $(varE sname)
       |]
     genToAvroFieldsExp sname = [| \r -> record $(varE sname)
-        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE . mkTextName $ mkFieldTextName n fld) r |]
+        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkFieldTextName n fld) r |]
           in listE $ assign <$> fs
         )
       |]
+
+schemaDef :: Name -> Schema -> Q [Dec]
+schemaDef sname sch = setName sname $
+  [d|
+      x :: Schema
+      x = fromMaybe undefined (J.decode (LBSC8.pack $(mkLit (LBSC8.unpack $ J.encode sch))))
+  |]
 
 -- | A hack around TemplateHaskell limitation:
 -- It is currently not possible to splice variable name in QQ.
@@ -107,33 +137,14 @@ setName = fmap . map . sn
     sn _ d = d
 
 genType :: Schema -> Q [Dec]
-genType (S.Record (TN n) _ _ _ _ fs) = do
+genType (S.Record n _ _ _ _ fs) = do
   flds <- traverse (mkField n) fs
-  let dname = mkTextName $ mkDataTypeName n
+  let dname = mkDataTypeName n
   sequenceA [genDataType dname flds]
+genType (S.Enum n _ _ _ vs _) = do
+  let dname = mkDataTypeName n
+  sequenceA [genEnum dname (mkAdtCtorName n <$> vs)]
 genType _ = pure []
-
-sanitiseName :: Text -> Text
-sanitiseName =
-  let valid c = isAlphaNum c || c == '\'' || c == '_'
-  in T.concat . T.split (not . valid)
-
-mkSchemaValueName :: Text -> Text
-mkSchemaValueName r = "schema'" <> r
-
-mkDataTypeName :: Text -> Text
-mkDataTypeName =
-  sanitiseName . updateFirst T.toUpper . T.takeWhileEnd (/='.')
-
-mkFieldTextName :: Text -> Field -> Text
-mkFieldTextName dn fld = sanitiseName $
-  updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
-
-mkField :: Text -> Field -> Q VarStrictType
-mkField prefix field = do
-  ftype <- mkFieldTypeName (fldType field)
-  let fName = mkName $ T.unpack (mkFieldTextName prefix field)
-  pure (fName, defaultStrictness, ftype)
 
 mkFieldTypeName :: S.Type -> Q TH.Type
 mkFieldTypeName t = case t of
@@ -148,11 +159,12 @@ mkFieldTypeName t = case t of
   S.Union (x :| [Null]) _       -> [t| Maybe $(mkFieldTypeName x) |] --AppT (ConT $ mkName "Maybe") (mkFieldTypeName x)
   S.Union (x :| [y]) _          -> [t| Either $(mkFieldTypeName x) $(mkFieldTypeName y) |] -- AppT (AppT (ConT (mkName "Either")) (mkFieldTypeName x)) (mkFieldTypeName y)
   S.Union (_ :| _) _            -> error "Unions with more than 2 elements are not yet supported"
-  S.Record (TN x) _ _ _ _ _     -> [t| $(conT . mkTextName . mkDataTypeName $ x) |]
+  S.Record n _ _ _ _ _          -> [t| $(conT $ mkDataTypeName n) |]
   S.Map x                       -> [t| Map Text $(mkFieldTypeName x) |] --AppT (AppT (ConT (mkName "Map")) (ConT $ mkName "Text")) (mkFieldTypeName x)
   S.Array x                     -> [t| [$(mkFieldTypeName x)] |]--AppT (ConT $ Text "[]") (mkFieldTypeName x)
-  S.NamedType (TN x)            -> [t| $(conT $ mkTextName (mkDataTypeName x))|] --ConT . mkName . T.unpack . mkDataTypeName $ x
-  S.Fixed (TN x) _ _ _          -> [t| $(conT $ mkTextName (mkDataTypeName x))|] --ConT . mkName . T.unpack . mkDataTypeName $ x
+  S.NamedType n                 -> [t| $(conT $ mkDataTypeName n)|] --ConT . mkName . T.unpack . mkDataTypeName $ x
+  S.Fixed n _ _ _               -> [t| $(conT $ mkDataTypeName n)|] --ConT . mkName . T.unpack . mkDataTypeName $ x
+  S.Enum n _ _ _ _ _            -> [t| $(conT $ mkDataTypeName n)|]
   _                             -> error $ "Avro type is not supported: " <> show t
 
 updateFirst :: (Text -> Text) -> Text -> Text
@@ -162,6 +174,49 @@ updateFirst f t =
 
 decodeSchema :: FilePath -> IO (Either String Schema)
 decodeSchema p = eitherDecode <$> LBS.readFile p
+
+mkAdtCtorName :: TypeName -> Text -> Name
+mkAdtCtorName prefix nm =
+  concatNames (mkDataTypeName prefix) (mkDataTypeName' nm)
+
+concatNames :: Name -> Name -> Name
+concatNames a b = mkName $ nameBase a <> nameBase b
+
+sanitiseName :: Text -> Text
+sanitiseName =
+  let valid c = isAlphaNum c || c == '\'' || c == '_'
+  in T.concat . T.split (not . valid)
+
+mkSchemaValueName :: TypeName -> Name
+mkSchemaValueName (TN n) = mkTextName $ "schema'" <> n
+
+mkDataTypeName :: TypeName -> Name
+mkDataTypeName = mkDataTypeName' . unTN
+
+mkDataTypeName' :: Text -> Name
+mkDataTypeName' =
+  mkTextName . sanitiseName . updateFirst T.toUpper . T.takeWhileEnd (/='.')
+
+mkFieldTextName :: TypeName -> Field -> Name
+mkFieldTextName (TN dn) fld = mkTextName . sanitiseName $
+  updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
+
+mkField :: TypeName -> Field -> Q VarStrictType
+mkField prefix field = do
+  ftype <- mkFieldTypeName (fldType field)
+  let fName = mkFieldTextName prefix field
+  pure (fName, defaultStrictness, ftype)
+
+genEnum :: Name -> [Name] -> Q Dec
+#if MIN_VERSION_template_haskell(2,11,0)
+genEnum dn vs = do
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
+#else
+genEnum dn vs = do
+  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en]
+#endif
 
 genDataType :: Name -> [VarStrictType] -> Q Dec
 #if MIN_VERSION_template_haskell(2,11,0)
@@ -176,7 +231,7 @@ genDataType dn flds = do
 
 defaultStrictness :: Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-defaultStrictness = Bang SourceUnpack SourceStrict
+defaultStrictness = Bang SourceNoUnpack SourceStrict
 #else
 defaultStrictness = NotStrict
 #endif

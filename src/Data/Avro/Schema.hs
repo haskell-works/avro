@@ -22,7 +22,6 @@ module Data.Avro.Schema
   , typeName
   , buildTypeEnvironment
   , Result(..)
-  , extractRecords
   ) where
 
 import           Prelude as P
@@ -487,23 +486,6 @@ buildTypeEnvironment failure from =
         Fixed {..}  -> mk name aliases namespace
         Array {..}  -> go item
         _           -> []
-
--- | Extracts all the records from the schema (flattens the schema)
--- Named types get resolved when needed to include at least one "inlined"
--- schema in each record and to make each record self-contained.
--- Note: Namespaces are not really supported in this version. All the
--- namespaces (including inlined into full names) will be ignored
--- during names resolution.
-extractRecords :: Schema -> [Schema]
-extractRecords s = flip evalState S.empty . normSchema rawRecs <$> rawRecs
-  where
-    rawRecs = getRecs s
-    getRecs rec = case rec of
-      r@(Record _ _ _ _ _ fs) -> r : (fs >>= (getRecs . fldType))
-      Array t                 -> getRecs t
-      Union (t1 :| ts) _      -> getRecs t1 <> concatMap getRecs ts
-      Map t                   -> getRecs t
-      _                       -> []
 
 -- TODO: Currently ensures normalisation: only in one way
 -- that is needed for "extractRecord".
