@@ -231,7 +231,7 @@ genDataType dn flds = do
 
 defaultStrictness :: Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-defaultStrictness = Bang SourceNoUnpack SourceStrict
+defaultStrictness = Bang SourceNoUnpack NoSourceStrictness
 #else
 defaultStrictness = NotStrict
 #endif
