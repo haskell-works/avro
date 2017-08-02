@@ -18,7 +18,7 @@ module Data.Avro.Encode
 
 import Prelude as P
 import qualified Data.Aeson as A
-import           Data.Array              (Array)
+import qualified Data.Array              as Ar
 import           Data.Ix                 (Ix)
 import           Data.Bits
 import           Data.ByteString.Lazy    as BL
@@ -35,13 +35,13 @@ import           Data.List.NonEmpty      (NonEmpty(..))
 import qualified Data.List.NonEmpty      as NE
 import           Data.Monoid
 import           Data.Maybe              (catMaybes, mapMaybe)
-import           Data.Set                (Set)
+import qualified Data.Set                as S
 import           Data.Text               (Text)
 import qualified Data.Text               as T
 import qualified Data.Text.Encoding      as T
 import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import           Data.Vector             (Vector)
+import qualified Data.Vector             as V
 import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 import           Data.Proxy
@@ -162,31 +162,35 @@ instance EncodeAvro Double where
 instance EncodeAvro Float where
   avro d = AvroM (word32LE (IEEE.floatToWord d), S.Float)
 
+-- Terminating word for array and map types.
+long0 :: Builder
+long0 = encodeRaw (0 :: Word64)
+
 instance EncodeAvro a => EncodeAvro [a] where
-  avro xs = AvroM ( encodeRaw (F.length xs) <> foldMap putAvro xs
+  avro a = AvroM ( if DL.null a then long0 else encodeRaw (F.length a) <> foldMap putAvro a <> long0
                   , S.Array (getType (Proxy :: Proxy a))
                   )
 
-instance (Ix i, EncodeAvro a) => EncodeAvro (Array i a) where
-  avro a = AvroM ( encodeRaw (F.length a) <> foldMap putAvro a
+instance (Ix i, EncodeAvro a) => EncodeAvro (Ar.Array i a) where
+  avro a = AvroM ( if F.length a == 0 then long0 else encodeRaw (F.length a) <> foldMap putAvro a <> long0
                  , S.Array (getType (Proxy :: Proxy a))
                  )
-instance EncodeAvro a => EncodeAvro (Vector a) where
-  avro a = AvroM ( encodeRaw (F.length a) <> foldMap putAvro a <> word8 0
+instance EncodeAvro a => EncodeAvro (V.Vector a) where
+  avro a = AvroM ( if V.null a then long0 else encodeRaw (F.length a) <> foldMap putAvro a <> long0
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 instance (U.Unbox a, EncodeAvro a) => EncodeAvro (U.Vector a) where
-  avro a = AvroM ( encodeRaw (U.length a) <> foldMap putAvro (U.toList a)
+  avro a = AvroM ( if U.null a then long0 else encodeRaw (U.length a) <> foldMap putAvro (U.toList a) <> long0
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 
-instance EncodeAvro a => EncodeAvro (Set a) where
-  avro a = AvroM ( encodeRaw (F.length a) <> foldMap putAvro a
+instance EncodeAvro a => EncodeAvro (S.Set a) where
+  avro a = AvroM ( if S.null a then long0 else encodeRaw (F.length a) <> foldMap putAvro a <> long0
                  , S.Array (getType (Proxy :: Proxy a))
                  )
 
 instance EncodeAvro a => EncodeAvro (HashMap Text a) where
-  avro hm = AvroM ( putI (F.length hm) <> foldMap putKV (HashMap.toList hm)
+  avro hm = AvroM ( if HashMap.null hm then long0 else putI (F.length hm) <> foldMap putKV (HashMap.toList hm) <> long0
                   , S.Map (getType (Proxy :: Proxy a))
                   )
     where putKV (k,v) = putAvro k <> putAvro v

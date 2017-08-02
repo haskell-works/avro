@@ -4,8 +4,13 @@
 module Avro.THSimpleSpec
 where
 
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Data.Aeson (decodeStrict)
 import           Data.Avro
 import           Data.Avro.Deriving
+import           Data.Avro.Schema
+import           Data.ByteString as BS
 
 import Test.Hspec
 
@@ -13,12 +18,33 @@ import Test.Hspec
 
 deriveAvro "test/data/small.avsc"
 
+smallSchema :: (MonadIO m) => m Schema
+smallSchema = do
+  bs <- liftIO $ BS.readFile "test/data/small.avsc"
+  let Just sch = decodeStrict bs
+  return sch
+
 spec :: Spec
 spec = describe "Avro.THSpec: Small Schema" $ do
-  it "should do roundtrip" $ do
-    let msg = Endpoint
-              { endpointIps   = ["192.168.1.1", "127.0.0.1"]
-              , endpointPorts = [PortRange 1 10, PortRange 11 20]
-              }
-    fromAvro (toAvro msg) `shouldBe` pure msg
+  let msgs =
+        [ Endpoint
+          { endpointIps   = ["192.168.1.1", "127.0.0.1"]
+          , endpointPorts = [PortRange 1 10, PortRange 11 20]
+          }
+        , Endpoint
+          { endpointIps   = []
+          , endpointPorts = [PortRange 1 10, PortRange 11 20]
+          }
+        ]
 
+  it "should do roundtrip" $ do
+    forM_ msgs $ \msg ->
+      fromAvro (toAvro msg) `shouldBe` pure msg
+
+  it "should do full round trip" $
+    forM_ msgs $ \msg -> do
+      sch <- smallSchema
+      let encoded = encode msg
+      let decoded = decode sch encoded
+
+      pure msg `shouldBe` decoded
