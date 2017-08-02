@@ -5,7 +5,6 @@ module Avro.THSimpleSpec
 where
 
 import           Control.Monad
-import           Control.Monad.IO.Class
 import           Data.Aeson (decodeStrict)
 import           Data.Avro
 import           Data.Avro.Deriving
@@ -17,12 +16,6 @@ import Test.Hspec
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
 deriveAvro "test/data/small.avsc"
-
-smallSchema :: (MonadIO m) => m Schema
-smallSchema = do
-  bs <- liftIO $ BS.readFile "test/data/small.avsc"
-  let Just sch = decodeStrict bs
-  return sch
 
 spec :: Spec
 spec = describe "Avro.THSpec: Small Schema" $ do
@@ -43,8 +36,7 @@ spec = describe "Avro.THSpec: Small Schema" $ do
 
   it "should do full round trip" $
     forM_ msgs $ \msg -> do
-      sch <- smallSchema
       let encoded = encode msg
-      let decoded = decode sch encoded
+      let decoded = decode (schemaOf msg) encoded
 
       pure msg `shouldBe` decoded

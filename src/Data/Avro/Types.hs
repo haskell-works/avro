@@ -9,7 +9,7 @@ import Data.Vector
 
 data Value f
       = Null
-      | Boolean {-# UNPACK #-} !Bool
+      | Boolean !Bool
       | Int {-# UNPACK #-} !Int32
       | Long {-# UNPACK #-} !Int64
       | Float {-# UNPACK #-} !Float
