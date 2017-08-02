@@ -208,7 +208,11 @@ mkField prefix field = do
   pure (fName, defaultStrictness, ftype)
 
 genEnum :: Name -> [Name] -> Q Dec
-#if MIN_VERSION_template_haskell(2,11,0)
+#if MIN_VERSION_template_haskell(2,12,0)
+genEnum dn vs = do
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) [DerivClause Nothing ders]
+#elif MIN_VERSION_template_haskell(2,11,0)
 genEnum dn vs = do
   ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
@@ -219,7 +223,11 @@ genEnum dn vs = do
 #endif
 
 genDataType :: Name -> [VarStrictType] -> Q Dec
-#if MIN_VERSION_template_haskell(2,11,0)
+#if MIN_VERSION_template_haskell(2,12,0)
+genDataType dn flds = do
+  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  pure $ DataD [] dn [] Nothing [RecC dn flds] [DerivClause Nothing ders]
+#elif MIN_VERSION_template_haskell(2,11,0)
 genDataType dn flds = do
   ders <- sequenceA [[t|Eq|], [t|Show|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] ders
