@@ -2,7 +2,7 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                avro
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Avro serialization support for Haskell
 description:         Avro serialization and deserialization support for Haskell
 homepage:            https://github.com/GaloisInc/avro.git
@@ -25,19 +25,21 @@ flag dev
   manual: True
   description: Use development GHC flags
 
+flag templateHaskell
+  Description: Build Avro.Deriving, which uses Template Haskell.
+  Default: True
+
 library
   exposed-modules:      Data.Avro,
                         Data.Avro.Decode,
                         Data.Avro.DecodeRaw,
                         Data.Avro.Deconflict,
-                        Data.Avro.Deriving,
                         Data.Avro.Encode,
                         Data.Avro.EncodeRaw,
                         Data.Avro.Schema,
                         Data.Avro.Types,
                         Data.Avro.Zag,
                         Data.Avro.Zig
-  other-modules:        Data.Avro.Deriving.NormSchema
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <5.0,
                        aeson,
@@ -57,8 +59,14 @@ library
                        vector,
                        pure-zlib,
                        semigroups,
-                       tagged,
-                       template-haskell
+                       tagged
+
+  if flag(templateHaskell)
+    build-depends: template-haskell >= 2.4
+    other-extensions: TemplateHaskell
+    exposed-modules: Data.Avro.Deriving
+    other-modules:        Data.Avro.Deriving.NormSchema
+
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2
@@ -79,15 +87,8 @@ test-suite test
                       , Avro.Codec.TextSpec
                       , Avro.Codec.ZigZagSpec
                       , Avro.EncodeRawSpec
-                      , Avro.THEnumSpec
-                      , Avro.THReusedSpec
-                      , Avro.THSimpleSpec
                       , Avro.ToAvroSpec
 
-  main-is:              Spec.hs
-  ghc-options:          -threaded
-  if flag(dev)
-    ghc-options: -Wall -Werror
   build-depends:        base >=4.6 && < 5
                       , avro
                       , aeson
@@ -108,6 +109,17 @@ test-suite test
                       , pure-zlib
                       , semigroups
                       , tagged
-                      , template-haskell
                       , hspec
                       , QuickCheck
+
+  if flag(templateHaskell)
+    build-depends: template-haskell
+    other-extensions: TemplateHaskell
+    other-modules:    Avro.THEnumSpec
+                    , Avro.THReusedSpec
+                    , Avro.THSimpleSpec
+
+  main-is:              Spec.hs
+  ghc-options:          -threaded
+  if flag(dev)
+    ghc-options: -Wall -Werror
