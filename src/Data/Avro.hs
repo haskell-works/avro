@@ -77,6 +77,7 @@ module Data.Avro
   , (.=), record
   , Result(..), badValue
   , decode
+  , decodeWithSchema
   , decodeContainer
   , decodeContainerBytes
   , encode
