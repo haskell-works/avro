@@ -40,19 +40,21 @@ deriveAvro p = readSchema p >>= deriveAvro'
 deriveAvro' :: Schema -> Q [Dec]
 deriveAvro' s = do
   let schemas = extractDerivables s
-  types <- traverse genType schemas
+  types     <- traverse genType schemas
+  hasSchema <- traverse genHasAvroSchema schemas
   fromAvros <- traverse genFromAvro schemas
-  toAvros <- traverse genToAvro schemas
-  pure $ join types <> join fromAvros <> join toAvros
+  toAvros   <- traverse genToAvro schemas
+  pure $ join types <> join hasSchema <> join fromAvros <> join toAvros
 
 -- | Derives "read only" Avro from a given schema file.
 -- Generates data types and FromAvro.
 deriveFromAvro :: FilePath -> Q [Dec]
 deriveFromAvro p = do
-  schemas <- extractDerivables <$> readSchema p
-  types <- traverse genType schemas
+  schemas   <- extractDerivables <$> readSchema p
+  types     <- traverse genType schemas
+  hasSchema <- traverse genHasAvroSchema schemas
   fromAvros <- traverse genFromAvro schemas
-  pure $ join types <> join fromAvros
+  pure $ join types <> join hasSchema <> join fromAvros
 
 readSchema :: FilePath -> Q Schema
 readSchema p = do
@@ -84,17 +86,25 @@ genFromAvroFieldsExp n (x:xs) =
      )
   |]
 
+genHasAvroSchema :: Schema -> Q [Dec]
+genHasAvroSchema s = do
+  let sname = mkSchemaValueName (name s)
+  sdef <- schemaDef sname s
+  idef <- hasAvroSchema sname
+  pure (sdef <> idef)
+  where
+    hasAvroSchema sname =
+      [d| instance HasAvroSchema $(conT $ mkDataTypeName (name s)) where
+            schema = pure $(varE sname)
+      |]
+
 genToAvro :: Schema -> Q [Dec]
 genToAvro s@(Enum n _ _ _ vs _) = do
-  let sname = mkSchemaValueName n
-  sdef <- schemaDef sname s
-  idef <- toAvroInstance sname
-  pure (sdef <> idef)
+  toAvroInstance (mkSchemaValueName n)
   where
     conP' = flip conP [] . mkAdtCtorName n
     toAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName n) where
-            schema = pure $(varE sname)
             toAvro = $([| \x ->
               let convert = AT.Enum $(varE sname) (fromEnum $([|x|]))
               in $(caseE [|x|] ((\v -> match (conP' v)
@@ -102,16 +112,12 @@ genToAvro s@(Enum n _ _ _ vs _) = do
               |])
       |]
 
-genToAvro s@(Record n _ _ _ _ fs) = do
-  let sname = mkSchemaValueName n
-  sdef <- schemaDef sname s
-  idef <- toAvroInstance sname
-  pure (sdef <> idef)
+genToAvro s@(Record n _ _ _ _ fs) =
+  toAvroInstance (mkSchemaValueName n)
   where
     toAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName n) where
             toAvro = $(genToAvroFieldsExp sname)
-            schema = pure $(varE sname)
       |]
     genToAvroFieldsExp sname = [| \r -> record $(varE sname)
         $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkFieldTextName n fld) r |]

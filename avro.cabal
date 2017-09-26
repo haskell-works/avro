@@ -2,14 +2,14 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                avro
-version:             0.1.0.1
+version:             0.2.0.0
 synopsis:            Avro serialization support for Haskell
 description:         Avro serialization and deserialization support for Haskell
-homepage:            https://github.com/GaloisInc/avro.git
+homepage:            https://github.com/haskell-works/hw-haskell-avro.git
 license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
-maintainer:          tommd@galois.com
+maintainer:          Alexey Raga <alexey.raga@gmail.com>
 -- copyright:
 category:            Data
 build-type:          Simple
@@ -39,7 +39,10 @@ library
                         Data.Avro.Schema,
                         Data.Avro.Types,
                         Data.Avro.Zag,
-                        Data.Avro.Zig
+                        Data.Avro.Zig,
+                        Data.Avro.HasAvroSchema,
+                        Data.Avro.FromAvro,
+                        Data.Avro.ToAvro
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <5.0,
                        aeson,

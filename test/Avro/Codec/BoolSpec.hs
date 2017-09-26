@@ -30,11 +30,13 @@ onlyBoolSchema =
         [ fld "onlyBoolValue" Boolean Nothing
         ]
 
+instance HasAvroSchema OnlyBool where
+  schema = pure onlyBoolSchema
+
 instance ToAvro OnlyBool where
   toAvro sa = record onlyBoolSchema
     [ "onlyBoolValue" .= onlyBoolValue sa
     ]
-  schema = pure onlyBoolSchema
 
 instance FromAvro OnlyBool where
   fromAvro (AT.Record _ r) =
@@ -42,7 +44,6 @@ instance FromAvro OnlyBool where
 
 spec :: Spec
 spec = describe "Avro.Codec.BoolSpec" $ do
-  let x = untag (schema :: Tagged OnlyBool Type)
   it "should encode True correctly" $ do
     let trueEncoding = BL.singleton 0x01
     encode (OnlyBool True) `shouldBe` trueEncoding
@@ -52,7 +53,7 @@ spec = describe "Avro.Codec.BoolSpec" $ do
     encode (OnlyBool False) `shouldBe` falseEncoding
 
   it "should encode then decode True correctly" $ do
-    decode x (encode $ OnlyBool True) `shouldBe` Success (OnlyBool True)
+    decode (encode $ OnlyBool True) `shouldBe` Success (OnlyBool True)
 
   it "should encode then decode False correctly" $ do
-    decode x (encode $ OnlyBool False) `shouldBe` Success (OnlyBool False)
+    decode (encode $ OnlyBool False) `shouldBe` Success (OnlyBool False)
