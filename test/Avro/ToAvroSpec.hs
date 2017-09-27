@@ -39,6 +39,9 @@ tmSchema =
         , fld "attraction" Double Nothing
         ]
 
+instance HasAvroSchema TypesTestMessage where
+  schema = pure tmSchema
+
 instance ToAvro TypesTestMessage where
   toAvro m = record tmSchema
     [ "id"          .= tmId m
@@ -48,7 +51,6 @@ instance ToAvro TypesTestMessage where
     , "competence"  .= tmCompetence m
     , "attraction"  .= tmAttraction m
     ]
-  schema = pure tmSchema
 
 instance FromAvro TypesTestMessage where
   fromAvro (AT.Record _ r) =

@@ -37,6 +37,6 @@ spec = describe "Avro.THSpec: Small Schema" $ do
   it "should do full round trip" $
     forM_ msgs $ \msg -> do
       let encoded = encode msg
-      let decoded = decode (schemaOf msg) encoded
+      let decoded = decode encoded
 
       pure msg `shouldBe` decoded

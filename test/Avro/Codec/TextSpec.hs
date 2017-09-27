@@ -24,10 +24,12 @@ onlyTextSchema =
         [ fld "onlyTextValue" String Nothing
         ]
 
+instance HasAvroSchema OnlyText where
+  schema = pure onlyTextSchema
+
 instance ToAvro OnlyText where
   toAvro sa = record onlyTextSchema
     [ "onlyTextValue" .= onlyTextValue sa ]
-  schema = pure onlyTextSchema
 
 instance FromAvro OnlyText where
   fromAvro (AT.Record _ r) =
@@ -43,5 +45,4 @@ spec = describe "Avro.Codec.TextSpec" $ do
 
   it "Can decode encoded Text values" $ do
     Q.property $ \(t :: String) ->
-      let x = untag (schema :: Tagged OnlyText Type) in
-        decode x (encode (OnlyText (pack t))) == Success (OnlyText (pack t))
+      decode (encode (OnlyText (pack t))) == Success (OnlyText (pack t))

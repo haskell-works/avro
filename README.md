@@ -32,9 +32,9 @@ This library provides the following conversions between Haskell types and Avro t
 | HashMap String a  | {"type": "map", "value": "a"}   |
 | [a]               | {"type": "array", "value": "a"} |
 
-User defined data types should provide `ToAvro`/`FromAvro` instances to be encoded/decoded to/from Avro.
+User defined data types should provide `HasAvroSchema`/`ToAvro`/`FromAvro` instances to be encoded/decoded to/from Avro.
 
-## Defining types and `FromAvro` / `ToAvro` manually
+## Defining types and `HasAvroSchema` / `FromAvro` / `ToAvro` manually
 
 Typically these imports are useful:
 ```
@@ -69,6 +69,9 @@ personSchema =
     ]
     where
      fld nm ty def = Field nm [] Nothing Nothing ty def
+
+instance HasAvroSchema Person where
+  schema = pure personSchema
 ```
 
 `ToAvro` instance for `Person` can be defined as:
@@ -94,8 +97,8 @@ instance FromAvro Person where
   fromAvro r = badValue r "Person"
 ```
 
-## Defining types and `FromAvro` / `ToAvro` "automatically"
-This library provides functionality to derive Haskell data types and `FromAvro`/`ToAvro` instances "automatically" from already existing Avro schemas (using TemplateHaskell).
+## Defining types and `HasAvroSchema` / `FromAvro` / `ToAvro` "automatically"
+This library provides functionality to derive Haskell data types and `HasAvroSchema`/`FromAvro`/`ToAvro` instances "automatically" from already existing Avro schemas (using TemplateHaskell).
 
 ### Examples
 

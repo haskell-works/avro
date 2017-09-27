@@ -14,8 +14,8 @@ import qualified Test.QuickCheck as Q
 
 spec :: Spec
 spec = describe "Avro.Codec.ArraySpec" $ do
-  it "list roundtip" $ Q.property $ \(xs :: [Int]) -> decode (schemaOf xs) (encode xs) == Success xs
+  it "list roundtip" $ Q.property $ \(xs :: [Int]) -> decode (encode xs) == Success xs
 
   it "map roundtrip" $ Q.property $ \(xs :: Map String Int) ->
     let xs' = M.mapKeys T.pack xs
-    in decode (schemaOf xs') (encode xs') == Success xs'
+    in decode (encode xs') == Success xs'

@@ -24,10 +24,12 @@ onlyDoubleSchema =
         [ fld "onlyDoubleValue" Double Nothing
         ]
 
+instance HasAvroSchema OnlyDouble where
+  schema = pure onlyDoubleSchema
+
 instance ToAvro OnlyDouble where
   toAvro sa = record onlyDoubleSchema
     [ "onlyDoubleValue" .= onlyDoubleValue sa ]
-  schema = pure onlyDoubleSchema
 
 instance FromAvro OnlyDouble where
   fromAvro (AT.Record _ r) =
@@ -52,5 +54,4 @@ spec = describe "Avro.Codec.DoubleSpec" $ do
 
   it "Can decode encoded Double values" $ do
     Q.property $ \(d :: Double) ->
-      let x = untag (schema :: Tagged OnlyDouble Type) in
-        decode x (encode (OnlyDouble d)) == Success (OnlyDouble d)
+        decode (encode (OnlyDouble d)) == Success (OnlyDouble d)

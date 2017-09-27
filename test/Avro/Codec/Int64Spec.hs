@@ -37,11 +37,13 @@ onlyInt64Schema =
         [ fld "onlyInt64Value"    Long Nothing
         ]
 
+instance HasAvroSchema OnlyInt64 where
+  schema = pure onlyInt64Schema
+
 instance ToAvro OnlyInt64 where
   toAvro sa = record onlyInt64Schema
     [ "onlyInt64Value" .= onlyInt64Value sa
     ]
-  schema = pure onlyInt64Schema
 
 instance FromAvro OnlyInt64 where
   fromAvro (AT.Record _ r) =
@@ -67,24 +69,20 @@ spec = describe "Avro.Codec.Int64Spec" $ do
     let value = OnlyInt64 90071992547409917
     encode value `shouldBe` expectedBuffer
   it "Can decode 90071992547409917L correctly" $ do
-    let x = untag (schema :: Tagged OnlyInt64 Type)
     let buffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
     let expectedValue = OnlyInt64 90071992547409917
-    decode x buffer `shouldBe` Success expectedValue
+    decode buffer `shouldBe` Success expectedValue
   it "Can decode encoded Int64 values" $ do
-    let x = untag (schema :: Tagged OnlyInt64 Type)
-    Q.property $ \(w :: Int64) -> decode x (encode (OnlyInt64 w)) == Success (OnlyInt64 w)
+    Q.property $ \(w :: Int64) -> decode (encode (OnlyInt64 w)) == Success (OnlyInt64 w)
 
   it "Can decode 129L" $ do
     let w = 129 :: Int64
-    let x = untag (schema :: Tagged OnlyInt64 Type)
-    decode x (encode (OnlyInt64 w)) == Success (OnlyInt64 w)
+    decode (encode (OnlyInt64 w)) == Success (OnlyInt64 w)
 
   it "Can decode 36028797018963968 correctly" $ do
-    let x = untag (schema :: Tagged OnlyInt64 Type)
     let buffer = BL.pack (bitStringToWord8s "10000000 10000000 10000000 10000000 10000000 10000000 10000000 10000000 00000001")
     let expectedValue = OnlyInt64 36028797018963968
-    decode x buffer `shouldBe` Success expectedValue
+    decode buffer `shouldBe` Success expectedValue
 
   it "bitStringToWord8s 00000000"                   $  bitStringToWord8s "00000000"                    `shouldBe` [0x00             ]
   it "bitStringToWord8s 00000001"                   $  bitStringToWord8s "00000001"                    `shouldBe` [0x01             ]
