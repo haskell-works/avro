@@ -27,6 +27,7 @@ module Data.Avro.Schema
 import           Prelude as P
 import           Control.Applicative
 import           Control.Monad.Except
+import           Control.Monad.State.Strict
 import qualified Control.Monad.Fail as MF
 import qualified Data.Aeson as A
 import           Data.Aeson ((.=),object,(.:?),(.:),(.!=),FromJSON(..),ToJSON(..))
@@ -34,10 +35,12 @@ import           Data.Aeson.Types (Parser,typeMismatch)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable
+import qualified Data.List as L
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import           Data.Maybe (catMaybes)
+import           Data.Maybe (catMaybes, fromMaybe)
 import           Data.Monoid ((<>), First(..))
+import qualified Data.Set as S
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -414,7 +417,7 @@ parseAvroJSON env ty av =
             maybe (fail $ "No match for given record in union '" <> show (typeName ty) <> "'.") pure f
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
-                  Null -> return $ Ty.Null
+                  Null -> return Ty.Null
                   Union us _ | Null `elem` NE.toList us -> return $ Ty.Union us Null Ty.Null
                   _ -> avroTypeMismatch ty "null"
 
@@ -437,9 +440,9 @@ instance ToJSON Order where
 instance FromJSON Order where
   parseJSON (A.String s) =
     case s of
-      "ascending"  -> return $ Ascending
-      "descending" -> return $ Descending
-      "ignore"     -> return $ Ignore
+      "ascending"  -> return Ascending
+      "descending" -> return Descending
+      "ignore"     -> return Ignore
       _            -> fail $ "Unknown string for order: " <> T.unpack s
   parseJSON j = typeMismatch "Order" j
 
@@ -454,6 +457,7 @@ instance FromJSON Order where
 --  * Default values for unions can be cast as the type indicated by the
 --  first structure.
 --  * Default values can be cast/de-serialize correctly.
+--  * Named types are resolvable
 validateSchema :: Schema -> Parser ()
 validateSchema _sch = return () -- XXX TODO
 
@@ -476,9 +480,42 @@ buildTypeEnvironment failure from =
                 qual   = maybe [] (\x -> P.map (mappend (TN x <> ".")) unqual) ns
             in zip (unqual ++ qual) (repeat ty)
     in case ty of
-        Record {..} -> mk name aliases namespace ++ concatMap go (P.map fldType fields)
+        Record {..} -> mk name aliases namespace ++ concatMap (go . fldType) fields
         Enum {..}   -> mk name aliases namespace
         Union {..}  -> concatMap go options
         Fixed {..}  -> mk name aliases namespace
         Array {..}  -> go item
         _           -> []
+
+-- TODO: Currently ensures normalisation: only in one way
+-- that is needed for "extractRecord".
+-- it ensures that an "extracted" record is self-contained and
+-- all the named types are resolvable within the scope of the schema.
+-- The other way around (to each record is inlined only once and is referenced
+-- as a named type after that) is not implemented.
+normSchema :: [Schema] -- ^ List of all possible records
+           -> Schema   -- ^ Schema to normalise
+           -> State (S.Set TypeName) Schema
+normSchema rs r = case r of
+  t@(NamedType tn) -> do
+    let sn = shortName tn
+    resolved <- get
+    if S.member sn resolved
+      then pure t
+      else do
+        modify' (S.insert sn)
+        pure $ fromMaybe (error $ "Unable to resolve schema: " <> show (typeName t)) (findSchema tn)
+
+  Array s   -> Array <$> normSchema rs s
+  Map s     -> Map <$> normSchema rs s
+  Record{name = tn}  -> do
+    let sn = shortName tn
+    modify' (S.insert sn)
+    flds <- mapM (\fld -> setType fld <$> normSchema rs (fldType fld)) (fields r)
+    pure $ r { fields = flds }
+  s         -> pure s
+  where
+    shortName tn = TN $ T.takeWhileEnd (/='.') (unTN tn)
+    setType fld t = fld { fldType = t}
+    fullName s = TN $ maybe (typeName s) (\n -> typeName s <> "." <> n) (namespace s)
+    findSchema tn = L.find (\s -> name s == tn || fullName s == tn) rs

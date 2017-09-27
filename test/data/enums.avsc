@@ -1,0 +1,15 @@
+{ "type": "record",
+  "name": "EnumWrapper",
+  "namespace": "haskell.avro.example",
+  "fields": [
+    { "name": "id",     "type": "long" },
+    { "name": "name",   "type": "string"},
+    { "name": "reason",
+    "type": {
+        "type": "enum",
+        "name": "EnumReason",
+        "symbols": ["Because", "Instead"]
+      }
+    }
+  ]
+}

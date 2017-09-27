@@ -2,18 +2,18 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                avro
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            Avro serialization support for Haskell
 description:         Avro serialization and deserialization support for Haskell
-homepage:            https://github.com/GaloisInc/avro.git
+homepage:            https://github.com/haskell-works/hw-haskell-avro.git
 license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
-maintainer:          tommd@galois.com
+maintainer:          Alexey Raga <alexey.raga@gmail.com>
 -- copyright:
 category:            Data
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+extra-source-files:  ChangeLog.md, test/data/reused.avsc, test/data/small.avsc, test/data/enums.avsc
 cabal-version:       >=1.10
 
 source-repository head
@@ -25,6 +25,10 @@ flag dev
   manual: True
   description: Use development GHC flags
 
+flag templateHaskell
+  Description: Build Avro.Deriving, which uses Template Haskell.
+  Default: True
+
 library
   exposed-modules:      Data.Avro,
                         Data.Avro.Decode,
@@ -35,8 +39,10 @@ library
                         Data.Avro.Schema,
                         Data.Avro.Types,
                         Data.Avro.Zag,
-                        Data.Avro.Zig
-  -- other-modules:
+                        Data.Avro.Zig,
+                        Data.Avro.HasAvroSchema,
+                        Data.Avro.FromAvro,
+                        Data.Avro.ToAvro
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <5.0,
                        aeson,
@@ -57,6 +63,13 @@ library
                        pure-zlib,
                        semigroups,
                        tagged
+
+  if flag(templateHaskell)
+    build-depends: template-haskell >= 2.4
+    other-extensions: TemplateHaskell
+    exposed-modules: Data.Avro.Deriving
+    other-modules:        Data.Avro.Deriving.NormSchema
+
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2
@@ -67,7 +80,8 @@ test-suite test
   type:                 exitcode-stdio-1.0
   default-language:     Haskell2010
   hs-source-dirs:       test
-  other-modules:        Avro.Codec.BoolSpec
+  other-modules:        Avro.Codec.ArraySpec
+                      , Avro.Codec.BoolSpec
                       , Avro.Codec.CodecRawSpec
                       , Avro.Codec.DoubleSpec
                       , Avro.Codec.Int64Spec
@@ -78,10 +92,6 @@ test-suite test
                       , Avro.EncodeRawSpec
                       , Avro.ToAvroSpec
 
-  main-is:              Spec.hs
-  ghc-options:          -threaded
-  if flag(dev)
-    ghc-options: -Wall -Werror
   build-depends:        base >=4.6 && < 5
                       , avro
                       , aeson
@@ -104,3 +114,15 @@ test-suite test
                       , tagged
                       , hspec
                       , QuickCheck
+
+  if flag(templateHaskell)
+    build-depends: template-haskell
+    other-extensions: TemplateHaskell
+    other-modules:    Avro.THEnumSpec
+                    , Avro.THReusedSpec
+                    , Avro.THSimpleSpec
+
+  main-is:              Spec.hs
+  ghc-options:          -threaded
+  if flag(dev)
+    ghc-options: -Wall -Werror

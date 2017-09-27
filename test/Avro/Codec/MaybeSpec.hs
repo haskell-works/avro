@@ -27,11 +27,13 @@ onlyMaybeBoolSchema =
         [ fld "onlyMaybeBoolValue" (mkUnion (Null :| [Boolean])) Nothing
         ]
 
+instance HasAvroSchema OnlyMaybeBool where
+  schema = pure onlyMaybeBoolSchema
+
 instance ToAvro OnlyMaybeBool where
   toAvro sa = record onlyMaybeBoolSchema
     [ "onlyMaybeBoolValue" .= onlyMaybeBoolValue sa
     ]
-  schema = pure onlyMaybeBoolSchema
 
 instance FromAvro OnlyMaybeBool where
   fromAvro (AT.Record _ r) =
@@ -41,5 +43,4 @@ spec :: Spec
 spec = describe "Avro.Codec.MaybeSpec" $ do
   it "should encode then decode Maybe Bool correctly" $ do
     Q.property $ \(w :: Maybe Bool) ->
-      let x = untag (schema :: Tagged OnlyMaybeBool Type) in
-        decode x (encode (OnlyMaybeBool w)) `shouldBe` Success (OnlyMaybeBool w)
+      decode (encode (OnlyMaybeBool w)) `shouldBe` Success (OnlyMaybeBool w)

@@ -71,11 +71,13 @@
 module Data.Avro
   ( FromAvro(..)
   , ToAvro(..)
+  , HasAvroSchema(..)
   , Avro
   , (.:)
   , (.=), record
   , Result(..), badValue
   , decode
+  , decodeWithSchema
   , decodeContainer
   , decodeContainerBytes
   , encode
@@ -85,7 +87,6 @@ module Data.Avro
   ) where
 
 import           Prelude              as P
-import           Control.Monad.Except as X
 import           Control.Arrow        (first)
 import qualified Data.Avro.Decode     as D
 import           Data.Avro.Deconflict as C
@@ -103,7 +104,6 @@ import           Data.Int
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map             as Map
 import           Data.Monoid          ((<>))
-import           Data.Proxy
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
@@ -111,11 +111,21 @@ import           Data.Tagged
 import qualified Data.Vector          as V
 import           Data.Word
 
-import GHC.Generics
+import Data.Avro.FromAvro
+import Data.Avro.ToAvro
+import Data.Avro.HasAvroSchema
+
+type Avro a = (FromAvro a, ToAvro a)
 
 -- |Decode a lazy bytestring using a given Schema.
-decode :: FromAvro a => Schema -> ByteString -> Result a
-decode sch bytes =
+decode :: forall a. FromAvro a => ByteString -> Result a
+decode bytes =
+  case D.decodeAvro (untag (schema :: Tagged a Type)) bytes of
+      Right val -> fromAvro val
+      Left err  -> Error err
+
+decodeWithSchema :: FromAvro a => Schema -> ByteString -> Result a
+decodeWithSchema sch bytes =
   case D.decodeAvro sch bytes of
     Right val -> fromAvro val
     Left err  -> Error err
@@ -165,152 +175,9 @@ decodeContainerBytes bs =
                                  G.bytesRead
        G.getLazyByteString (end-start)
 
-type Avro a = (FromAvro a, ToAvro a)
-class FromAvro a where
-  fromAvro :: Value Type -> Result a
-
-instance FromAvro (Value Type) where
-  fromAvro = pure
-instance (ToAvro a, ToAvro b, FromAvro a, FromAvro b) => FromAvro (Either a b) where
-  fromAvro e@(T.Union _ v x) =
-    if | v == untag (schema :: Tagged a Type) -> Left <$> fromAvro x
-       | v == untag (schema :: Tagged b Type) -> Right <$> fromAvro x
-       | otherwise -> badValue e "either"
-  fromAvro x = badValue x "either"
-instance FromAvro Bool where
-  fromAvro (T.Boolean b) = pure b
-  fromAvro v             = badValue v "Bool"
-instance FromAvro B.ByteString where
-  fromAvro (T.Bytes b) = pure b
-  fromAvro v          = badValue v "ByteString"
-instance FromAvro BL.ByteString where
-  fromAvro (T.Bytes b) = pure (BL.fromStrict b)
-  fromAvro v          = badValue v "Lazy ByteString"
-instance FromAvro Int where
-  fromAvro (T.Int i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
-                      = pure (fromIntegral i)
-  fromAvro (T.Long i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
-                      = pure (fromIntegral i)
-  fromAvro v          = badValue v "Int"
-instance FromAvro Int32 where
-  fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro v          = badValue v "Int32"
-instance FromAvro Int64 where
-  fromAvro (T.Long i) = pure i
-  fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro v = badValue v "Int64"
-instance FromAvro Double where
-  fromAvro (T.Double d) = pure d
-  fromAvro v            = badValue v "Double"
-instance FromAvro a => FromAvro (Maybe a) where
-  fromAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
-  fromAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromAvro v
-  fromAvro v = badValue v "Maybe a"
-
-instance FromAvro a => FromAvro [a] where
-  fromAvro (T.Array vec) = mapM fromAvro $ toList vec
-  fromAvro v = badValue v "[a]"
-
-instance FromAvro Text where
-  fromAvro (T.String txt) = pure txt
-  fromAvro v = badValue v "Text"
-
-instance FromAvro TL.Text where
-  fromAvro (T.String txt) = pure (TL.fromStrict txt)
-  fromAvro v = badValue v "LazyText"
-
-instance (FromAvro a) => FromAvro (Map.Map Text a) where
-  fromAvro (T.Record _ mp) = mapM fromAvro $ Map.fromList (HashMap.toList mp)
-  fromAvro (T.Map mp)  = mapM fromAvro $ Map.fromList (HashMap.toList mp)
-  fromAvro v = badValue v "Map Text a"
-
-instance (FromAvro a) => FromAvro (HashMap.HashMap Text a) where
-  fromAvro (T.Record _ mp) = mapM fromAvro mp
-  fromAvro (T.Map mp)    = mapM fromAvro mp
-  fromAvro v = badValue v "HashMap Text a"
-
-badValue :: Value Type -> String -> Result a
-badValue v t = fail $ "Unexpected value when decoding for '" <> t <> "': " <> show v
-
-(.:) :: FromAvro a => HashMap.HashMap Text (Value Type) -> Text -> Result a
-(.:) obj key =
-  case HashMap.lookup key obj of
-    Nothing -> fail $ "Requested field not available: " <> show key
-    Just v  -> fromAvro v
-
-(.=)  :: ToAvro a => Text -> a -> (Text,T.Value Type)
-(.=) nm val = (nm,toAvro val)
-
 record :: Foldable f => Type -> f (Text,T.Value Type) -> T.Value Type
 record ty = T.Record ty . HashMap.fromList . toList
 
-class ToAvro a where
-  toAvro :: a -> T.Value Type
-  schema :: Tagged a Type
-
-schemaOf :: (ToAvro a) => a -> Type
-schemaOf = witness schema
-
-instance ToAvro Bool where
-  toAvro = T.Boolean
-  schema = Tagged S.Boolean
-instance ToAvro () where
-  toAvro a = T.Null
-  schema = Tagged S.Null
-instance ToAvro Int where
-  toAvro = T.Long . fromIntegral
-  schema = Tagged S.Long
-instance ToAvro Int32 where
-  toAvro = T.Int
-  schema = Tagged S.Int
-instance ToAvro Int64 where
-  toAvro = T.Long
-  schema = Tagged S.Long
-instance ToAvro Double where
-  toAvro = T.Double
-  schema = Tagged S.Double
-instance ToAvro Text.Text where
-  toAvro = T.String
-  schema = Tagged S.String
-instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
-  toAvro e =
-    let sch@(l:|[r]) = options (schemaOf e)
-    in case e of
-         Left a  -> T.Union sch l (toAvro a)
-         Right b -> T.Union sch r (toAvro b)
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [untag (schema :: Tagged b Type)])
-instance (ToAvro a) => ToAvro (Map.Map Text a) where
-  toAvro = toAvro . HashMap.fromList . Map.toList
-  schema = wrapTag S.Map (schema :: Tagged a Type)
-instance (ToAvro a) => ToAvro (HashMap.HashMap Text a) where
-  toAvro = T.Map . HashMap.map toAvro
-  schema = wrapTag S.Map (schema :: Tagged a Type)
-instance (ToAvro a) => ToAvro (Map.Map TL.Text a) where
-  toAvro = toAvro . HashMap.fromList . map (first TL.toStrict) . Map.toList
-  schema = wrapTag S.Map (schema :: Tagged a Type)
-instance (ToAvro a) => ToAvro (HashMap.HashMap TL.Text a) where
-  toAvro = toAvro . HashMap.fromList . map (first TL.toStrict) . HashMap.toList
-  schema = wrapTag S.Map (schema :: Tagged a Type)
-instance (ToAvro a) => ToAvro (Map.Map String a) where
-  toAvro = toAvro . HashMap.fromList . map (first Text.pack) . Map.toList
-  schema = wrapTag S.Map (schema :: Tagged a Type)
-instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
-  toAvro = toAvro . HashMap.fromList . map (first Text.pack) . HashMap.toList
-  schema = wrapTag S.Map (schema :: Tagged a Type)
-instance (ToAvro a) => ToAvro (Maybe a) where
-  toAvro a =
-    let sch@(l:|[r]) = options (schemaOf a)
-    in case a of
-      Nothing -> T.Union sch S.Null (toAvro ())
-      Just v  -> T.Union sch r (toAvro v)
-  schema = Tagged $ mkUnion (S.Null:| [untag (schema :: Tagged a Type)])
-instance (ToAvro a) => ToAvro [a] where
-  toAvro = T.Array . V.fromList . (toAvro <$>)
-  schema = wrapTag S.Array (schema :: Tagged a Type)
-
-wrapTag :: (Type -> Type) -> Tagged a Type -> Tagged b Type
-wrapTag f = Tagged . f . untag
-{-# INLINE wrapTag #-}
 
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').

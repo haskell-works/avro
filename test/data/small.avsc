@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "Endpoint",
+  "fields": [
+    {
+      "name": "ips",
+      "type": {
+        "type": "array",
+        "items": "string"
+      }
+    },
+    {
+      "name": "ports",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "PortRange",
+          "fields": [
+            {
+              "name": "start",
+              "type": "int"
+            },
+            {
+              "name": "end",
+              "type": "int"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

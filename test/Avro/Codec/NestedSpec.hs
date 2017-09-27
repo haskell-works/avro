@@ -36,12 +36,17 @@ parentTypeSchema =
         [ fld "parentValue1" Long             Nothing
         , fld "parentValue2" (Array childTypeSchema)  Nothing]
 
+instance HasAvroSchema ParentType where
+  schema = pure parentTypeSchema
+
+instance HasAvroSchema ChildType where
+  schema = pure childTypeSchema
+
 instance ToAvro ChildType where
   toAvro sa = record childTypeSchema
     [ "childValue1" .= childValue1 sa
     , "childValue2" .= childValue2 sa
     ]
-  schema = pure childTypeSchema
 
 instance FromAvro ChildType where
   fromAvro (AT.Record _ r) =
@@ -54,7 +59,6 @@ instance ToAvro ParentType where
     [ "parentValue1" .= parentValue1 sa
     , "parentValue2" .= parentValue2 sa
     ]
-  schema = pure parentTypeSchema
 
 instance FromAvro ParentType where
   fromAvro (AT.Record _ r) =
@@ -68,5 +72,5 @@ spec = describe "Avro.Codec.NestedSpec" $ do
     let parent = ParentType 0 [ChildType 1 2, ChildType 3 4]
     let parentEncoded = encode parent
 
-    let parentDecoded = decode parentTypeSchema parentEncoded
+    let parentDecoded = decode parentEncoded
     parentDecoded `shouldBe` Success parent
