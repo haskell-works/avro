@@ -91,13 +91,13 @@ encodeContainerWithSync syncBytes xss =
 -- encodeSchema = toLazyByteString . putAvro . getSchema
 
 putAvro :: EncodeAvro a => a -> Builder
-putAvro   = fst . runAvro . avro
+putAvro = fst . runAvro . avro
 
 getSchema :: forall a. EncodeAvro a => a -> Schema
-getSchema _ = getType (Proxy :: Proxy a)
+getSchema = snd . runAvro . avro
 
 getType :: EncodeAvro a => Proxy a -> Type
-getType p = snd (runAvro (avro (undefined `asProxyTypeOf` p)))
+getType = getSchema . (asProxyTypeOf undefined)
 -- N.B. ^^^ Local knowledge that 'fst' won't be used,
 -- so the bottom of 'undefined' will not escape so long as schema creation
 -- remains lazy in the argument.
