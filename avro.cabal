@@ -84,6 +84,7 @@ test-suite test
                       , Avro.Codec.BoolSpec
                       , Avro.Codec.CodecRawSpec
                       , Avro.Codec.DoubleSpec
+                      , Avro.Codec.FloatSpec
                       , Avro.Codec.Int64Spec
                       , Avro.Codec.MaybeSpec
                       , Avro.Codec.NestedSpec
