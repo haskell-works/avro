@@ -176,7 +176,7 @@ mkFieldTypeName :: S.Type -> Q TH.Type
 mkFieldTypeName t = case t of
   S.Boolean                     -> [t| Bool |]
   S.Long                        -> [t| Int64 |]
-  S.Int                         -> [t| Int |]
+  S.Int                         -> [t| Int32 |]
   S.Float                       -> [t| Float |]
   S.Double                      -> [t| Double |]
   S.Bytes                       -> [t| ByteString |]
@@ -251,7 +251,7 @@ genNewtype dn = do
   [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
-  pure $ NewtypeD [] dn [] Nothing ctor [eq, sh]
+  pure $ NewtypeD [] dn [] ctor [eq, sh]
 #endif
 
 genEnum :: Name -> [Name] -> Q Dec
