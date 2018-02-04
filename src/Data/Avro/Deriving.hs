@@ -27,6 +27,7 @@ import           Language.Haskell.TH.Syntax
 
 import Data.Avro.Deriving.NormSchema
 
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy       as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBSC8
 import           Data.Text                  (Text)
@@ -75,9 +76,9 @@ genFromAvro (S.Record n _ _ _ _ fs) =
         fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName $ unTN n) fs) r
         fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ unTN n)|] ) value
   |]
-genFromAvro (S.Fixed n _ _ _) =
+genFromAvro (S.Fixed n _ _ s) =
   [d| instance FromAvro $(conT $ mkDataTypeName n) where
-        fromAvro (AT.Fixed _ v) = pure $ $(conE (mkDataTypeName n)) v
+        fromAvro (AT.Fixed _ v) | BS.length v == s = pure $ $(conE (mkDataTypeName n)) v
         fromAvro value = $( [|\v -> badValue v $(mkTextLit $ unTN n)|] ) value
   |]
 genFromAvro _                             = pure []
