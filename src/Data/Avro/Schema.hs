@@ -95,7 +95,7 @@ data Type
       | Fixed { name        :: TypeName
               , namespace   :: Maybe Text
               , aliases     :: [TypeName]
-              , size        :: Integer
+              , size        :: Int
               }
     deriving (Show)
 
@@ -320,7 +320,7 @@ instance ToJSON (Ty.Value Type) where
       Ty.Record _ flds     -> A.Object (HashMap.map toJSON flds)
       Ty.Union _ _ Ty.Null -> A.Null
       Ty.Union _ ty val    -> object [ typeName ty .= val ]
-      Ty.Fixed bs          -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
+      Ty.Fixed _ bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
@@ -486,36 +486,3 @@ buildTypeEnvironment failure from =
         Fixed {..}  -> mk name aliases namespace
         Array {..}  -> go item
         _           -> []
-
--- TODO: Currently ensures normalisation: only in one way
--- that is needed for "extractRecord".
--- it ensures that an "extracted" record is self-contained and
--- all the named types are resolvable within the scope of the schema.
--- The other way around (to each record is inlined only once and is referenced
--- as a named type after that) is not implemented.
-normSchema :: [Schema] -- ^ List of all possible records
-           -> Schema   -- ^ Schema to normalise
-           -> State (S.Set TypeName) Schema
-normSchema rs r = case r of
-  t@(NamedType tn) -> do
-    let sn = shortName tn
-    resolved <- get
-    if S.member sn resolved
-      then pure t
-      else do
-        modify' (S.insert sn)
-        pure $ fromMaybe (error $ "Unable to resolve schema: " <> show (typeName t)) (findSchema tn)
-
-  Array s   -> Array <$> normSchema rs s
-  Map s     -> Map <$> normSchema rs s
-  Record{name = tn}  -> do
-    let sn = shortName tn
-    modify' (S.insert sn)
-    flds <- mapM (\fld -> setType fld <$> normSchema rs (fldType fld)) (fields r)
-    pure $ r { fields = flds }
-  s         -> pure s
-  where
-    shortName tn = TN $ T.takeWhileEnd (/='.') (unTN tn)
-    setType fld t = fld { fldType = t}
-    fullName s = TN $ maybe (typeName s) (\n -> typeName s <> "." <> n) (namespace s)
-    findSchema tn = L.find (\s -> name s == tn || fullName s == tn) rs

@@ -24,6 +24,8 @@ data TypesTestMessage = TypesTestMessage
   , tmTimestamp   :: Maybe Int64
   , tmForeignId   :: Maybe Int64
   , tmCompetence  :: Maybe Double
+  , tmRelevance   :: Maybe Float
+  , tmSeverity    :: Float
   , tmAttraction  :: Double
   } deriving (Show, Eq)
 
@@ -36,6 +38,8 @@ tmSchema =
         , fld "timestamp" (mkUnion (Null :| [Long])) Nothing
         , fld "foreignId" (mkUnion (Null :| [Long])) Nothing
         , fld "competence" (mkUnion (Null :| [Double])) Nothing
+        , fld "relevance" (mkUnion (Null :| [Float])) Nothing
+        , fld "severity" Float Nothing
         , fld "attraction" Double Nothing
         ]
 
@@ -49,6 +53,8 @@ instance ToAvro TypesTestMessage where
     , "timestamp"   .= tmTimestamp m
     , "foreignId"   .= tmForeignId m
     , "competence"  .= tmCompetence m
+    , "relevance"   .= tmRelevance m
+    , "severity"    .= tmSeverity m
     , "attraction"  .= tmAttraction m
     ]
 
@@ -59,6 +65,8 @@ instance FromAvro TypesTestMessage where
                      <*> r .: "timestamp"
                      <*> r .: "foreignId"
                      <*> r .: "competence"
+                     <*> r .: "relevance"
+                     <*> r .: "severity"
                      <*> r .: "attraction"
   fromAvro v = badValue v "TypesTestMessage"
 
@@ -69,6 +77,8 @@ message = TypesTestMessage
   , tmTimestamp  = Just 7
   , tmForeignId  = Nothing
   , tmCompetence = Just 7.5
+  , tmRelevance  = Just 3.8
+  , tmSeverity   = -255.77
   , tmAttraction = 8.974
   }
 
