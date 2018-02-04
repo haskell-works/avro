@@ -10,6 +10,7 @@
         "size": 16
       }
     },
+    { "name": "correlation", "type": "Opaque" },
     {
       "name": "ips",
       "type": {
