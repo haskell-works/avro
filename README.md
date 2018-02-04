@@ -48,7 +48,7 @@ Assuming there is a data type to be encoded/decoded from/to Avro:
 data Gender = Male | Female deriving (Eq, Ord, Show, Enum)
 data Person = Person
      { fullName :: Text
-     , age      :: Int
+     , age      :: Int32
      , gender   :: Gender
      , ssn      :: Maybe Text
      } deriving (Show, Eq)

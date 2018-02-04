@@ -70,6 +70,11 @@ instance FromAvro Int64 where
 instance FromAvro Double where
   fromAvro (T.Double d) = pure d
   fromAvro v            = badValue v "Double"
+
+instance FromAvro Float where
+  fromAvro (T.Float f) = pure f
+  fromAvro v           = badValue v "Float"
+
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
   fromAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromAvro v
