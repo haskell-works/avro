@@ -3,6 +3,14 @@
   "name": "Endpoint",
   "fields": [
     {
+      "name": "opaque",
+      "type": {
+        "name": "Opaque",
+        "type": "fixed",
+        "size": 16
+      }
+    },
+    {
       "name": "ips",
       "type": {
         "type": "array",

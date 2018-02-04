@@ -21,12 +21,14 @@ spec :: Spec
 spec = describe "Avro.THSpec: Small Schema" $ do
   let msgs =
         [ Endpoint
-          { endpointIps   = ["192.168.1.1", "127.0.0.1"]
-          , endpointPorts = [PortRange 1 10, PortRange 11 20]
+          { endpointIps    = ["192.168.1.1", "127.0.0.1"]
+          , endpointPorts  = [PortRange 1 10, PortRange 11 20]
+          , endpointOpaque = Opaque "16-b-long-string"
           }
         , Endpoint
           { endpointIps   = []
           , endpointPorts = [PortRange 1 10, PortRange 11 20]
+          , endpointOpaque = Opaque "opaque-long-text"
           }
         ]
 
@@ -39,4 +41,4 @@ spec = describe "Avro.THSpec: Small Schema" $ do
       let encoded = encode msg
       let decoded = decode encoded
 
-      pure msg `shouldBe` decoded
+      decoded `shouldBe` pure msg

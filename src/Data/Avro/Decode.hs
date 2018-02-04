@@ -161,7 +161,7 @@ getAvroOf ty0 = go ty0
          case unionLookup i of
           Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName $ NE.toList ts)
           Just t  -> T.Union ts t <$> go t
-    Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
+    Fixed {..} -> T.Fixed ty <$> G.getByteString (fromIntegral size)
 
  getKVBlocks :: Type -> Get [[(Text,T.Value Type)]]
  getKVBlocks t =
