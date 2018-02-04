@@ -27,6 +27,7 @@ import           Language.Haskell.TH.Syntax
 
 import Data.Avro.Deriving.NormSchema
 
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy       as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBSC8
 import           Data.Text                  (Text)
@@ -75,6 +76,11 @@ genFromAvro (S.Record n _ _ _ _ fs) =
         fromAvro (AT.Record _ r) = $(genFromAvroFieldsExp (mkTextName $ unTN n) fs) r
         fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ unTN n)|] ) value
   |]
+genFromAvro (S.Fixed n _ _ s) =
+  [d| instance FromAvro $(conT $ mkDataTypeName n) where
+        fromAvro (AT.Fixed _ v) | BS.length v == s = pure $ $(conE (mkDataTypeName n)) v
+        fromAvro value = $( [|\v -> badValue v $(mkTextLit $ unTN n)|] ) value
+  |]
 genFromAvro _                             = pure []
 
 genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
@@ -99,7 +105,7 @@ genHasAvroSchema s = do
       |]
 
 genToAvro :: Schema -> Q [Dec]
-genToAvro s@(Enum n _ _ _ vs _) = do
+genToAvro s@(Enum n _ _ _ vs _) =
   toAvroInstance (mkSchemaValueName n)
   where
     conP' = flip conP [] . mkAdtCtorName n
@@ -123,6 +129,16 @@ genToAvro s@(Record n _ _ _ _ fs) =
         $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkFieldTextName n fld) r |]
           in listE $ assign <$> fs
         )
+      |]
+
+genToAvro s@(Fixed n _ _ size) =
+  toAvroInstance (mkSchemaValueName n)
+  where
+    toAvroInstance sname =
+      [d| instance ToAvro $(conT $ mkDataTypeName n) where
+            toAvro = $(do
+              x <- newName "x"
+              lamE [conP (mkDataTypeName n) [varP x]] [| AT.Fixed $(varE sname) $(varE x) |])
       |]
 
 schemaDef :: Name -> Schema -> Q [Dec]
@@ -150,13 +166,17 @@ genType (S.Record n _ _ _ _ fs) = do
 genType (S.Enum n _ _ _ vs _) = do
   let dname = mkDataTypeName n
   sequenceA [genEnum dname (mkAdtCtorName n <$> vs)]
+genType (S.Fixed n _ _ s) = do
+  let dname = mkDataTypeName n
+  sequenceA [genNewtype dname]
+
 genType _ = pure []
 
 mkFieldTypeName :: S.Type -> Q TH.Type
 mkFieldTypeName t = case t of
   S.Boolean                     -> [t| Bool |]
   S.Long                        -> [t| Int64 |]
-  S.Int                         -> [t| Int |]
+  S.Int                         -> [t| Int32 |]
   S.Float                       -> [t| Float |]
   S.Double                      -> [t| Double |]
   S.Bytes                       -> [t| ByteString |]
@@ -212,6 +232,27 @@ mkField prefix field = do
   ftype <- mkFieldTypeName (fldType field)
   let fName = mkFieldTextName prefix field
   pure (fName, defaultStrictness, ftype)
+
+genNewtype :: Name -> Q Dec
+#if MIN_VERSION_template_haskell(2,12,0)
+genNewtype dn = do
+  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  fldType <- [t|ByteString|]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  pure $ NewtypeD [] dn [] Nothing ctor [DerivClause Nothing ders]
+#elif MIN_VERSION_template_haskell(2,11,0)
+genNewtype dn = do
+  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  fldType <- [t|ByteString|]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  pure $ NewtypeD [] dn [] Nothing ctor ders
+#else
+genNewtype dn = do
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  fldType <- [t|ByteString|]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  pure $ NewtypeD [] dn [] ctor [eq, sh]
+#endif
 
 genEnum :: Name -> [Name] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)

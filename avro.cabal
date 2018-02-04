@@ -2,7 +2,7 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                avro
-version:             0.2.0.0
+version:             0.2.1.0
 synopsis:            Avro serialization support for Haskell
 description:         Avro serialization and deserialization support for Haskell
 homepage:            https://github.com/haskell-works/hw-haskell-avro.git
@@ -56,13 +56,13 @@ library
                        fail,
                        hashable,
                        mtl,
+                       pure-zlib,
                        scientific,
+                       semigroups,
+                       tagged,
                        text,
                        unordered-containers,
-                       vector,
-                       pure-zlib,
-                       semigroups,
-                       tagged
+                       vector
 
   if flag(templateHaskell)
     build-depends: template-haskell >= 2.4
@@ -94,9 +94,10 @@ test-suite test
                       , Avro.ToAvroSpec
 
   build-depends:        base >=4.6 && < 5
-                      , avro
                       , aeson
+                      , lens-aeson
                       , array
+                      , avro
                       , base16-bytestring
                       , binary
                       , bytestring
@@ -105,16 +106,18 @@ test-suite test
                       , extra
                       , fail
                       , hashable
+                      , hspec
+                      , lens
                       , mtl
-                      , scientific
-                      , text
-                      , unordered-containers
-                      , vector
                       , pure-zlib
+                      , QuickCheck
+                      , scientific
                       , semigroups
                       , tagged
-                      , hspec
-                      , QuickCheck
+                      , text
+                      , transformers
+                      , unordered-containers
+                      , vector
 
   if flag(templateHaskell)
     build-depends: template-haskell
