@@ -121,6 +121,7 @@ test-suite test
     other-modules:    Avro.THEnumSpec
                     , Avro.THReusedSpec
                     , Avro.THSimpleSpec
+                    , Avro.THEncodeContainerSpec
 
   main-is:              Spec.hs
   ghc-options:          -threaded
