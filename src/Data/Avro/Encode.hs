@@ -233,5 +233,10 @@ instance EncodeAvro (T.Value Type) where
         case DL.elemIndex sel (NE.toList opts) of
           Just idx -> AvroM (putI idx <> putAvro val, S.mkUnion opts)
           Nothing  -> error "Union encoding specifies type not found in schema"
-      T.Fixed bs  -> avro bs
       T.Enum sch@S.Enum{..} ix t -> AvroM (putI ix, sch)
+      T.Fixed ty bs  ->
+        if (B.length bs == size ty)
+          then AvroM (byteString bs, S.Bytes)
+          else error $ "Fixed type "  <> show (name ty)
+                      <> " has size " <> show (size ty)
+                      <> " but the value has length " <> show (B.length bs)

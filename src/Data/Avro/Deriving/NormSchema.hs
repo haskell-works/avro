@@ -28,6 +28,7 @@ extractDerivables s = flip evalState S.empty . normSchema rawRecs <$> rawRecs
       Union (t1 :| ts) _      -> getTypes t1 <> concatMap getTypes ts
       Map t                   -> getTypes t
       e@Enum{}                -> [e]
+      f@Fixed{}               -> [f]
       _                       -> []
 
 -- TODO: Currently ensures normalisation: only in one way

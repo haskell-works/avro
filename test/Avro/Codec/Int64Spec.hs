@@ -19,7 +19,7 @@ import           Test.Hspec
 import qualified Data.Avro.Types      as AT
 import qualified Data.ByteString.Lazy as BL
 import qualified Test.QuickCheck      as Q
-import Debug.Trace
+
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
 
