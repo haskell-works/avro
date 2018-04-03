@@ -1,9 +1,9 @@
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 -- | Avro 'Schema's, represented here as values of type 'Schema',
 -- describe the serialization and de-serialization of values.
 --
@@ -24,32 +24,33 @@ module Data.Avro.Schema
   , Result(..)
   ) where
 
-import           Prelude as P
 import           Control.Applicative
 import           Control.Monad.Except
+import qualified Control.Monad.Fail         as MF
 import           Control.Monad.State.Strict
-import qualified Control.Monad.Fail as MF
-import qualified Data.Aeson as A
-import           Data.Aeson ((.=),object,(.:?),(.:),(.!=),FromJSON(..),ToJSON(..))
-import           Data.Aeson.Types (Parser,typeMismatch)
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.HashMap.Strict as HashMap
+import           Data.Aeson                 (FromJSON (..), ToJSON (..), object,
+                                             (.!=), (.:), (.:!), (.:?), (.=))
+import qualified Data.Aeson                 as A
+import           Data.Aeson.Types           (Parser, typeMismatch)
+import qualified Data.Avro.Types            as Ty
+import qualified Data.ByteString.Base16     as Base16
 import           Data.Hashable
-import qualified Data.List as L
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import           Data.Maybe (catMaybes, fromMaybe)
-import           Data.Monoid ((<>), First(..))
-import qualified Data.Set as S
+import qualified Data.HashMap.Strict        as HashMap
+import           Data.Int
+import qualified Data.IntMap                as IM
+import qualified Data.List                  as L
+import           Data.List.NonEmpty         (NonEmpty (..))
+import qualified Data.List.NonEmpty         as NE
+import           Data.Maybe                 (catMaybes, fromMaybe)
+import           Data.Monoid                (First (..), (<>))
+import qualified Data.Set                   as S
 import           Data.String
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Data.Text.Encoding as T
-import qualified Data.Vector as V
-import qualified Data.Avro.Types as Ty
-import qualified Data.IntMap as IM
-import Data.Int
-import Text.Show.Functions
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Data.Text.Encoding         as T
+import qualified Data.Vector                as V
+import           Prelude                    as P
+import           Text.Show.Functions
 
 -- |An Avro schema is either
 -- * A "JSON object in the form `{"type":"typeName" ...`
@@ -82,20 +83,20 @@ data Type
                , order     :: Maybe Order
                , fields    :: [Field]
                }
-      | Enum { name      :: TypeName
-             , namespace :: Maybe Text
-             , aliases   :: [TypeName]
-             , doc       :: Maybe Text
-             , symbols   :: [Text]
+      | Enum { name         :: TypeName
+             , namespace    :: Maybe Text
+             , aliases      :: [TypeName]
+             , doc          :: Maybe Text
+             , symbols      :: [Text]
              , symbolLookup :: Int64 -> Maybe Text
              }
-      | Union { options  :: NonEmpty Type
+      | Union { options     :: NonEmpty Type
               , unionLookup :: Int64 -> Maybe Type
               }
-      | Fixed { name        :: TypeName
-              , namespace   :: Maybe Text
-              , aliases     :: [TypeName]
-              , size        :: Int
+      | Fixed { name      :: TypeName
+              , namespace :: Maybe Text
+              , aliases   :: [TypeName]
+              , size      :: Int
               }
     deriving (Show)
 
@@ -167,12 +168,12 @@ typeName bt =
     Union (x:|_) _   -> typeName x
     _                -> unTN $ name bt
 
-data Field = Field { fldName       :: Text
-                   , fldAliases    :: [Text]
-                   , fldDoc        :: Maybe Text
-                   , fldOrder      :: Maybe Order
-                   , fldType       :: Type
-                   , fldDefault    :: Maybe (Ty.Value Type)
+data Field = Field { fldName    :: Text
+                   , fldAliases :: [Text]
+                   , fldDoc     :: Maybe Text
+                   , fldOrder   :: Maybe Order
+                   , fldType    :: Type
+                   , fldDefault :: Maybe (Ty.Value Type)
                    }
   deriving (Eq, Show)
 
@@ -182,15 +183,15 @@ data Order = Ascending | Descending | Ignore
 instance FromJSON Type where
   parseJSON (A.String s) =
     case s of
-      "null"     -> return Null
-      "boolean"  -> return Boolean
-      "int"      -> return Int
-      "long"     -> return Long
-      "float"    -> return Float
-      "double"   -> return Double
-      "bytes"    -> return Bytes
-      "string"   -> return String
-      somename   -> return (NamedType (TN somename))
+      "null"    -> return Null
+      "boolean" -> return Boolean
+      "int"     -> return Int
+      "long"    -> return Long
+      "float"   -> return Float
+      "double"  -> return Double
+      "bytes"   -> return Bytes
+      "string"  -> return String
+      somename  -> return (NamedType (TN somename))
   parseJSON (A.Object o) =
     do ty <- o .: ("type" :: Text)
        case ty of
@@ -272,7 +273,7 @@ instance ToJSON TypeName where
 
 instance FromJSON TypeName where
   parseJSON (A.String s) = return (TN s)
-  parseJSON j = typeMismatch "TypeName" j
+  parseJSON j            = typeMismatch "TypeName" j
 
 instance FromJSON Field where
   parseJSON (A.Object o) =
@@ -280,7 +281,7 @@ instance FromJSON Field where
        doc <- o .:? "doc"
        ty  <- o .: "type"
        let err = fail "Haskell Avro bindings does not support default for aliased or recursive types at this time."
-       defM <- o .:? "default"
+       defM <- o .:! "default"
        def <- case parseAvroJSON err ty <$> defM of
                 Just (Success x) -> return (Just x)
                 Just (Error e)   -> fail e
@@ -349,7 +350,7 @@ instance Alternative Result where
 instance MonadPlus Result where
   mzero = fail "mzero"
   mplus a@(Success _) _ = a
-  mplus _ b = b
+  mplus _ b             = b
 instance Monoid (Result a) where
   mempty = fail "Empty Result"
   mappend = mplus
