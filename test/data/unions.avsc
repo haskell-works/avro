@@ -1,0 +1,46 @@
+{ "type" : "record",
+  "name" : "Unions",
+  "namespace" : "haskell.avro.example",
+  "fields" : [
+    { "name" : "scalars",
+      "type" : ["string", "long"]
+    },
+    { "name" : "nullable",
+      "type" : ["null", "int"]
+    },
+    { "name" : "records",
+      "type" : [
+        { "type" : "record",
+          "name" : "Foo",
+          "fields" : [
+            { "name" : "stuff",
+              "type" : "string"
+            }
+          ]
+        },
+        { "type" : "record",
+          "name" : "Bar",
+          "fields" : [
+            { "name" : "stuff",
+              "type" : "string"
+            },
+            { "name" : "things",
+              "type" : "Foo"
+            }
+          ]
+        }
+      ]
+    },
+    { "name" : "sameFields",
+      "type" : [
+        "Foo",
+        { "type" : "record",
+          "name" : "NotFoo",
+          "fields" : [
+            { "name" : "stuff", "type" : "string" }
+          ]
+        }
+      ]
+    }
+  ]
+}
