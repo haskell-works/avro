@@ -45,6 +45,9 @@ instance HasAvroSchema Int64 where
 instance HasAvroSchema Double where
   schema = Tagged S.Double
 
+instance HasAvroSchema Float where
+  schema = Tagged S.Float
+
 instance HasAvroSchema Text.Text where
   schema = Tagged S.String
 

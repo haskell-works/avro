@@ -2,10 +2,10 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                avro
-version:             0.2.0.0
+version:             0.2.1.1
 synopsis:            Avro serialization support for Haskell
 description:         Avro serialization and deserialization support for Haskell
-homepage:            https://github.com/haskell-works/hw-haskell-avro.git
+homepage:            https://github.com/GaloisInc/avro.git
 license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
@@ -17,6 +17,7 @@ extra-source-files:  ChangeLog.md
                    , test/data/reused.avsc
                    , test/data/small.avsc
                    , test/data/enums.avsc
+                   , test/data/maybe.avsc
                    , test/data/unions.avsc
 cabal-version:       >=1.10
 
@@ -60,13 +61,13 @@ library
                        fail,
                        hashable,
                        mtl,
+                       pure-zlib,
                        scientific,
+                       semigroups,
+                       tagged,
                        text,
                        unordered-containers,
-                       vector,
-                       pure-zlib,
-                       semigroups,
-                       tagged
+                       vector
 
   if flag(templateHaskell)
     build-depends: template-haskell >= 2.4
@@ -88,6 +89,7 @@ test-suite test
                       , Avro.Codec.BoolSpec
                       , Avro.Codec.CodecRawSpec
                       , Avro.Codec.DoubleSpec
+                      , Avro.Codec.FloatSpec
                       , Avro.Codec.Int64Spec
                       , Avro.Codec.MaybeSpec
                       , Avro.Codec.NestedSpec
@@ -97,9 +99,10 @@ test-suite test
                       , Avro.ToAvroSpec
 
   build-depends:        base >=4.6 && < 5
-                      , avro
                       , aeson
+                      , lens-aeson
                       , array
+                      , avro
                       , base16-bytestring
                       , binary
                       , bytestring
@@ -108,16 +111,18 @@ test-suite test
                       , extra
                       , fail
                       , hashable
+                      , hspec
+                      , lens
                       , mtl
-                      , scientific
-                      , text
-                      , unordered-containers
-                      , vector
                       , pure-zlib
+                      , QuickCheck
+                      , scientific
                       , semigroups
                       , tagged
-                      , hspec
-                      , QuickCheck
+                      , text
+                      , transformers
+                      , unordered-containers
+                      , vector
 
   if flag(templateHaskell)
     build-depends: template-haskell

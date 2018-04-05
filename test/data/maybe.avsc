@@ -1,0 +1,7 @@
+{
+    "type": "record",
+    "name": "MaybeTest",
+    "fields": [
+      { "name": "tag", "type": ["null", "string"], "default": null }
+    ]
+  }

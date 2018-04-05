@@ -74,7 +74,7 @@ module Data.Avro
   , HasAvroSchema(..)
   , Avro
   , (.:)
-  , (.=), record
+  , (.=), record, fixed
   , Result(..), badValue
   , decode
   , decodeWithSchema
@@ -178,7 +178,8 @@ decodeContainerBytes bs =
 record :: Foldable f => Type -> f (Text,T.Value Type) -> T.Value Type
 record ty = T.Record ty . HashMap.fromList . toList
 
-
+fixed :: Type -> B.ByteString -> T.Value Type
+fixed = T.Fixed
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').
 -- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type

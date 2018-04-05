@@ -47,6 +47,9 @@ instance ToAvro Int64 where
 instance ToAvro Double where
   toAvro = T.Double
 
+instance ToAvro Float where
+  toAvro = T.Float
+
 instance ToAvro Text.Text where
   toAvro = T.String
 
