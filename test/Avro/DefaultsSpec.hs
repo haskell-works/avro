@@ -21,19 +21,22 @@ deriveAvro "test/data/maybe.avsc"
 spec :: Spec
 spec = describe "Avro.DefaultsSpec: Schema with named types" $ do
   it "should decode value" $
-    let msg = MaybeTest (Just "value")
+    let msg = MaybeTest (Just "value") (FixedTag "\0\42\255") "\0\37\255"
     in fromAvro (toAvro msg) `shouldBe` pure msg
 
   it "should decode no value" $
-    let msg = MaybeTest Nothing
+    let msg = MaybeTest Nothing (FixedTag "\0\42\255") "\0\37\255"
     in fromAvro (toAvro msg) `shouldBe` pure msg
 
   it "should read default from Schema" $
     let
       msgSchema = schemaOf (undefined :: MaybeTest)
-      fld = head (fields msgSchema)
-      def = fldDefault fld
-    in def `shouldNotBe` Nothing
+      fixedSchema = schemaOf (undefined :: FixedTag)
+      defaults = fldDefault <$> fields msgSchema
+    in defaults `shouldBe` [ Just Ty.Null
+                           , Just $ Ty.Fixed fixedSchema "\0\42\255"
+                           , Just $ Ty.Bytes "\0\37\255"
+                           ]
 
   it "should encode schema with default" $
     let

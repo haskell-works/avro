@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 -- | Avro 'Schema's, represented here as values of type 'Schema',
 -- describe the serialization and de-serialization of values.
 --
@@ -22,6 +23,8 @@ module Data.Avro.Schema
   , typeName
   , buildTypeEnvironment
   , Result(..)
+  , parseBytes
+  , serializeBytes
   ) where
 
 import           Control.Applicative
@@ -33,7 +36,9 @@ import           Data.Aeson                 (FromJSON (..), ToJSON (..), object,
 import qualified Data.Aeson                 as A
 import           Data.Aeson.Types           (Parser, typeMismatch)
 import qualified Data.Avro.Types            as Ty
+import qualified Data.ByteString            as B
 import qualified Data.ByteString.Base16     as Base16
+import qualified Data.Char                  as Char
 import           Data.Hashable
 import qualified Data.HashMap.Strict        as HashMap
 import           Data.Int
@@ -372,17 +377,24 @@ parseAvroJSON env (NamedType (TN tn)) av =
     Just t  -> parseAvroJSON env t av
 parseAvroJSON env ty av =
     case av of
-      A.String s     ->
+      A.String s      ->
         case ty of
-          String    -> return $ Ty.String s
-          Enum {..} ->
+          String      -> return $ Ty.String s
+          Enum {..}   ->
               if s `elem` symbols
                 then return $ Ty.Enum ty (maybe (error "IMPOSSIBLE BUG") id $ lookup s (zip symbols [0..])) s
                 else fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
+          Bytes       -> Ty.Bytes <$> parseBytes s
+          Fixed {..}  -> do
+            bytes <- parseBytes s
+            let len = B.length bytes
+            when (len /= size) $
+              fail $ "Fixed string wrong size. Expected " <> show size <> " but got " <> show len
+            return $ Ty.Fixed ty bytes
           Union tys _ -> do
             f <- tryAllTypes env tys av
             maybe (fail $ "No match for String in union '" <> show (typeName ty) <> "'.") pure f
-          _ -> avroTypeMismatch ty "string"
+          _           -> avroTypeMismatch ty "string"
       A.Bool b       -> case ty of
                           Boolean -> return $ Ty.Boolean b
                           _       -> avroTypeMismatch ty "boolean"
@@ -422,6 +434,21 @@ parseAvroJSON env ty av =
                   Null -> return Ty.Null
                   Union us _ | Null `elem` NE.toList us -> return $ Ty.Union us Null Ty.Null
                   _ -> avroTypeMismatch ty "null"
+
+-- | Parses a string literal into a bytestring in the format expected
+-- for bytes and fixed values. Will fail if every character does not
+-- have a codepoint between 0 and 255.
+parseBytes :: Text -> Result B.ByteString
+parseBytes bytes = case T.find (not . inRange) bytes of
+  Just badChar -> fail $ "Invalid character in bytes or fixed string representation: " <> show badChar
+  Nothing      -> return $ B.pack $ fromIntegral . Char.ord <$> T.unpack bytes
+  where inRange (Char.ord -> c) = c >= 0x00 && c <= 0xFF
+
+-- | Turn a 'ByteString' into a 'Text' that matches the format Avro
+-- expects from bytes and fixed literals in JSON. Each byte is mapped
+-- to a single Unicode codepoint between 0 and 255.
+serializeBytes :: B.ByteString -> Text
+serializeBytes = T.pack . map (Char.chr . fromIntegral ) . B.unpack
 
 tryAllTypes :: (Text -> Maybe Type) -> NonEmpty Type -> A.Value -> Result (Maybe (Ty.Value Type))
 tryAllTypes env tys av =

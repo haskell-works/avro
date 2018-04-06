@@ -1,6 +1,9 @@
-{-# LANGUAGE CPP                   #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Data.Avro.Deriving
 ( deriveAvro
@@ -9,29 +12,33 @@ module Data.Avro.Deriving
 )
 where
 
-import           Control.Monad              (join)
-import           Data.Aeson                 (eitherDecode)
-import           Data.Char                  (isAlphaNum)
-import qualified Data.Aeson                 as J
-import           Data.Avro                  hiding (decode, encode)
-import           Data.Avro.Schema           as S
-import qualified Data.Avro.Types            as AT
-import           Data.ByteString            (ByteString)
+import           Control.Monad                 (join)
+import           Data.Aeson                    (eitherDecode)
+import qualified Data.Aeson                    as J
+import           Data.Avro                     hiding (decode, encode)
+import           Data.Avro.Schema              as S
+import qualified Data.Avro.Types               as AT
+import           Data.ByteString               (ByteString)
+import qualified Data.ByteString as B
+import           Data.Char                     (isAlphaNum)
 import           Data.Int
-import           Data.List.NonEmpty         (NonEmpty( (:|) ))
-import           Data.Map                   (Map)
-import           Data.Maybe                 (fromMaybe)
-import           Data.Semigroup             ((<>))
-import           Language.Haskell.TH        as TH
+import           Data.List.NonEmpty            (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty            as NE
+import           Data.Map                      (Map)
+import           Data.Maybe                    (fromMaybe)
+import           Data.Semigroup                ((<>))
+import           Language.Haskell.TH           as TH
 import           Language.Haskell.TH.Syntax
 
-import Data.Avro.Deriving.NormSchema
+import           Data.Avro.Deriving.NormSchema
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy       as LBS
-import qualified Data.ByteString.Lazy.Char8 as LBSC8
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
+import qualified Data.ByteString               as BS
+import qualified Data.ByteString.Lazy          as LBS
+import qualified Data.ByteString.Lazy.Char8    as LBSC8
+import qualified Data.HashMap.Strict           as HM
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import qualified Data.Vector                   as V
 
 -- | Derives Avro from a given schema file.
 -- Generates data types, FromAvro and ToAvro instances.
@@ -62,8 +69,8 @@ readSchema p = do
   qAddDependentFile p
   mbSchema <- runIO $ decodeSchema p
   case mbSchema of
-    Left err     -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
-    Right sch    -> pure sch
+    Left err  -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
+    Right sch -> pure sch
 
 genFromAvro :: Schema -> Q [Dec]
 genFromAvro (S.Enum n _ _ _ _ _) =
@@ -145,8 +152,89 @@ schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
   [d|
       x :: Schema
-      x = fromMaybe undefined (J.decode (LBSC8.pack $(mkLit (LBSC8.unpack $ J.encode sch))))
+      x = $(mkSchema sch)
   |]
+  where mkSchema = \case
+          Null           -> [e| Null |]
+          Boolean        -> [e| Boolean |]
+          Int            -> [e| Int |]
+          Long           -> [e| Long |]
+          Float          -> [e| Float |]
+          Double         -> [e| Double |]
+          Bytes          -> [e| Bytes |]
+          String         -> [e| String |]
+          Array item     -> [e| Array $(mkSchema item) |]
+          Map values     -> [e| Map $(mkSchema values) |]
+          NamedType name -> [e| NamedType $(mkName name) |]
+          Record {..}    -> [e| Record { name      = $(mkName name)
+                                       , namespace = $(mkMaybeText namespace)
+                                       , aliases   = $(ListE <$> mapM mkName aliases)
+                                       , doc       = $(mkMaybeText doc)
+                                       , order     = $(mkOrder order)
+                                       , fields    = $(ListE <$> mapM mkField fields)
+                                       }
+                              |]
+          Enum {..}      -> [e| mkEnum $(mkName name)
+                                       $(ListE <$> mapM mkName aliases)
+                                       $(mkMaybeText namespace)
+                                       $(mkMaybeText doc)
+                                       $(ListE <$> mapM mkText symbols)
+                              |]
+          Union {..}     -> [e| mkUnion $(mkNE options) |]
+          Fixed {..}     -> [e| Fixed { name      = $(mkName name)
+                                      , namespace = $(mkMaybeText namespace)
+                                      , aliases   = $(ListE <$> mapM mkName aliases)
+                                      , size      = $(litE $ IntegerL $ fromIntegral size)
+                                      }
+                              |]
+
+        mkText text = [e| T.pack $(mkTextLit text) |]
+
+        mkName (TN name) = [e| TN $(mkText name) |]
+
+        mkMaybeText (Just text) = [e| Just $(mkText text) |]
+        mkMaybeText Nothing     = [e| Nothing |]
+
+        mkOrder (Just Ascending)  = [e| Just Ascending |]
+        mkOrder (Just Descending) = [e| Just Descending |]
+        mkOrder (Just Ignore)     = [e| Just Ignore |]
+        mkOrder Nothing           = [e| Nothing |]
+
+        mkField Field {..} =
+          [e| Field { fldName    = $(mkText fldName)
+                    , fldAliases = $(ListE <$> mapM mkText fldAliases)
+                    , fldDoc     = $(mkMaybeText fldDoc)
+                    , fldOrder   = $(mkOrder fldOrder)
+                    , fldType    = $(mkSchema fldType)
+                    , fldDefault = $(fromMaybe [e|Nothing|] $ mkJust . mkDefaultValue <$> fldDefault)
+                    }
+            |]
+
+        mkJust exp = [e|Just $(exp)|]
+
+        mkDefaultValue = \case
+          AT.Null         -> [e| AT.Null |]
+          AT.Boolean b    -> [e| AT.Boolean $(if b then [e|True|] else [e|False|]) |]
+          AT.Int n        -> [e| AT.Int $(litE $ IntegerL $ fromIntegral n) |]
+          AT.Long n       -> [e| AT.Long $(litE $ IntegerL $ fromIntegral n) |]
+          AT.Float f      -> [e| AT.Long $(litE $ FloatPrimL $ realToFrac f) |]
+          AT.Double f     -> [e| AT.Long $(litE $ FloatPrimL $ realToFrac f) |]
+          AT.Bytes bs     -> [e| AT.Bytes $(mkByteString bs) |]
+          AT.String s     -> [e| AT.String $(mkText s) |]
+          AT.Array vec    -> [e| AT.Array $ V.fromList $(ListE <$> mapM mkDefaultValue (V.toList vec)) |]
+          AT.Map m        -> [e| AT.Map $ $(mkMap m) |]
+          AT.Record s m   -> [e| AT.Record $(mkSchema s) $(mkMap m) |]
+          AT.Union _ _ v  -> mkDefaultValue v
+          AT.Fixed s bs   -> [e| AT.Fixed $(mkSchema s) $(mkByteString bs) |]
+          AT.Enum s n sym -> [e| AT.Enum $(mkSchema s) $(litE $ IntegerL $ fromIntegral n) $(mkText sym) |]
+
+        mkByteString bs = [e| B.pack $(ListE <$> mapM numericLit (B.unpack bs)) |]
+          where numericLit = litE . IntegerL . fromIntegral
+
+        mkMap (HM.toList -> xs) = [e| HM.fromList $(ListE <$> mapM mkKVPair xs) |]
+        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) e|]
+
+        mkNE (NE.toList -> xs) = [e| NE.fromList $(ListE <$> mapM mkSchema xs) |]
 
 -- | A hack around TemplateHaskell limitation:
 -- It is currently not possible to splice variable name in QQ.
@@ -154,9 +242,9 @@ schemaDef sname sch = setName sname $
 setName :: Name -> Q [Dec] -> Q [Dec]
 setName = fmap . map . sn
   where
-    sn n (SigD _ t) = SigD n t
+    sn n (SigD _ t)          = SigD n t
     sn n (ValD (VarP _) x y) = ValD (VarP n) x y
-    sn _ d = d
+    sn _ d                   = d
 
 genType :: Schema -> Q [Dec]
 genType (S.Record n _ _ _ _ fs) = do

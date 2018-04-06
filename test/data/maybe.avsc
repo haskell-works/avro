@@ -1,7 +1,19 @@
 {
-    "type": "record",
-    "name": "MaybeTest",
-    "fields": [
-      { "name": "tag", "type": ["null", "string"], "default": null }
-    ]
-  }
+  "type": "record",
+  "name": "MaybeTest",
+  "fields": [
+    { "name": "tag", "type": ["null", "string"], "default": null },
+    { "name": "fixedTag",
+      "type": {
+        "type": "fixed",
+        "name": "FixedTag",
+        "size": 3
+      },
+      "default": "\u0000\u002a\u00ff"
+    },
+    { "name": "bytesTag",
+      "type": "bytes",
+      "default": "\u0000\u0025\u00ff"
+    }
+  ]
+}
