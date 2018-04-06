@@ -112,7 +112,8 @@ instance Eq Type where
   Array ty == Array ty2 = ty == ty2
   Map ty == Map ty2 = ty == ty2
   NamedType t == NamedType t2 = t == t2
-  Record _ _ _ _ _ fs == Record _ _ _ _ _ fs2 = fs == fs2
+  Record name1 ns1 _ _ _ fs1 == Record name2 ns2 _ _ _ fs2 =
+    and [name1 == name2, ns1 == ns2, fs1 == fs2]
   Enum _ _ _ _ s _ == Enum _ _ _ _ s2 _ = s == s2
   Union a _ == Union b _ = a == b
   Fixed _ _ _ s == Fixed _ _ _ s2 = s == s2

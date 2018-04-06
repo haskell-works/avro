@@ -13,7 +13,12 @@ maintainer:          Alexey Raga <alexey.raga@gmail.com>
 -- copyright:
 category:            Data
 build-type:          Simple
-extra-source-files:  ChangeLog.md, test/data/reused.avsc, test/data/small.avsc, test/data/enums.avsc, test/data/maybe.avsc
+extra-source-files:  ChangeLog.md
+                   , test/data/reused.avsc
+                   , test/data/small.avsc
+                   , test/data/enums.avsc
+                   , test/data/maybe.avsc
+                   , test/data/unions.avsc
 cabal-version:       >=1.10
 
 source-repository head
