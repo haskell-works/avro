@@ -4,20 +4,22 @@
 module Avro.THSimpleSpec
 where
 
-import           Control.Monad
 import           Control.Lens
+import           Control.Monad
+
+import qualified Data.Aeson         as J
 import           Data.Aeson.Lens
+import qualified Data.ByteString    as B
+import qualified Data.Char          as Char
+import           Data.Monoid        ((<>))
+import           Data.Text          (Text)
+import qualified Data.Text          as T
+
+import           Test.Hspec
+
 import           Data.Avro
 import           Data.Avro.Deriving
 import           Data.Avro.Schema
-import           Data.Monoid ((<>))
-import qualified Data.Aeson as J
-import           Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.ByteString.Base16 as Base16
-
-import Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
@@ -63,5 +65,5 @@ spec = describe "Avro.THSpec: Small Schema" $ do
       json ^? key "tag" . _Value . key "string" . _String  `shouldBe` endpointTag msg ^? _Right
     where
       encodeOpaque :: Opaque -> Text
-      encodeOpaque v = "\\u" <> T.decodeUtf8 (Base16.encode $ unOpaque v)
+      encodeOpaque (Opaque bs) = T.pack $ Char.chr . fromIntegral <$> B.unpack bs
 

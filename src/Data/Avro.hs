@@ -1,7 +1,7 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiWayIf #-}
 -- | Avro encoding and decoding routines.
 --
 -- This library provides a high level interface for encoding (and decoding)
@@ -86,34 +86,34 @@ module Data.Avro
   , schemaOf
   ) where
 
-import           Prelude              as P
-import           Control.Arrow        (first)
-import qualified Data.Avro.Decode     as D
-import           Data.Avro.Deconflict as C
-import qualified Data.Avro.Encode     as E
-import           Data.Avro.Schema     as S
-import           Data.Avro.Types      as T
-import qualified Data.Binary.Get      as G
-import qualified Data.Binary.Put      as P
-import qualified Data.ByteString      as B
-import           Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BL
-import           Data.Foldable        (toList)
-import qualified Data.HashMap.Strict  as HashMap
+import           Control.Arrow           (first)
+import qualified Data.Avro.Decode        as D
+import           Data.Avro.Deconflict    as C
+import qualified Data.Avro.Encode        as E
+import           Data.Avro.Schema        as S
+import           Data.Avro.Types         as T
+import qualified Data.Binary.Get         as G
+import qualified Data.Binary.Put         as P
+import qualified Data.ByteString         as B
+import           Data.ByteString.Lazy    (ByteString)
+import qualified Data.ByteString.Lazy    as BL
+import           Data.Foldable           (toList)
+import qualified Data.HashMap.Strict     as HashMap
 import           Data.Int
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.Map             as Map
-import           Data.Monoid          ((<>))
-import           Data.Text            (Text)
-import qualified Data.Text            as Text
-import qualified Data.Text.Lazy       as TL
+import           Data.List.NonEmpty      (NonEmpty (..))
+import qualified Data.Map                as Map
+import           Data.Monoid             ((<>))
 import           Data.Tagged
-import qualified Data.Vector          as V
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import qualified Data.Text.Lazy          as TL
+import qualified Data.Vector             as V
 import           Data.Word
+import           Prelude                 as P
 
-import Data.Avro.FromAvro
-import Data.Avro.ToAvro
-import Data.Avro.HasAvroSchema
+import           Data.Avro.FromAvro
+import           Data.Avro.HasAvroSchema
+import           Data.Avro.ToAvro
 
 type Avro a = (FromAvro a, ToAvro a)
 
@@ -167,7 +167,7 @@ decodeContainerBytes :: ByteString -> [[ByteString]]
 decodeContainerBytes bs =
   case D.decodeContainerWith schemaBytes bs of
     Right (writerSchema, val) -> val
-    Left e -> error $ "Could not decode container: " <> e
+    Left e                    -> error $ "Could not decode container: " <> e
   where
   schemaBytes sch =
     do start <- G.bytesRead

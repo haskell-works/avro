@@ -37,7 +37,7 @@ fromJSON json = parseAvroJSON union env schema json >>= fromAvro
               Just t  -> do
                 nested <- parseAvroJSON union env t $ obj ! branch
                 return $ Avro.Union schemas t nested
-              Nothing -> fail $ "Type '" <> Text.unpack branch <> "' not in union."
+              Nothing -> fail $ "Type '" <> Text.unpack branch <> "' not in union: " <> show schemas
         union Schema.Union{} _ =
           Avro.Error "Invalid JSON representation for union: has to be a JSON object with exactly one field."
         union _ _ = error "Impossible: function given non-union schema."

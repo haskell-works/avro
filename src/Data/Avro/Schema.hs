@@ -26,6 +26,8 @@ module Data.Avro.Schema
   , buildTypeEnvironment
   , Result(..)
 
+  , matches
+
   , parseBytes
   , serializeBytes
 
@@ -327,14 +329,14 @@ instance ToJSON (Ty.Value Type) where
       Ty.Long i            -> A.Number (fromIntegral i)
       Ty.Float f           -> A.Number (realToFrac f)
       Ty.Double d          -> A.Number (realToFrac d)
-      Ty.Bytes bs          -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))
+      Ty.Bytes bs          -> A.String (serializeBytes bs)
       Ty.String t          -> A.String t
       Ty.Array vec         -> A.Array (V.map toJSON vec)
       Ty.Map mp            -> A.Object (HashMap.map toJSON mp)
       Ty.Record _ flds     -> A.Object (HashMap.map toJSON flds)
       Ty.Union _ _ Ty.Null -> A.Null
       Ty.Union _ ty val    -> object [ typeName ty .= val ]
-      Ty.Fixed _ bs        -> A.String ("\\u" <> T.decodeUtf8 (Base16.encode bs))  -- XXX the example wasn't literal - this should be an actual bytestring... somehow.
+      Ty.Fixed _ bs        -> A.String (serializeBytes bs)
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
@@ -524,3 +526,22 @@ buildTypeEnvironment failure from =
         Fixed {..}  -> mk name aliases namespace
         Array {..}  -> go item
         _           -> []
+
+-- | Checks that two schemas match. This is like equality of schemas,
+-- except 'NamedTypes' match against other types /with the same name/.
+--
+-- This extends recursively: two records match if they have the same
+-- name, the same number of fields and the fields all match.
+matches :: Type -> Type -> Bool
+matches (NamedType (TN n)) t        = n == typeName t
+matches t (NamedType (TN n))        = typeName t == n
+matches (Array itemA) (Array itemB) = matches itemA itemB
+matches a@Record{} b@Record{}       =
+  and [ name a == name b
+      , namespace a == namespace b
+      , length (fields a) == length (fields b)
+      , and $ zipWith fieldMatches (fields a) (fields b)
+      ]
+  where fieldMatches = matches `on` fldType
+matches a@Union{} b@Union{}         = and $ NE.zipWith matches (options a) (options b)
+matches t1 t2                       = t1 == t2

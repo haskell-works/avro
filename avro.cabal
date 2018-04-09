@@ -19,6 +19,10 @@ extra-source-files:  ChangeLog.md
                    , test/data/enums.avsc
                    , test/data/maybe.avsc
                    , test/data/unions.avsc
+
+                   , test/data/enums-object.json
+                   , test/data/unions-object-a.json
+                   , test/data/unions-object-b.json
 cabal-version:       >=1.10
 
 source-repository head
