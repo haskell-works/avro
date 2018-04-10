@@ -1,0 +1,21 @@
+{
+  "scalars": {
+    "long": 37
+  },
+  "nullable": {
+    "int": 42
+  },
+  "records": {
+    "Bar": {
+      "stuff": "stuff",
+      "things": {
+        "stuff": "things"
+      }
+    }
+  },
+  "sameFields": {
+    "NotFoo": {
+      "stuff": "not foo stuff"
+    }
+  }
+}

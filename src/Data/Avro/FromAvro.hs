@@ -40,10 +40,12 @@ class HasAvroSchema a => FromAvro a where
     Just v  -> fromAvro v
 
 instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
-  fromAvro e@(T.Union _ v x) =
-    if | v == untag (schema :: Tagged a Type) -> Left  <$> fromAvro x
-       | v == untag (schema :: Tagged b Type) -> Right <$> fromAvro x
-       | otherwise -> badValue e "either"
+  fromAvro e@(T.Union _ branch x)
+    | S.matches branch schemaA = Left  <$> fromAvro x
+    | S.matches branch schemaB = Right <$> fromAvro x
+    | otherwise              = badValue e "either"
+    where Tagged schemaA = schema :: Tagged a Type
+          Tagged schemaB = schema :: Tagged b Type
   fromAvro x = badValue x "either"
 instance FromAvro Bool where
   fromAvro (T.Boolean b) = pure b

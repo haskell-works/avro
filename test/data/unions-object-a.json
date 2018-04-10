@@ -1,0 +1,16 @@
+{
+  "scalars": {
+    "string": "blarg"
+  },
+  "nullable": null,
+  "records": {
+    "Foo": {
+      "stuff": "stuff"
+    }
+  },
+  "sameFields": {
+    "Foo": {
+      "stuff": "foo stuff"
+    }
+  }
+}
