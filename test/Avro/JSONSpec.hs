@@ -15,6 +15,9 @@ import           Test.Hspec
 
 import           Paths_avro
 
+import           System.Directory     (doesFileExist, getCurrentDirectory)
+import           System.Environment   (setEnv)
+
 deriveAvro "test/data/enums.avsc"
 deriveAvro "test/data/reused.avsc"
 deriveAvro "test/data/small.avsc"
@@ -57,7 +60,8 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
           ]
     forM_ msgs $ \ msg ->
       parseJSON (Aeson.encode (toJSON msg)) `shouldBe` pure msg
-  enumsExampleJSON <- runIO $ getDataFileName "test/data/enums-object.json" >>= LBS.readFile
+
+  enumsExampleJSON <- runIO $ getFileName "test/data/enums-object.json" >>= LBS.readFile
   it "should parse (enums)" $ do
     let expected = EnumWrapper 37 "blarg" EnumReasonInstead
     parseJSON enumsExampleJSON `shouldBe` pure expected
@@ -78,8 +82,14 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
   it "should roundtrip (unions)" $ do
     forM_ [unionsExampleA, unionsExampleB] $ \ msg ->
       parseJSON (Aeson.encode (toJSON msg)) `shouldBe` pure msg
-  unionsJsonA <- runIO $ getDataFileName "test/data/unions-object-a.json" >>= LBS.readFile
-  unionsJsonB <- runIO $ getDataFileName "test/data/unions-object-b.json" >>= LBS.readFile
+  unionsJsonA <- runIO $ getFileName "test/data/unions-object-a.json" >>= LBS.readFile
+  unionsJsonB <- runIO $ getFileName "test/data/unions-object-b.json" >>= LBS.readFile
   it "should parse (unions)" $ do
     parseJSON unionsJsonA `shouldBe` pure unionsExampleA
     parseJSON unionsJsonB `shouldBe` pure unionsExampleB
+
+getFileName :: FilePath -> IO FilePath
+getFileName p = do
+  path <- getDataFileName p
+  isOk <- doesFileExist path
+  pure $ if isOk then path else p

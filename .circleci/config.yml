@@ -1,0 +1,90 @@
+defaults: &defaults
+  working_directory: ~/build
+  docker:
+    - image: quay.io/haskell_works/stack-build-python
+
+  steps:
+    - checkout
+
+    - restore_cache:
+        keys:
+          - dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
+          - dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}
+
+    - restore_cache:
+        key: stack-work-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
+
+    - run: stack setup --resolver ${LTS}
+    - run: stack build --test --no-run-tests --haddock --no-haddock-deps --resolver ${LTS}
+
+    - save_cache:
+        key: dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}
+        paths:
+          - ~/.stack
+
+    - run:
+        name: Running unit tests
+        command: stack test --resolver ${LTS}
+
+    - save_cache:
+        key: dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
+        paths:
+          - ~/.stack
+
+    - save_cache:
+        key: stack-work-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
+        paths: ~/build/.stack-work
+
+version: 2.0
+jobs:
+  lts-7:
+    environment:
+      - LTS: "lts-7"
+    <<: *defaults
+
+  lts-9:
+    environment:
+      - LTS: "lts-9"
+    <<: *defaults
+
+  lts-11:
+    environment:
+      - LTS: "lts-11"
+    <<: *defaults
+
+  nightly:
+    environment:
+      - LTS: "nightly"
+    <<: *defaults
+
+  release:
+    working_directory: ~/build
+    docker:
+      - image: quay.io/haskell_works/stack-build-python
+
+    steps:
+      - checkout
+
+      - run:
+          name: Making a release
+          command: ./scripts/release
+
+
+workflows:
+  version: 2
+  multiple-ghcs:
+    jobs:
+      - lts-7
+      - lts-9
+      - lts-11
+      # - nightly
+      - release:
+          requires:
+            - lts-7
+            - lts-9
+            - lts-11
+            # - nightly
+          filters:
+            branches:
+              only: master
+

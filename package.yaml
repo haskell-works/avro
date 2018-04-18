@@ -1,0 +1,105 @@
+name: avro
+version: '0.2.1.1'
+synopsis: Avro serialization support for Haskell
+description: Avro serialization and deserialization support for Haskell
+category: Data
+author: Thomas M. DuBuisson
+maintainer: Alexey Raga <alexey.raga@gmail.com>
+license: BSD3
+github: GaloisInc/avro.git
+extra-source-files:
+- ChangeLog.md
+- test/data/reused.avsc
+- test/data/small.avsc
+- test/data/enums.avsc
+- test/data/maybe.avsc
+- test/data/unions.avsc
+- test/data/enums-object.json
+- test/data/unions-object-a.json
+- test/data/unions-object-b.json
+dependencies:
+- aeson
+- array
+- base16-bytestring
+- binary
+- bytestring
+- containers
+- entropy
+- fail
+- hashable
+- mtl
+- pure-zlib
+- scientific
+- semigroups
+- tagged
+- text
+- unordered-containers
+- vector
+library:
+  source-dirs: src
+  other-extensions:
+  - OverloadedStrings
+  ghc-options: -O2
+  exposed-modules:
+  - Data.Avro
+  - Data.Avro.Decode
+  - Data.Avro.DecodeRaw
+  - Data.Avro.Deconflict
+  - Data.Avro.Encode
+  - Data.Avro.Deriving
+  - Data.Avro.EncodeRaw
+  - Data.Avro.JSON
+  - Data.Avro.Schema
+  - Data.Avro.Types
+  - Data.Avro.Zag
+  - Data.Avro.Zig
+  - Data.Avro.HasAvroSchema
+  - Data.Avro.FromAvro
+  - Data.Avro.ToAvro
+  dependencies:
+  - base >=4.8 && <5.0
+  - data-binary-ieee754
+  when:
+  - condition: flag(templatehaskell)
+    other-extensions:
+    - TemplateHaskell
+    dependencies:
+    - template-haskell >=2.4
+  - condition: flag(dev)
+    ghc-options:
+    - -Wall
+    - -Werror
+tests:
+  test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options: -threaded
+    dependencies:
+    - base >=4.6 && <5
+    - lens-aeson
+    - avro
+    - directory
+    - extra
+    - hspec
+    - lens
+    - QuickCheck
+    - transformers
+    when:
+    - condition: flag(templatehaskell)
+      other-extensions:
+      - TemplateHaskell
+      dependencies:
+      - template-haskell
+    - condition: flag(dev)
+      ghc-options:
+      - -Wall
+      - -Werror
+flags:
+  templatehaskell:
+    description: Build Avro.Deriving, which uses Template Haskell.
+    manual: false
+    default: true
+  dev:
+    description: Use development GHC flags
+    manual: true
+    default: false
