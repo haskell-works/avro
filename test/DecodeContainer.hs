@@ -1,8 +1,11 @@
-import Data.Avro.Decode
-import Data.Avro.Deconflict as D
+module DecodeContainer
+where
+
+import qualified Data.Aeson           as A
+import           Data.Avro.Decode
+import           Data.Avro.Deconflict as D
 import qualified Data.ByteString.Lazy as BL
-import System.Environment
-import qualified Data.Aeson as A
+import           System.Environment
 
 main :: IO ()
 main =

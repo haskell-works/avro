@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
-import qualified Data.Avro.Types as Ty
+module Example1
+where
+import           Data.Avro
+import           Data.Avro.Schema
+import qualified Data.Avro.Types      as Ty
 import qualified Data.ByteString.Lazy as BL
-import Data.Avro.Schema
-import Data.Avro
-import Data.Text (Text)
-import Data.Map as M
-import qualified Data.Text as Text
-import           Data.List.NonEmpty (NonEmpty(..))
+import           Data.List.NonEmpty   (NonEmpty (..))
+import           Data.Map             as M
+import           Data.Text            (Text)
+import qualified Data.Text            as Text
 
 data MyEnum = A | B | C | D deriving (Eq,Ord,Show,Enum)
 data MyStruct = MyStruct (Either MyEnum Text) Int deriving (Eq,Ord,Show)
@@ -31,9 +33,15 @@ msSchema =
 -- data as well as the schema under which it is encoded.  The encoding and
 -- schema must match, though there is no type or programmatic routine that enforces
 -- this law.
+instance HasAvroSchema MyEnum where
+    schema = pure meSchema
+
 instance ToAvro MyEnum where
     toAvro x = Ty.Enum meSchema (fromEnum x) (Text.pack $ show x)
-    schema = pure meSchema
+    -- schema = pure meSchema
+
+instance HasAvroSchema MyStruct where
+    schema = pure msSchema
 
 instance ToAvro MyStruct where
     toAvro (MyStruct ab i) =
@@ -41,7 +49,7 @@ instance ToAvro MyStruct where
             [ "enumOrString" .= ab
             , "intvalue"     .= i
             ]
-    schema = pure msSchema
+    -- schema = pure msSchema
 
 -- Much like Aeson, decoding data is involves pattern matching the value
 -- constructor then building the ADT.
@@ -53,7 +61,7 @@ instance FromAvro MyStruct where
 
 instance FromAvro MyEnum where
     fromAvro (Ty.Enum _ i _) = pure (toEnum i)
-    fromAvro v = badValue v "MyEnum"
+    fromAvro v               = badValue v "MyEnum"
 
 main = do
   let valR = MyStruct (Right "Hello") 1
@@ -68,9 +76,9 @@ main = do
   print (fromAvro encL == Success valL)
   putStrLn "----------- MS Right full bytestring enc/dec--------------"
   print (BL.unpack $ encode valR)
-  print (decode msSchema (encode valR) `asTypeOf` Success valR)
-  print (decode msSchema (encode valR) == Success valR)
+  print (decode (encode valR) `asTypeOf` Success valR)
+  print (decode (encode valR) == Success valR)
   putStrLn "----------- MS Left full bytestring enc/dec--------------"
   print (BL.unpack $ encode valL)
-  print (decode msSchema (encode valL) `asTypeOf` Success valL)
-  print (decode msSchema (encode valL) == Success valL)
+  print (decode (encode valL) `asTypeOf` Success valL)
+  print (decode (encode valL) == Success valL)
