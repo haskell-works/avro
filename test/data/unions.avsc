@@ -3,10 +3,12 @@
   "namespace" : "haskell.avro.example",
   "fields" : [
     { "name" : "scalars",
-      "type" : ["string", "long"]
+      "type" : ["string", "long"],
+      "default" : "foo"
     },
     { "name" : "nullable",
-      "type" : ["null", "int"]
+      "type" : ["null", "int"],
+      "default" : null
     },
     { "name" : "records",
       "type" : [

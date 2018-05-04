@@ -383,8 +383,8 @@ instance Traversable Result where
 -- of the first type in the union.
 parseFieldDefault :: (Text -> Maybe Type) -> Type -> A.Value -> Result (Ty.Value Type)
 parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
-  where defaultUnion (Union (t :| _) _) val = parseFieldDefault env t val
-        defaultUnion _ _                    = error "Impossible: not Union."
+  where defaultUnion (Union ts@(t :| _) _) val = Ty.Union ts t <$> parseFieldDefault env t val
+        defaultUnion _ _                       = error "Impossible: not Union."
 
 -- | Parse JSON-encoded avro data.
 parseAvroJSON :: (Type -> A.Value -> Result (Ty.Value Type))
