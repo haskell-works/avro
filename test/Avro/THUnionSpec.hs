@@ -4,14 +4,20 @@
 module Avro.THUnionSpec
 where
 
-import qualified Data.List.NonEmpty as NE
+import qualified Data.List.NonEmpty   as NE
 
+import qualified Data.Aeson           as Aeson
 import           Data.Avro
 import           Data.Avro.Deriving
-import qualified Data.Avro.Schema   as Schema
-import qualified Data.Avro.Types    as Avro
+import qualified Data.Avro.Schema     as Schema
+import qualified Data.Avro.Types      as Avro
+import qualified Data.ByteString.Lazy as LBS
+
+import           System.Directory     (doesFileExist)
 
 import           Test.Hspec
+
+import           Paths_avro
 
 deriveAvro "test/data/unions.avsc"
 
@@ -52,8 +58,19 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , field "things" (named "Foo") Nothing
         ]
       notFooSchema = record "NotFoo" Nothing [field "stuff" Schema.String Nothing]
+
+  unionsSchemaFile <- runIO $ getFileName "test/data/unions.avsc" >>= LBS.readFile
+  let Just unionsSchemaFromJSON = Aeson.decode unionsSchemaFile
+
   it "produces valid schemas" $ do
-    schema'Unions `shouldBe` expectedSchema
+    schema'Unions        `shouldBe` expectedSchema
+    unionsSchemaFromJSON `shouldBe` expectedSchema
   it "records with unions should roundtrip" $ do
     fromAvro (toAvro objA) `shouldBe` pure objA
     fromAvro (toAvro objB) `shouldBe` pure objB
+
+getFileName :: FilePath -> IO FilePath
+getFileName p = do
+  path <- getDataFileName p
+  isOk <- doesFileExist path
+  pure $ if isOk then path else p
