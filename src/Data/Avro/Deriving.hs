@@ -209,6 +209,7 @@ schemaDef sname sch = setName sname $
                     , fldDefault = $(fromMaybe [e|Nothing|] $ mkJust . mkDefaultValue <$> fldDefault)
                     }
             |]
+        wrapUnion ts@(t :| _) value = AT.Union ts t <$> value
 
         mkJust exp = [e|Just $(exp)|]
 
@@ -224,7 +225,7 @@ schemaDef sname sch = setName sname $
           AT.Array vec    -> [e| AT.Array $ V.fromList $(ListE <$> mapM mkDefaultValue (V.toList vec)) |]
           AT.Map m        -> [e| AT.Map $ $(mkMap m) |]
           AT.Record s m   -> [e| AT.Record $(mkSchema s) $(mkMap m) |]
-          AT.Union _ _ v  -> mkDefaultValue v
+          AT.Union ts t v -> [e| AT.Union $(mkNE ts) $(mkSchema t) $(mkDefaultValue v) |]
           AT.Fixed s bs   -> [e| AT.Fixed $(mkSchema s) $(mkByteString bs) |]
           AT.Enum s n sym -> [e| AT.Enum $(mkSchema s) $(litE $ IntegerL $ fromIntegral n) $(mkText sym) |]
 
