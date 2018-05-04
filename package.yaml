@@ -17,6 +17,8 @@ extra-source-files:
 - test/data/enums-object.json
 - test/data/unions-object-a.json
 - test/data/unions-object-b.json
+- test/data/deconflict/writer.avsc
+- test/data/deconflict/reader.avsc
 dependencies:
 - aeson
 - array
