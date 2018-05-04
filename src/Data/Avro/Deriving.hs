@@ -209,7 +209,6 @@ schemaDef sname sch = setName sname $
                     , fldDefault = $(fromMaybe [e|Nothing|] $ mkJust . mkDefaultValue <$> fldDefault)
                     }
             |]
-        wrapUnion ts@(t :| _) value = AT.Union ts t <$> value
 
         mkJust exp = [e|Just $(exp)|]
 
