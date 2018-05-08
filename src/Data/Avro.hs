@@ -79,6 +79,7 @@ module Data.Avro
   , decode
   , decodeWithSchema
   , decodeContainer
+  , decodeContainerWithSchema
   , decodeContainerBytes
   , encode
   , encodeContainer
@@ -117,24 +118,35 @@ import           Data.Avro.ToAvro
 
 type Avro a = (FromAvro a, ToAvro a)
 
--- |Decode a lazy bytestring using a given Schema.
+-- | Decode a lazy bytestring using a Schema for the return type.
 decode :: forall a. FromAvro a => ByteString -> Result a
 decode bytes =
   case D.decodeAvro (untag (schema :: Tagged a Type)) bytes of
       Right val -> fromAvro val
       Left err  -> Error err
 
+-- | Decode a lazy bytestring with a provided schema
 decodeWithSchema :: FromAvro a => Schema -> ByteString -> Result a
 decodeWithSchema sch bytes =
   case D.decodeAvro sch bytes of
     Right val -> fromAvro val
     Left err  -> Error err
 
+-- | Decode a container and de-conflict the writer schema with
+-- a reader schema for a return type.
+-- Like in 'decodeContainerWithSchema'
+-- exceptions are thrown instead of a 'Result' type to
+-- allow this function to be read lazy (to be done in some later version).
+decodeContainer :: forall a. FromAvro a => ByteString -> [[a]]
+decodeContainer bs =
+  let readerSchema = untag (schema :: Tagged a Schema)
+  in decodeContainerWithSchema readerSchema bs
+
 -- |Decode a container and de-conflict the writer schema with a given
 -- reader-schema.  Exceptions are thrown instead of a 'Result' type to
 -- allow this function to be read lazy (to be done in some later version).
-decodeContainer :: FromAvro a => Schema -> ByteString -> [[a]]
-decodeContainer readerSchema bs =
+decodeContainerWithSchema :: FromAvro a => Schema -> ByteString -> [[a]]
+decodeContainerWithSchema readerSchema bs =
   case D.decodeContainer bs of
     Right (writerSchema,val) ->
       let err e = error $ "Could not deconflict reader and writer schema." <> e
@@ -147,15 +159,25 @@ decodeContainer readerSchema bs =
       in P.map (P.map dec) val
     Left err -> error err
 
+-- | Encodes a value to a lazy ByteString
 encode :: ToAvro a => a -> BL.ByteString
 encode = E.encodeAvro . toAvro
 
-encodeContainer :: ToAvro a => [[a]] -> IO BL.ByteString
-encodeContainer = E.encodeContainer . map (map toAvro)
+-- | Encode chunks of objects into a container, using 16 random bytes for
+-- the synchronization markers.
+encodeContainer :: forall a. ToAvro a => [[a]] -> IO BL.ByteString
+encodeContainer =
+  let sch = untag (schema :: Tagged a Schema)
+  in E.encodeContainer sch . map (map toAvro)
 
-encodeContainerWithSync :: ToAvro a => (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
-encodeContainerWithSync (a,b,c,d) = E.encodeContainerWithSync s . map (map toAvro)
- where s = P.runPut $ mapM_ P.putWord64le [a,b,c,d]
+-- | Encode chunks of objects into a container, using the provided
+-- ByteString as the synchronization markers
+encodeContainerWithSync :: forall a. ToAvro a => (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
+encodeContainerWithSync (a,b,c,d) =
+  let
+    sch = untag (schema :: Tagged a Schema)
+    syncBytes = P.runPut $ mapM_ P.putWord64le [a,b,c,d]
+  in E.encodeContainerWithSync sch syncBytes . map (map toAvro)
 
 -- |Like 'decodeContainer' but returns the avro-encoded bytes for each
 -- object in the container instead of the Haskell type.

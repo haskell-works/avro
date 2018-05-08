@@ -1,9 +1,9 @@
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE RecordWildCards      #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Data.Avro.Encode
   ( -- * High level interface
@@ -16,64 +16,64 @@ module Data.Avro.Encode
   , putAvro
   ) where
 
-import Prelude as P
-import qualified Data.Aeson as A
-import qualified Data.Array              as Ar
-import           Data.Ix                 (Ix)
+import qualified Data.Aeson                 as A
+import qualified Data.Array                 as Ar
+import qualified Data.Binary.IEEE754        as IEEE
 import           Data.Bits
-import           Data.ByteString.Lazy    as BL
-import qualified Data.Binary.IEEE754     as IEEE
-import           Data.ByteString.Lazy.Char8 ()
-import qualified Data.ByteString         as B
+import qualified Data.ByteString            as B
 import           Data.ByteString.Builder
-import qualified Data.Foldable           as F
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as HashMap
+import           Data.ByteString.Lazy       as BL
+import           Data.ByteString.Lazy.Char8 ()
+import qualified Data.Foldable              as F
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as HashMap
 import           Data.Int
-import           Data.List               as DL
-import           Data.List.NonEmpty      (NonEmpty(..))
-import qualified Data.List.NonEmpty      as NE
+import           Data.Ix                    (Ix)
+import           Data.List                  as DL
+import           Data.List.NonEmpty         (NonEmpty (..))
+import qualified Data.List.NonEmpty         as NE
+import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Monoid
-import           Data.Maybe              (catMaybes, mapMaybe)
-import qualified Data.Set                as S
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import qualified Data.Text.Encoding      as T
-import qualified Data.Text.Lazy          as TL
-import qualified Data.Text.Lazy.Encoding as TL
-import qualified Data.Vector             as V
-import qualified Data.Vector.Unboxed     as U
-import           Data.Word
 import           Data.Proxy
-import           System.Entropy (getEntropy)
+import qualified Data.Set                   as S
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import qualified Data.Text.Encoding         as T
+import qualified Data.Text.Lazy             as TL
+import qualified Data.Text.Lazy.Encoding    as TL
+import qualified Data.Vector                as V
+import qualified Data.Vector.Unboxed        as U
+import           Data.Word
+import           Prelude                    as P
+import           System.Entropy             (getEntropy)
 
-import Data.Avro.EncodeRaw
-import Data.Avro.Schema as S
-import Data.Avro.Types  as T
-import Data.Avro.Zag
-import Data.Avro.Zig
+import           Data.Avro.EncodeRaw
+import           Data.Avro.HasAvroSchema
+import           Data.Avro.Schema           as S
+import           Data.Avro.Types            as T
+import           Data.Avro.Zag
+import           Data.Avro.Zig
 
 encodeAvro :: EncodeAvro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
 
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers.
-encodeContainer :: EncodeAvro a => [[a]] -> IO BL.ByteString
-encodeContainer xss =
+encodeContainer :: EncodeAvro a => Schema -> [[a]] -> IO BL.ByteString
+encodeContainer sch xss =
   do sync <- getEntropy 16
-     return $ encodeContainerWithSync (BL.fromStrict sync) xss
+     return $ encodeContainerWithSync sch (BL.fromStrict sync) xss
 
 -- |Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
-encodeContainerWithSync :: EncodeAvro a => BL.ByteString -> [[a]] -> BL.ByteString
-encodeContainerWithSync syncBytes xss =
+encodeContainerWithSync :: EncodeAvro a => Schema -> BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync sch syncBytes xss =
  toLazyByteString $
   lazyByteString avroMagicBytes <>
-  putAvro (HashMap.fromList [("avro.schema", A.encode objSchema), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
+  putAvro (HashMap.fromList [("avro.schema", A.encode sch), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
   lazyByteString syncBytes <>
   foldMap putBlocks xss
  where
-  objSchema    = getSchema (P.head (P.head xss))
   putBlocks ys =
     let nrObj    = P.length ys
         nrBytes  = BL.length theBytes
