@@ -19,7 +19,7 @@ import           Data.Avro                     hiding (decode, encode)
 import           Data.Avro.Schema              as S
 import qualified Data.Avro.Types               as AT
 import           Data.ByteString               (ByteString)
-import qualified Data.ByteString as B
+import qualified Data.ByteString               as B
 import           Data.Char                     (isAlphaNum)
 import           Data.Int
 import           Data.List.NonEmpty            (NonEmpty ((:|)))
