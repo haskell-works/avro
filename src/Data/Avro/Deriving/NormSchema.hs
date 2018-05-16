@@ -57,9 +57,10 @@ normSchema r = case r of
 
   Array s   -> Array <$> normSchema s
   Map s     -> Map <$> normSchema s
+  Union l f -> flip Union f <$> traverse normSchema l
   r@Record{name = tn}  -> do
     let sn = shortName tn
-    modify' (M.insert sn r)
+    modify' (M.insert sn (NamedType tn))
     flds <- mapM (\fld -> setType fld <$> normSchema (fldType fld)) (fields r)
     pure $ r { fields = flds }
   s         -> pure s

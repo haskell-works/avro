@@ -1,0 +1,26 @@
+[{
+    "type": "record",
+    "name": "Blessing",
+    "namespace": "avro.test.data",
+    "fields": [
+      { "name": "geo",
+        "type": ["null", {
+          "type": "record",
+          "name": "Geo",
+          "fields": [
+            { "name": "source", "type": "string" },
+            { "name": "dest", "type": "string" }
+          ]
+        }]
+      }
+    ]
+  },
+  {
+    "type": "record",
+    "name": "Curse",
+    "namespace": "avro.test.data",
+    "fields": [
+      { "name": "geo", "type": ["null", "Geo"] }
+    ]
+  }
+]
