@@ -207,30 +207,35 @@ instance FromJSON Type where
       "bytes"   -> return Bytes
       "string"  -> return String
       somename  -> return (NamedType (TN somename))
-  parseJSON (A.Object o) =
-    do ty <- o .: ("type" :: Text)
-       case ty of
-        "map"    -> Map   <$> o .: ("values" :: Text)
-        "array"  -> Array <$> o .: ("items"  :: Text)
-        "record" ->
-          Record <$> o .:  ("name" :: Text)
-                 <*> o .:? ("namespace" :: Text)
-                 <*> o .:? ("aliases" :: Text) .!= []
-                 <*> o .:? ("doc" :: Text)
-                 <*> o .:? ("order" :: Text) .!= Just Ascending
-                 <*> o .:  ("fields" :: Text)
-        "enum"   ->
-          mkEnum <$> o .:  ("name" :: Text)
-                 <*> o .:? ("aliases" :: Text)  .!= []
-                 <*> o .:? ("namespace" :: Text)
-                 <*> o .:? ("doc" :: Text)
-                 <*> o .:  ("symbols" :: Text)
-        "fixed"  ->
-           Fixed <$> o .:  ("name" :: Text)
-                 <*> o .:? ("namespace" :: Text)
-                 <*> o .:? ("aliases" :: Text) .!= []
-                 <*> o .:  ("size" :: Text)
-        s  -> fail $ "Unrecognized object type: " <> s
+  parseJSON (A.Object o) = do
+    mbLogicalType <- o .:? ("logicalType" :: Text) :: Parser (Maybe Text)
+    ty            <- o .:  ("type" :: Text)
+
+    case mbLogicalType of
+      Just _  -> parseJSON (A.String ty)
+      Nothing ->
+        case ty of
+          "map"    -> Map   <$> o .: ("values" :: Text)
+          "array"  -> Array <$> o .: ("items"  :: Text)
+          "record" ->
+            Record <$> o .:  ("name" :: Text)
+                  <*> o .:? ("namespace" :: Text)
+                  <*> o .:? ("aliases" :: Text) .!= []
+                  <*> o .:? ("doc" :: Text)
+                  <*> o .:? ("order" :: Text) .!= Just Ascending
+                  <*> o .:  ("fields" :: Text)
+          "enum"   ->
+            mkEnum <$> o .:  ("name" :: Text)
+                  <*> o .:? ("aliases" :: Text)  .!= []
+                  <*> o .:? ("namespace" :: Text)
+                  <*> o .:? ("doc" :: Text)
+                  <*> o .:  ("symbols" :: Text)
+          "fixed"  ->
+            Fixed <$> o .:  ("name" :: Text)
+                  <*> o .:? ("namespace" :: Text)
+                  <*> o .:? ("aliases" :: Text) .!= []
+                  <*> o .:  ("size" :: Text)
+          s  -> fail $ "Unrecognized object type: " <> T.unpack s
   parseJSON (A.Array arr) | V.length arr > 0 =
            mkUnion . NE.fromList <$> mapM parseJSON (V.toList arr)
   parseJSON foo = typeMismatch "Invalid JSON for Avro Schema" foo

@@ -1,0 +1,12 @@
+{
+  "name": "Logical",
+  "type": "record",
+  "fields": [{
+    "name": "timestamp",
+    "type":
+      {
+        "logicalType": "timestamp-millis",
+        "type": "long"
+      }
+  }]
+}
