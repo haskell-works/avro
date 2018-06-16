@@ -55,7 +55,8 @@ import qualified Data.List                  as L
 import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NE
 import           Data.Maybe                 (catMaybes, fromMaybe)
-import           Data.Monoid                (First (..), (<>))
+import           Data.Monoid                (First (..))
+import           Data.Semigroup
 import qualified Data.Set                   as S
 import           Data.String
 import           Data.Text                  (Text)
@@ -154,9 +155,12 @@ newtype TypeName = TN { unTN :: T.Text }
 instance Show TypeName where
   show (TN s) = show s
 
+instance Semigroup TypeName where
+  TN a <> TN b = TN (a <> b)
+
 instance Monoid TypeName where
   mempty = TN mempty
-  mappend (TN a) (TN b) = TN (a <> b)
+  mappend = (<>)
 
 instance IsString TypeName where
   fromString = TN . fromString
@@ -371,6 +375,8 @@ instance MonadPlus Result where
   mzero = fail "mzero"
   mplus a@(Success _) _ = a
   mplus _ b             = b
+instance Semigroup (Result a) where
+  (<>) = mplus
 instance Monoid (Result a) where
   mempty = fail "Empty Result"
   mappend = mplus
