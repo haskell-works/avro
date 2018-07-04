@@ -47,6 +47,7 @@ import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Lazy          as LBS
 import qualified Data.ByteString.Lazy.Char8    as LBSC8
 import qualified Data.HashMap.Strict           as HM
+import qualified Data.Set                      as S
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
@@ -55,18 +56,18 @@ import qualified Data.Vector                   as V
 -- Generates data types, FromAvro and ToAvro instances.
 data DeriveOptions = DeriveOptions
   { -- | How to build field names for generated data types
-    doFieldNameBuilder :: TypeName -> Field -> Name
-  }
+    fieldNameBuilder :: TypeName -> Field -> T.Text
+  } deriving Generic
 
 -- | Default deriving options
 --
 -- @
 -- defaultDeriveOptions = 'DeriveOptions'
---   { doFieldNameBuilder = 'mkPrefixedFieldName'
+--   { fieldNameBuilder = 'mkPrefixedFieldName'
 --   }
 -- @
 defaultDeriveOptions = DeriveOptions
-  { doFieldNameBuilder = mkPrefixedFieldName
+  { fieldNameBuilder = mkPrefixedFieldName
   }
 
 -- | Generates a field name that is prefixed with the type name.
@@ -77,8 +78,8 @@ defaultDeriveOptions = DeriveOptions
 -- @
 -- Person { personFirstName :: Text }
 -- @
-mkPrefixedFieldName :: TypeName -> Field -> Name
-mkPrefixedFieldName (TN dn) fld = mkTextName . sanitiseName $
+mkPrefixedFieldName :: TypeName -> Field -> T.Text
+mkPrefixedFieldName (TN dn) fld = sanitiseName $
   updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
 
 -- | Generates a field name that matches the field name in schema
@@ -92,8 +93,8 @@ mkPrefixedFieldName (TN dn) fld = mkTextName . sanitiseName $
 -- @
 -- You may want to enable 'DuplicateRecordFields' if you want to use this method.
 
-mkAsIsFieldName :: TypeName -> Field -> Name
-mkAsIsFieldName _ = mkTextName . sanitiseName . updateFirst T.toLower . fldName
+mkAsIsFieldName :: TypeName -> Field -> Text
+mkAsIsFieldName _ = sanitiseName . updateFirst T.toLower . fldName
 
 -- | Generates Haskell classes and 'FromAvro' and 'ToAvro' instances
 -- given the Avro schema file
@@ -221,7 +222,7 @@ genToAvro opts s@(Record n _ _ _ _ fs) =
             toAvro = $(genToAvroFieldsExp sname)
       |]
     genToAvroFieldsExp sname = [| \r -> record $(varE sname)
-        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ (doFieldNameBuilder opts) n fld) r |]
+        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkTextName $ (fieldNameBuilder opts) n fld) r |]
           in listE $ assign <$> fs
         )
       |]
@@ -404,7 +405,7 @@ mkDataTypeName' =
 mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
 mkField opts prefix field = do
   ftype <- mkFieldTypeName (fldType field)
-  let fName = (doFieldNameBuilder opts) prefix field
+  let fName = mkTextName $ (fieldNameBuilder opts) prefix field
   pure (fName, defaultStrictness, ftype)
 
 genNewtype :: Name -> Q Dec
