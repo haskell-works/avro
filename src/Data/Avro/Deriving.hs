@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -6,7 +7,15 @@
 {-# LANGUAGE ViewPatterns      #-}
 
 module Data.Avro.Deriving
-( deriveAvro
+( -- * Deriving options
+  DeriveOptions(..), defaultDeriveOptions
+, mkPrefixedFieldName, mkAsIsFieldName
+
+  -- * Deriving Haskell types from Avro schema
+, deriveAvroWithOptions
+, deriveAvroWithOptions'
+, deriveFromAvroWithOptions
+, deriveAvro
 , deriveAvro'
 , deriveFromAvro
 )
@@ -27,6 +36,7 @@ import qualified Data.List.NonEmpty            as NE
 import           Data.Map                      (Map)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Semigroup                ((<>))
+import           GHC.Generics                  (Generic)
 import           Language.Haskell.TH           as TH
 import           Language.Haskell.TH.Syntax
 
@@ -42,27 +52,94 @@ import qualified Data.Vector                   as V
 
 -- | Derives Avro from a given schema file.
 -- Generates data types, FromAvro and ToAvro instances.
-deriveAvro :: FilePath -> Q [Dec]
-deriveAvro p = readSchema p >>= deriveAvro'
+data DeriveOptions = DeriveOptions
+  { -- | How to build field names for generated data types
+    doFieldNameBuilder :: TypeName -> Field -> Name
+  }
 
-deriveAvro' :: Schema -> Q [Dec]
-deriveAvro' s = do
+-- | Default deriving options
+--
+-- @
+-- defaultDeriveOptions = 'DeriveOptions'
+--   { doFieldNameBuilder = 'mkPrefixedFieldName'
+--   }
+-- @
+defaultDeriveOptions = DeriveOptions
+  { doFieldNameBuilder = mkPrefixedFieldName
+  }
+
+-- | Generates a field name that is prefixed with the type name.
+--
+-- For example, if the schema defines type 'Person' that has a field 'firstName',
+-- then the generated Haskell type will be like
+--
+-- @
+-- Person { personFirstName :: Text }
+-- @
+mkPrefixedFieldName :: TypeName -> Field -> Name
+mkPrefixedFieldName (TN dn) fld = mkTextName . sanitiseName $
+  updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
+
+-- | Generates a field name that matches the field name in schema
+-- (sanitised for Haskell, so first letter is lower cased)
+--
+-- For example, if the schema defines type 'Person' that has a field 'firstName',
+-- then the generated Haskell type will be like
+--
+-- @
+-- Person { firstName :: Text }
+-- @
+-- You may want to enable 'DuplicateRecordFields' if you want to use this method.
+
+mkAsIsFieldName :: TypeName -> Field -> Name
+mkAsIsFieldName _ = mkTextName . sanitiseName . updateFirst T.toLower . fldName
+
+-- | Generates Haskell classes and 'FromAvro' and 'ToAvro' instances
+-- given the Avro schema file
+deriveAvroWithOptions :: DeriveOptions -> FilePath -> Q [Dec]
+deriveAvroWithOptions o p = readSchema p >>= deriveAvroWithOptions' o
+
+-- | Generates Haskell classes and 'FromAvro' and 'ToAvro' instances
+-- given the Avro schema
+deriveAvroWithOptions' :: DeriveOptions -> Schema -> Q [Dec]
+deriveAvroWithOptions' o s = do
   let schemas = extractDerivables s
-  types     <- traverse genType schemas
+  types     <- traverse (genType o) schemas
   hasSchema <- traverse genHasAvroSchema schemas
   fromAvros <- traverse genFromAvro schemas
-  toAvros   <- traverse genToAvro schemas
+  toAvros   <- traverse (genToAvro o) schemas
   pure $ join types <> join hasSchema <> join fromAvros <> join toAvros
 
 -- | Derives "read only" Avro from a given schema file.
 -- Generates data types and FromAvro.
-deriveFromAvro :: FilePath -> Q [Dec]
-deriveFromAvro p = do
+deriveFromAvroWithOptions :: DeriveOptions -> FilePath -> Q [Dec]
+deriveFromAvroWithOptions o p = do
   schemas   <- extractDerivables <$> readSchema p
-  types     <- traverse genType schemas
+  types     <- traverse (genType o) schemas
   hasSchema <- traverse genHasAvroSchema schemas
   fromAvros <- traverse genFromAvro schemas
   pure $ join types <> join hasSchema <> join fromAvros
+
+-- | Same as 'deriveAvroWithOptions' but uses 'defaultDeriveOptions'
+--
+-- @
+-- deriveAvro' = deriveAvroWithOptions' 'defaultDeriveOptions'
+-- @
+deriveAvro :: FilePath -> Q [Dec]
+deriveAvro = deriveAvroWithOptions defaultDeriveOptions
+
+-- | Same as 'deriveAvroWithOptions'' but uses 'defaultDeriveOptions'
+--
+-- @
+-- deriveAvro' = 'deriveAvroWithOptions'' 'defaultDeriveOptions'
+-- @
+deriveAvro' :: Schema -> Q [Dec]
+deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
+
+-- | Derives "read only" Avro from a given schema file.
+-- Generates data types and FromAvro.
+deriveFromAvro :: FilePath -> Q [Dec]
+deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
 
 readSchema :: FilePath -> Q Schema
 readSchema p = do
@@ -111,8 +188,8 @@ genHasAvroSchema s = do
             schema = pure $(varE sname)
       |]
 
-genToAvro :: Schema -> Q [Dec]
-genToAvro s@(Enum n _ _ _ vs _) =
+genToAvro :: DeriveOptions -> Schema -> Q [Dec]
+genToAvro opts s@(Enum n _ _ _ vs _) =
   toAvroInstance (mkSchemaValueName n)
   where
     conP' = flip conP [] . mkAdtCtorName n
@@ -125,7 +202,7 @@ genToAvro s@(Enum n _ _ _ vs _) =
               |])
       |]
 
-genToAvro s@(Record n _ _ _ _ fs) =
+genToAvro opts s@(Record n _ _ _ _ fs) =
   toAvroInstance (mkSchemaValueName n)
   where
     toAvroInstance sname =
@@ -133,12 +210,12 @@ genToAvro s@(Record n _ _ _ _ fs) =
             toAvro = $(genToAvroFieldsExp sname)
       |]
     genToAvroFieldsExp sname = [| \r -> record $(varE sname)
-        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkFieldTextName n fld) r |]
+        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ (doFieldNameBuilder opts) n fld) r |]
           in listE $ assign <$> fs
         )
       |]
 
-genToAvro s@(Fixed n _ _ size) =
+genToAvro opts s@(Fixed n _ _ size) =
   toAvroInstance (mkSchemaValueName n)
   where
     toAvroInstance sname =
@@ -246,19 +323,19 @@ setName = fmap . map . sn
     sn n (ValD (VarP _) x y) = ValD (VarP n) x y
     sn _ d                   = d
 
-genType :: Schema -> Q [Dec]
-genType (S.Record n _ _ _ _ fs) = do
-  flds <- traverse (mkField n) fs
+genType :: DeriveOptions -> Schema -> Q [Dec]
+genType opts (S.Record n _ _ _ _ fs) = do
+  flds <- traverse (mkField opts n) fs
   let dname = mkDataTypeName n
   sequenceA [genDataType dname flds]
-genType (S.Enum n _ _ _ vs _) = do
+genType _ (S.Enum n _ _ _ vs _) = do
   let dname = mkDataTypeName n
   sequenceA [genEnum dname (mkAdtCtorName n <$> vs)]
-genType (S.Fixed n _ _ s) = do
+genType _ (S.Fixed n _ _ s) = do
   let dname = mkDataTypeName n
   sequenceA [genNewtype dname]
 
-genType _ = pure []
+genType _ _ = pure []
 
 mkFieldTypeName :: S.Type -> Q TH.Type
 mkFieldTypeName t = case t of
@@ -311,32 +388,28 @@ mkDataTypeName' :: Text -> Name
 mkDataTypeName' =
   mkTextName . sanitiseName . updateFirst T.toUpper . T.takeWhileEnd (/='.')
 
-mkFieldTextName :: TypeName -> Field -> Name
-mkFieldTextName (TN dn) fld = mkTextName . sanitiseName $
-  updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
-
-mkField :: TypeName -> Field -> Q VarStrictType
-mkField prefix field = do
+mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
+mkField opts prefix field = do
   ftype <- mkFieldTypeName (fldType field)
-  let fName = mkFieldTextName prefix field
+  let fName = (doFieldNameBuilder opts) prefix field
   pure (fName, defaultStrictness, ftype)
 
 genNewtype :: Name -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genNewtype dn = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genNewtype dn = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor ders
 #else
 genNewtype dn = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
   pure $ NewtypeD [] dn [] ctor [eq, sh]
@@ -345,30 +418,30 @@ genNewtype dn = do
 genEnum :: Name -> [Name] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
 #else
 genEnum dn vs = do
-  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en]
 #endif
 
 genDataType :: Name -> [VarStrictType] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] ders
 #else
 genDataType dn flds = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
 #endif
 

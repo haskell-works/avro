@@ -441,11 +441,11 @@ parseAvroJSON union env ty av                  =
           Long   -> return $ Ty.Long   (floor i)
           Float  -> return $ Ty.Float  (realToFrac i)
           Double -> return $ Ty.Double (realToFrac i)
-          _                   -> avroTypeMismatch ty "number"
+          _      -> avroTypeMismatch ty "number"
       A.Array vec    ->
         case ty of
           Array t -> Ty.Array <$> V.mapM (parseAvroJSON union env t) vec
-          _  -> avroTypeMismatch ty "array"
+          _       -> avroTypeMismatch ty "array"
       A.Object obj ->
         case ty of
           Map mTy     -> Ty.Map <$> mapM (parseAvroJSON union env mTy) obj
@@ -460,7 +460,7 @@ parseAvroJSON union env ty av                  =
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
                   Null -> return Ty.Null
-                  _ -> avroTypeMismatch ty "null"
+                  _    -> avroTypeMismatch ty "null"
 
 -- | Parses a string literal into a bytestring in the format expected
 -- for bytes and fixed values. Will fail if every character does not
