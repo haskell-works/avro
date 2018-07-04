@@ -105,6 +105,7 @@ This library provides functionality to derive Haskell data types and `HasAvroSch
 `deriveAvro` will derive data types, `FromAvro` and `ToAvro` instances from a provided Avro schema file:
 ```
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric   #-}
 import Data.Avro.Deriving
 
 deriveAvro "schemas/contract.avsc"

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -7,7 +8,7 @@ where
 import           Data.Avro
 import           Data.Avro.Deriving
 
-import Test.Hspec
+import           Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 

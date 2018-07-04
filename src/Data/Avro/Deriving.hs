@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -27,6 +28,7 @@ import qualified Data.List.NonEmpty            as NE
 import           Data.Map                      (Map)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Semigroup                ((<>))
+import           GHC.Generics                  (Generic)
 import           Language.Haskell.TH           as TH
 import           Language.Haskell.TH.Syntax
 
@@ -324,19 +326,19 @@ mkField prefix field = do
 genNewtype :: Name -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genNewtype dn = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genNewtype dn = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor ders
 #else
 genNewtype dn = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
   pure $ NewtypeD [] dn [] ctor [eq, sh]
@@ -345,30 +347,30 @@ genNewtype dn = do
 genEnum :: Name -> [Name] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
 #else
 genEnum dn vs = do
-  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en]
 #endif
 
 genDataType :: Name -> [VarStrictType] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] ders
 #else
 genDataType dn flds = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
 #endif
 
