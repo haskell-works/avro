@@ -12,6 +12,7 @@ module Data.Avro.Deriving
 , mkPrefixedFieldName, mkAsIsFieldName
 
   -- * Deriving Haskell types from Avro schema
+, makeSchema
 , deriveAvroWithOptions
 , deriveAvroWithOptions'
 , deriveFromAvroWithOptions
@@ -141,6 +142,16 @@ deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
 deriveFromAvro :: FilePath -> Q [Dec]
 deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
 
+-- | Generates the value of type 'Schema' that it can later be used with
+-- 'deriveAvro'' or 'deriveAvroWithOptions''.
+--
+-- @
+-- mySchema :: Schema
+-- mySchema = $(makeSchema "schemas/my-schema.avsc")
+-- @
+makeSchema :: FilePath -> Q Exp
+makeSchema p = readSchema p >>= schemaDef'
+
 readSchema :: FilePath -> Q Schema
 readSchema p = do
   qAddDependentFile p
@@ -229,8 +240,10 @@ schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
   [d|
       x :: Schema
-      x = $(mkSchema sch)
+      x = $(schemaDef' sch)
   |]
+
+schemaDef' sch = mkSchema sch
   where mkSchema = \case
           Null           -> [e| Null |]
           Boolean        -> [e| Boolean |]
