@@ -39,6 +39,7 @@ import           Data.Maybe                    (fromMaybe)
 import           Data.Semigroup                ((<>))
 import           GHC.Generics                  (Generic)
 import           Language.Haskell.TH           as TH
+import           Language.Haskell.TH.Lib       as TH
 import           Language.Haskell.TH.Syntax
 
 import           Data.Avro.Deriving.NormSchema
@@ -200,6 +201,9 @@ genHasAvroSchema s = do
             schema = pure $(varE sname)
       |]
 
+newNames :: String {- ^ base name -} -> Int {- ^ count -} -> Q [Name]
+newNames base n = sequence [ newName (base++show i) | i <- [1..n] ]
+
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
 genToAvro opts s@(Enum n _ _ _ vs _) =
   toAvroInstance (mkSchemaValueName n)
@@ -221,11 +225,15 @@ genToAvro opts s@(Record n _ _ _ _ fs) =
       [d| instance ToAvro $(conT $ mkDataTypeName n) where
             toAvro = $(genToAvroFieldsExp sname)
       |]
-    genToAvroFieldsExp sname = [| \r -> record $(varE sname)
-        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkTextName $ (fieldNameBuilder opts) n fld) r |]
-          in listE $ assign <$> fs
-        )
-      |]
+    genToAvroFieldsExp sname = do
+      names <- newNames "p_" (length fs)
+      let con = conP (mkDataTypeName n) (varP <$> names)
+      lamE [con]
+            [| record $(varE sname)
+                $(let assign (fld, n) = [| T.pack $(mkTextLit (fldName fld)) .= $(varE n) |]
+                  in listE $ assign <$> zip fs names
+                )
+            |]
 
 genToAvro opts s@(Fixed n _ _ size) =
   toAvroInstance (mkSchemaValueName n)
@@ -244,7 +252,8 @@ schemaDef sname sch = setName sname $
       x = $(schemaDef' sch)
   |]
 
-schemaDef' sch = mkSchema sch
+schemaDef' :: S.Type -> ExpQ
+schemaDef' = mkSchema
   where mkSchema = \case
           Null           -> [e| Null |]
           Boolean        -> [e| Boolean |]
