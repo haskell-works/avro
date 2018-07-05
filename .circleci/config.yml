@@ -77,7 +77,7 @@ workflows:
       - lts-7
       - lts-9
       - lts-11
-      # - nightly
+      - nightly
       - release:
           requires:
             - lts-7
