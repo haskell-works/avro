@@ -6,7 +6,7 @@ category: Data
 author: Thomas M. DuBuisson
 maintainer: Alexey Raga <alexey.raga@gmail.com>
 license: BSD3
-github: GaloisInc/avro.git
+github: GaloisInc/avro
 extra-source-files:
 - ChangeLog.md
 - test/data/reused.avsc

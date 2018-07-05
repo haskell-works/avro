@@ -2,15 +2,15 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a7df532e971306f0e8b7c7ff21ecb95e20f336d396ec72f86154b1df850f7ee7
+-- hash: 438237429b809a0b32ee0a562e2b073ddb59ba7b0eef4e5c011f99b630993e57
 
 name:           avro
 version:        0.3.2.0
 synopsis:       Avro serialization support for Haskell
 description:    Avro serialization and deserialization support for Haskell
 category:       Data
-homepage:       https://github.com/GaloisInc/avro.git#readme
-bug-reports:    https://github.com/GaloisInc/avro.git/issues
+homepage:       https://github.com/GaloisInc/avro#readme
+bug-reports:    https://github.com/GaloisInc/avro/issues
 author:         Thomas M. DuBuisson
 maintainer:     Alexey Raga <alexey.raga@gmail.com>
 license:        BSD3
@@ -35,7 +35,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/GaloisInc/avro.git
+  location: https://github.com/GaloisInc/avro
 
 flag dev
   description: Use development GHC flags
