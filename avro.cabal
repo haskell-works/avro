@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fb70ba948e5cb538713c28699ed1af9e5f81d4b7fcc982938ed9b462e7511448
+-- hash: f59db9948ed230bc0070382e7b8045e364799034a83ba89d56b52ab8d49aa9bd
 
 name:           avro
 version:        0.3.3.1
@@ -55,6 +55,7 @@ library
       Data.Avro.Deconflict
       Data.Avro.Encode
       Data.Avro.Deriving
+      Data.Avro.EitherN
       Data.Avro.EncodeRaw
       Data.Avro.JSON
       Data.Avro.Schema
