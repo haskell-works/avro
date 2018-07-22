@@ -54,14 +54,27 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
 
+
+-- | Describes the strictness of a field for a derived
+-- data type. The field will be derived as if it were
+-- written with a @!@.
+data FieldStrictness = StrictField | LazyField
+  deriving Generic
+
+-- | Describes the representation of a field for a derived
+-- data type. The field will be derived as if it were written
+-- with an @{-# UNPACK #-}@ pragma.
+data FieldUnpackedness = UnpackedField | NonUnpackedField
+  deriving Generic
+
 -- | Derives Avro from a given schema file.
 -- Generates data types, FromAvro and ToAvro instances.
 data DeriveOptions = DeriveOptions
   { -- | How to build field names for generated data types
     fieldNameBuilder :: TypeName -> Field -> T.Text
 
-    -- | Determines field strictness of generated data types
-  , fieldStrictness  :: TypeName -> Field -> Bool
+    -- | Determines field representation of generated data types
+  , fieldRepresentation  :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
   } deriving Generic
 
 -- | Default deriving options
@@ -73,8 +86,8 @@ data DeriveOptions = DeriveOptions
 --   }
 -- @
 defaultDeriveOptions = DeriveOptions
-  { fieldNameBuilder = mkPrefixedFieldName
-  , fieldStrictness  = mkLazyField
+  { fieldNameBuilder    = mkPrefixedFieldName
+  , fieldRepresentation = mkLazyField
   }
 
 -- | Generates a field name that is prefixed with the type name.
@@ -91,9 +104,9 @@ mkPrefixedFieldName (TN dn) fld = sanitiseName $
 
 
 -- | Marks any field as non-strict in the generated data types.
-mkLazyField :: TypeName -> Field -> Bool
+mkLazyField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
 mkLazyField _ _ =
-  False
+  (LazyField, NonUnpackedField)
 
 
 -- | Generates a field name that matches the field name in schema
@@ -428,10 +441,12 @@ mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
 mkField opts prefix field = do
   ftype <- mkFieldTypeName (fldType field)
   let fName = mkTextName $ (fieldNameBuilder opts) prefix field
+      (fieldStrictness, fieldUnpackedness) =
+        fieldRepresentation opts prefix field
       strictness =
-        if fieldStrictness opts prefix field
-        then strict
-        else notStrict
+        case fieldStrictness of
+          StrictField -> strict fieldUnpackedness
+          LazyField   -> notStrict
 
   pure (fName, strictness, ftype)
 
@@ -493,11 +508,13 @@ notStrict = Bang SourceNoUnpack NoSourceStrictness
 notStrict = NotStrict
 #endif
 
-strict :: Strict
+strict :: FieldUnpackedness -> Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-strict = Bang SourceNoUnpack SourceStrict
+strict UnpackedField    = Bang SourceUnpack SourceStrict
+strict NonUnpackedField = Bang SourceNoUnpack SourceStrict
 #else
-strict = IsStrict
+strict UnpackedField    = Unpacked
+strict NonUnpackedField = IsStrict
 #endif
 
 mkTextName :: Text -> Name
