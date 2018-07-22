@@ -10,6 +10,7 @@ module Data.Avro.Deriving
 ( -- * Deriving options
   DeriveOptions(..), defaultDeriveOptions
 , mkPrefixedFieldName, mkAsIsFieldName
+, mkLazyField
 
   -- * Deriving Haskell types from Avro schema
 , makeSchema
@@ -38,8 +39,8 @@ import           Data.Map                      (Map)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Semigroup                ((<>))
 import           GHC.Generics                  (Generic)
-import           Language.Haskell.TH           as TH
-import           Language.Haskell.TH.Lib       as TH
+import           Language.Haskell.TH           as TH hiding (notStrict)
+import           Language.Haskell.TH.Lib       as TH hiding (notStrict)
 import           Language.Haskell.TH.Syntax
 
 import           Data.Avro.Deriving.NormSchema
@@ -58,6 +59,9 @@ import qualified Data.Vector                   as V
 data DeriveOptions = DeriveOptions
   { -- | How to build field names for generated data types
     fieldNameBuilder :: TypeName -> Field -> T.Text
+
+    -- | Determines field strictness of generated data types
+  , fieldStrictness  :: TypeName -> Field -> Bool
   } deriving Generic
 
 -- | Default deriving options
@@ -65,10 +69,12 @@ data DeriveOptions = DeriveOptions
 -- @
 -- defaultDeriveOptions = 'DeriveOptions'
 --   { fieldNameBuilder = 'mkPrefixedFieldName'
+--   , fieldStrictness  = 'mkLazyField'
 --   }
 -- @
 defaultDeriveOptions = DeriveOptions
   { fieldNameBuilder = mkPrefixedFieldName
+  , fieldStrictness  = mkLazyField
   }
 
 -- | Generates a field name that is prefixed with the type name.
@@ -82,6 +88,13 @@ defaultDeriveOptions = DeriveOptions
 mkPrefixedFieldName :: TypeName -> Field -> T.Text
 mkPrefixedFieldName (TN dn) fld = sanitiseName $
   updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
+
+
+-- | Marks any field as non-strict in the generated data types.
+mkLazyField :: TypeName -> Field -> Bool
+mkLazyField _ _ =
+  False
+
 
 -- | Generates a field name that matches the field name in schema
 -- (sanitised for Haskell, so first letter is lower cased)
@@ -415,26 +428,31 @@ mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
 mkField opts prefix field = do
   ftype <- mkFieldTypeName (fldType field)
   let fName = mkTextName $ (fieldNameBuilder opts) prefix field
-  pure (fName, defaultStrictness, ftype)
+      strictness =
+        if fieldStrictness opts prefix field
+        then strict
+        else notStrict
+
+  pure (fName, strictness, ftype)
 
 genNewtype :: Name -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genNewtype dn = do
   ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genNewtype dn = do
   ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor ders
 #else
 genNewtype dn = do
   [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] ctor [eq, sh]
 #endif
 
@@ -468,11 +486,18 @@ genDataType dn flds = do
   pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
 #endif
 
-defaultStrictness :: Strict
+notStrict :: Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-defaultStrictness = Bang SourceNoUnpack NoSourceStrictness
+notStrict = Bang SourceNoUnpack NoSourceStrictness
 #else
-defaultStrictness = NotStrict
+notStrict = NotStrict
+#endif
+
+strict :: Strict
+#if MIN_VERSION_template_haskell(2,11,0)
+strict = Bang SourceNoUnpack SourceStrict
+#else
+strict = IsStrict
 #endif
 
 mkTextName :: Text -> Name
