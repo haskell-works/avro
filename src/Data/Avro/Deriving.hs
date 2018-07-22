@@ -111,7 +111,7 @@ mkLazyField _ _ =
 
 -- | Make a field strict and unpacked if it has a primitive representation.
 -- Primitive types are types which GHC has either a static or an unlifted
--- representation: `Boolean`, `Int32`, `Int64`, `()`, `Float`, `Double`.
+-- representation: `()`, `Boolean`, `Int32`, `Int64`, `Float`, `Double`.
 mkStrictPrimitiveField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
 mkStrictPrimitiveField _ field =
   if isPrimitive (S.fldType field)
