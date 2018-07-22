@@ -10,7 +10,7 @@ module Data.Avro.Deriving
 ( -- * Deriving options
   DeriveOptions(..), defaultDeriveOptions
 , mkPrefixedFieldName, mkAsIsFieldName
-, mkLazyField
+, mkLazyField, mkStrictPrimitiveField
 
   -- * Deriving Haskell types from Avro schema
 , makeSchema
@@ -108,6 +108,25 @@ mkLazyField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
 mkLazyField _ _ =
   (LazyField, NonUnpackedField)
 
+
+-- | Make a field strict and unpacked if it has a primitive representation.
+-- Primitive types are types which GHC has an unlifted representation:
+--   `Int32`, `Int64`, `()`, `Float`, `Double`
+mkStrictPrimitiveField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+mkStrictPrimitiveField _ field =
+  if isPrimitive (S.fldType field)
+  then (StrictField, UnpackedField)
+  else (LazyField, NonUnpackedField)
+  where
+    isPrimitive type_ =
+      case type_ of
+        S.Null    -> True
+        S.Boolean -> True
+        S.Int     -> True
+        S.Long    -> True
+        S.Float   -> True
+        S.Double  -> True
+        _         -> False
 
 -- | Generates a field name that matches the field name in schema
 -- (sanitised for Haskell, so first letter is lower cased)
