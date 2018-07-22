@@ -75,7 +75,7 @@ import           Data.Avro.Schema     (Schema, parseAvroJSON)
 import qualified Data.Avro.Schema     as Schema
 import qualified Data.Avro.Types      as Avro
 
-decodeAvroJSON :: Schema -> Aeson.Value -> Result (Avro.Value Schema.Type)
+decodeAvroJSON :: Schema -> Aeson.Value -> Result (Avro.Value Schema)
 decodeAvroJSON schema json =
   parseAvroJSON union env schema json
   where
