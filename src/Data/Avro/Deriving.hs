@@ -377,7 +377,7 @@ schemaDef' = mkSchema
           where numericLit = litE . IntegerL . fromIntegral
 
         mkMap (HM.toList -> xs) = [e| HM.fromList $(ListE <$> mapM mkKVPair xs) |]
-        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) e|]
+        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) |]
 
         mkNE (NE.toList -> xs) = [e| NE.fromList $(ListE <$> mapM mkSchema xs) |]
 
