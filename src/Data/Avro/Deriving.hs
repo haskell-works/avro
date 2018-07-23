@@ -8,7 +8,8 @@
 
 module Data.Avro.Deriving
 ( -- * Deriving options
-  DeriveOptions(..), defaultDeriveOptions
+  DeriveOptions(..), FieldStrictness(..), FieldUnpackedness(..)
+, defaultDeriveOptions
 , mkPrefixedFieldName, mkAsIsFieldName
 , mkLazyField, mkStrictPrimitiveField
 
