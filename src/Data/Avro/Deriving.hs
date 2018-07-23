@@ -10,6 +10,7 @@ module Data.Avro.Deriving
 ( -- * Deriving options
   DeriveOptions(..), defaultDeriveOptions
 , mkPrefixedFieldName, mkAsIsFieldName
+, mkLazyField, mkStrictPrimitiveField
 
   -- * Deriving Haskell types from Avro schema
 , makeSchema
@@ -38,8 +39,8 @@ import           Data.Map                      (Map)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Semigroup                ((<>))
 import           GHC.Generics                  (Generic)
-import           Language.Haskell.TH           as TH
-import           Language.Haskell.TH.Lib       as TH
+import           Language.Haskell.TH           as TH hiding (notStrict)
+import           Language.Haskell.TH.Lib       as TH hiding (notStrict)
 import           Language.Haskell.TH.Syntax
 
 import           Data.Avro.Deriving.NormSchema
@@ -53,11 +54,27 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
 
+
+-- | Describes the strictness of a field for a derived
+-- data type. The field will be derived as if it were
+-- written with a @!@.
+data FieldStrictness = StrictField | LazyField
+  deriving Generic
+
+-- | Describes the representation of a field for a derived
+-- data type. The field will be derived as if it were written
+-- with an @{-# UNPACK #-}@ pragma.
+data FieldUnpackedness = UnpackedField | NonUnpackedField
+  deriving Generic
+
 -- | Derives Avro from a given schema file.
 -- Generates data types, FromAvro and ToAvro instances.
 data DeriveOptions = DeriveOptions
   { -- | How to build field names for generated data types
     fieldNameBuilder :: TypeName -> Field -> T.Text
+
+    -- | Determines field representation of generated data types
+  , fieldRepresentation  :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
   } deriving Generic
 
 -- | Default deriving options
@@ -65,10 +82,12 @@ data DeriveOptions = DeriveOptions
 -- @
 -- defaultDeriveOptions = 'DeriveOptions'
 --   { fieldNameBuilder = 'mkPrefixedFieldName'
+--   , fieldStrictness  = 'mkLazyField'
 --   }
 -- @
 defaultDeriveOptions = DeriveOptions
-  { fieldNameBuilder = mkPrefixedFieldName
+  { fieldNameBuilder    = mkPrefixedFieldName
+  , fieldRepresentation = mkLazyField
   }
 
 -- | Generates a field name that is prefixed with the type name.
@@ -82,6 +101,38 @@ defaultDeriveOptions = DeriveOptions
 mkPrefixedFieldName :: TypeName -> Field -> T.Text
 mkPrefixedFieldName (TN dn) fld = sanitiseName $
   updateFirst T.toLower dn <> updateFirst T.toUpper (fldName fld)
+
+
+-- | Marks any field as non-strict in the generated data types.
+mkLazyField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+mkLazyField _ _ =
+  (LazyField, NonUnpackedField)
+
+
+-- | Make a field strict and unpacked if it has a primitive representation.
+-- Primitive types are types which GHC has either a static or an unlifted
+-- representation: `()`, `Boolean`, `Int32`, `Int64`, `Float`, `Double`.
+mkStrictPrimitiveField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+mkStrictPrimitiveField _ field =
+  if shouldStricten
+  then (StrictField, unpackedness)
+  else (LazyField, NonUnpackedField)
+  where
+    unpackedness =
+      case S.fldType field of
+        S.Null    -> NonUnpackedField
+        S.Boolean -> NonUnpackedField
+        _         -> UnpackedField
+
+    shouldStricten =
+      case S.fldType field of
+        S.Null    -> True
+        S.Boolean -> True
+        S.Int     -> True
+        S.Long    -> True
+        S.Float   -> True
+        S.Double  -> True
+        _         -> False
 
 -- | Generates a field name that matches the field name in schema
 -- (sanitised for Haskell, so first letter is lower cased)
@@ -415,26 +466,33 @@ mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
 mkField opts prefix field = do
   ftype <- mkFieldTypeName (fldType field)
   let fName = mkTextName $ (fieldNameBuilder opts) prefix field
-  pure (fName, defaultStrictness, ftype)
+      (fieldStrictness, fieldUnpackedness) =
+        fieldRepresentation opts prefix field
+      strictness =
+        case fieldStrictness of
+          StrictField -> strict fieldUnpackedness
+          LazyField   -> notStrict
+
+  pure (fName, strictness, ftype)
 
 genNewtype :: Name -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genNewtype dn = do
   ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genNewtype dn = do
   ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor ders
 #else
 genNewtype dn = do
   [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] ctor [eq, sh]
 #endif
 
@@ -468,11 +526,20 @@ genDataType dn flds = do
   pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
 #endif
 
-defaultStrictness :: Strict
+notStrict :: Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-defaultStrictness = Bang SourceNoUnpack NoSourceStrictness
+notStrict = Bang SourceNoUnpack NoSourceStrictness
 #else
-defaultStrictness = NotStrict
+notStrict = NotStrict
+#endif
+
+strict :: FieldUnpackedness -> Strict
+#if MIN_VERSION_template_haskell(2,11,0)
+strict UnpackedField    = Bang SourceUnpack SourceStrict
+strict NonUnpackedField = Bang SourceNoUnpack SourceStrict
+#else
+strict UnpackedField    = Unpacked
+strict NonUnpackedField = IsStrict
 #endif
 
 mkTextName :: Text -> Name
