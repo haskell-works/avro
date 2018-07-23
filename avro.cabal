@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f59db9948ed230bc0070382e7b8045e364799034a83ba89d56b52ab8d49aa9bd
+-- hash: 6de090ce98d5793524ae7c64328691c716a2787bef1e1c2c475c89ef3ee1920e
 
 name:           avro
 version:        0.3.3.1
@@ -51,22 +51,28 @@ library
   exposed-modules:
       Data.Avro
       Data.Avro.Decode
+      Data.Avro.Decode.Get
+      Data.Avro.Decode.Lazy
+      Data.Avro.Decode.Lazy.Convert
+      Data.Avro.Decode.Lazy.Deconflict
+      Data.Avro.Decode.Lazy.LazyValue
       Data.Avro.DecodeRaw
       Data.Avro.Deconflict
-      Data.Avro.Encode
       Data.Avro.Deriving
+      Data.Avro.Deriving.NormSchema
       Data.Avro.EitherN
+      Data.Avro.Encode
       Data.Avro.EncodeRaw
+      Data.Avro.FromAvro
+      Data.Avro.HasAvroSchema
       Data.Avro.JSON
       Data.Avro.Schema
+      Data.Avro.ToAvro
       Data.Avro.Types
+      Data.Avro.Types.Value
       Data.Avro.Zag
       Data.Avro.Zig
-      Data.Avro.HasAvroSchema
-      Data.Avro.FromAvro
-      Data.Avro.ToAvro
   other-modules:
-      Data.Avro.Deriving.NormSchema
       Paths_avro
   hs-source-dirs:
       src
@@ -114,6 +120,7 @@ test-suite test
       Avro.Codec.NestedSpec
       Avro.Codec.TextSpec
       Avro.Codec.ZigZagSpec
+      Avro.Decode.Lazy.ValuesSpec
       Avro.Deconflict.Reader
       Avro.Deconflict.Writer
       Avro.DeconflictSpec

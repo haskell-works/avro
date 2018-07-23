@@ -45,23 +45,6 @@ library:
   other-extensions:
   - OverloadedStrings
   ghc-options: -O2
-  exposed-modules:
-  - Data.Avro
-  - Data.Avro.Decode
-  - Data.Avro.DecodeRaw
-  - Data.Avro.Deconflict
-  - Data.Avro.Encode
-  - Data.Avro.Deriving
-  - Data.Avro.EitherN
-  - Data.Avro.EncodeRaw
-  - Data.Avro.JSON
-  - Data.Avro.Schema
-  - Data.Avro.Types
-  - Data.Avro.Zag
-  - Data.Avro.Zig
-  - Data.Avro.HasAvroSchema
-  - Data.Avro.FromAvro
-  - Data.Avro.ToAvro
   dependencies:
   - base >=4.8 && <5.0
   - data-binary-ieee754
