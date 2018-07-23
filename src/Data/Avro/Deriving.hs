@@ -114,12 +114,18 @@ mkLazyField _ _ =
 -- representation: `()`, `Boolean`, `Int32`, `Int64`, `Float`, `Double`.
 mkStrictPrimitiveField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
 mkStrictPrimitiveField _ field =
-  if isPrimitive (S.fldType field)
-  then (StrictField, UnpackedField)
+  if shouldStricten
+  then (StrictField, unpackedness)
   else (LazyField, NonUnpackedField)
   where
-    isPrimitive type_ =
-      case type_ of
+    unpackedness =
+      case S.fldType field of
+        S.Null    -> NonUnpackedField
+        S.Boolean -> NonUnpackedField
+        _         -> UnpackedField
+
+    shouldStricten =
+      case S.fldType field of
         S.Null    -> True
         S.Boolean -> True
         S.Int     -> True
