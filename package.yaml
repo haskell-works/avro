@@ -52,6 +52,7 @@ library:
   - Data.Avro.Deconflict
   - Data.Avro.Encode
   - Data.Avro.Deriving
+  - Data.Avro.EitherN
   - Data.Avro.EncodeRaw
   - Data.Avro.JSON
   - Data.Avro.Schema

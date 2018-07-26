@@ -45,6 +45,7 @@ import           Language.Haskell.TH.Lib       as TH hiding (notStrict)
 import           Language.Haskell.TH.Syntax
 
 import           Data.Avro.Deriving.NormSchema
+import           Data.Avro.EitherN
 
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Lazy          as LBS
@@ -233,6 +234,7 @@ genFromAvro (S.Fixed n _ _ s) =
 genFromAvro _                             = pure []
 
 genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
+genFromAvroFieldsExp n []     = [| (return . return) $(conE n) |]
 genFromAvroFieldsExp n (x:xs) =
   [| \r ->
     $(let extract fld = [| r .: T.pack $(mkTextLit (fldName fld))|]
@@ -424,7 +426,10 @@ mkFieldTypeName t = case t of
   S.Union (Null :| [x]) _       -> [t| Maybe $(mkFieldTypeName x) |] -- AppT (ConT $ mkName "Maybe") (mkFieldTypeName x)
   S.Union (x :| [Null]) _       -> [t| Maybe $(mkFieldTypeName x) |] --AppT (ConT $ mkName "Maybe") (mkFieldTypeName x)
   S.Union (x :| [y]) _          -> [t| Either $(mkFieldTypeName x) $(mkFieldTypeName y) |] -- AppT (AppT (ConT (mkName "Either")) (mkFieldTypeName x)) (mkFieldTypeName y)
-  S.Union (_ :| _) _            -> error "Unions with more than 2 elements are not yet supported"
+  S.Union (a :| [b, c]) _       -> [t| Either3 $(mkFieldTypeName a) $(mkFieldTypeName b) $(mkFieldTypeName c) |]
+  S.Union (a :| [b, c, d]) _    -> [t| Either4 $(mkFieldTypeName a) $(mkFieldTypeName b) $(mkFieldTypeName c) $(mkFieldTypeName d) |]
+  S.Union (a :| [b, c, d, e]) _ -> [t| Either5 $(mkFieldTypeName a) $(mkFieldTypeName b) $(mkFieldTypeName c) $(mkFieldTypeName d) $(mkFieldTypeName e) |]
+  S.Union _ _                   -> error "Unions with more than 5 elements are not yet supported"
   S.Record n _ _ _ _ _          -> [t| $(conT $ mkDataTypeName n) |]
   S.Map x                       -> [t| Map Text $(mkFieldTypeName x) |] --AppT (AppT (ConT (mkName "Map")) (ConT $ mkName "Text")) (mkFieldTypeName x)
   S.Array x                     -> [t| [$(mkFieldTypeName x)] |]--AppT (ConT $ Text "[]") (mkFieldTypeName x)
