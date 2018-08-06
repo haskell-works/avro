@@ -77,7 +77,7 @@ decodeContainer bs =
 -- The schema for the requested type will be de-conflicted with the schema
 -- embedded with the container.
 --
--- The content of the container is returned as a list ob "blocks" of values
+-- The content of the container is returned as a list of "blocks" of values
 -- inside this container, so the notion of blocks in the container is preserved.
 -- Since decoding is lazy it should be safe to concat these values into one lazy list.
 --
@@ -123,11 +123,11 @@ decodeAvro s = snd . getAvroOf s
 
 -- | Decodes the container into a list of blocks of raw Avro values.
 --
--- The content of the container is returned as a list ob "blocks" of values
+-- The content of the container is returned as a list of "blocks" of values
 -- inside this container, so the notion of blocks in the container is preserved.
 -- Since decoding is lazy it should be safe to concat these values into one lazy list.
 --
--- Each 'LazyyValue' can be an `Error' and this function doesn't make any attempts
+-- Each 'LazyValue' can be an `Error' and this function doesn't make any attempts
 -- of dealing with them leaving it up to the user.
 --
 -- The "outer" error represents the error in opening the container itself
