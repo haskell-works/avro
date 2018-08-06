@@ -2,10 +2,10 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6de090ce98d5793524ae7c64328691c716a2787bef1e1c2c475c89ef3ee1920e
+-- hash: 8b98a8b89f40922a3fbe1ab0ebd5a8bef25531bd5d1571b3216bb3b3ed75bed3
 
 name:           avro
-version:        0.3.3.1
+version:        0.3.4.0
 synopsis:       Avro serialization support for Haskell
 description:    Avro serialization and deserialization support for Haskell
 category:       Data
