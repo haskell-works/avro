@@ -52,6 +52,11 @@ jobs:
       - LTS: "lts-11"
     <<: *defaults
 
+  lts-12:
+    environment:
+      - LTS: "lts-12"
+    <<: *defaults
+
   nightly:
     environment:
       - LTS: "nightly"
@@ -77,12 +82,14 @@ workflows:
       - lts-7
       - lts-9
       - lts-11
+      - lts-12
       - nightly
       - release:
           requires:
             - lts-7
             - lts-9
             - lts-11
+            - lts-12
             # - nightly
           filters:
             branches:
