@@ -25,6 +25,7 @@ module Data.Avro.Schema
   , typeName
   , buildTypeEnvironment
   , Result(..)
+  , resultToEither
 
   , matches
 
@@ -349,7 +350,14 @@ instance ToJSON (Ty.Value Type) where
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
-  deriving (Eq,Ord,Show)
+  deriving (Eq, Ord, Show)
+
+resultToEither :: Result b -> Either String b
+resultToEither r =
+  case r of
+    Success v -> Right v
+    Error err -> Left err
+{-# INLINE resultToEither #-}
 
 instance Monad Result where
   return = pure
