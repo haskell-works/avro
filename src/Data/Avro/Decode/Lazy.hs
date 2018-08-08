@@ -158,10 +158,10 @@ getContainerValuesWith schemaToGet bs =
         (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
         (_, rest) -> Right rest
 
-    getBlocks :: (BL.ByteString -> (BL.ByteString, T.LazyValue Type))
-              -> BL.ByteString
-              -> BL.ByteString
-              -> (BL.ByteString -> Get BL.ByteString)
+    getBlocks :: (BL.ByteString -> (BL.ByteString, T.LazyValue Type)) -- ^ getValue
+              -> BL.ByteString                                        -- ^ sync bytes
+              -> BL.ByteString                                        -- ^ byteString to parse
+              -> (BL.ByteString -> Get BL.ByteString)                 -- ^ how to decompress
               -> (BL.ByteString, [[T.LazyValue Type]])
     getBlocks getValue sync bs decompress =
       case runGetOrFail (getRawBlock decompress) bs of
@@ -172,7 +172,7 @@ getContainerValuesWith schemaToGet bs =
             Left err -> (bs', [[T.Error err]])
             Right bs'' | BL.null bs'' -> (bs'', [vs])
             Right bs'' ->
-              let (rest, vs') = getBlocks getValue bs'' sync decompress
+              let (rest, vs') = getBlocks getValue sync bs'' decompress
               in (rest, vs : vs')
 
 decodeGet :: GetAvro a => (a -> T.LazyValue Type) -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
