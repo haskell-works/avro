@@ -69,19 +69,20 @@ getContainerWith schemaToGet =
       (containedSchema,) <$> getBlocks (schemaToGet containedSchema) syncBytes decompress
   where
   getBlocks :: Get a -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[a]]
-  getBlocks getValue sync decompress =
-   do nrObj    <- sFromIntegral =<< getLong
-      nrBytes  <- getLong
-      bytes    <- decompress =<< G.getLazyByteString nrBytes
-      r        <- case runGetOrFail (replicateM nrObj getValue) bytes of
-                    Right (_,_,x) -> return x
-                    Left (_,_,s)  -> fail s
-      marker   <- G.getLazyByteString nrSyncBytes
-      when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
-      e <- G.isEmpty
-      if e
-        then return [r]
-        else (r :) <$> getBlocks getValue sync decompress
+  getBlocks getValue sync decompress = do
+    isEmpty <- G.isEmpty
+    if isEmpty
+      then return []
+      else do
+        nrObj    <- sFromIntegral =<< getLong
+        nrBytes  <- getLong
+        bytes    <- decompress =<< G.getLazyByteString nrBytes
+        r        <- case runGetOrFail (replicateM nrObj getValue) bytes of
+                      Right (_,_,x) -> return x
+                      Left (_,_,s)  -> fail s
+        marker   <- G.getLazyByteString nrSyncBytes
+        when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
+        (r :) <$> getBlocks getValue sync decompress
 
 getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
 getCodec code | Just "null"    <- code =
