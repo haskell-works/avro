@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 307ace222c16e9660fc8fd8f1d3b126a4254daea39bb616b93782a86b81d73b0
+-- hash: 2c6985354c8e4acdcb47a9ff7d72b5ef4ec0999438aa2fe26ee2cd87faf2074d
 
 name:           avro
 version:        0.3.4.2
@@ -121,6 +121,7 @@ test-suite test
       Avro.Codec.TextSpec
       Avro.Codec.ZigZagSpec
       Avro.Decode.Lazy.ContainerSpec
+      Avro.Decode.Lazy.RawBlocksSpec
       Avro.Decode.Lazy.ValuesSpec
       Avro.Deconflict.Reader
       Avro.Deconflict.Writer

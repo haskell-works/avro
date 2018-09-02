@@ -9,7 +9,10 @@ module Data.Avro.Encode
   ( -- * High level interface
     getSchema
   , encodeAvro
-  , encodeContainer, encodeContainerWithSync
+  , encodeContainer
+  , newSyncBytes
+  , encodeContainerWithSync
+  , containerHeaderWithSync
   -- * Lower level interface
   , EncodeAvro(..)
   , Zag(..)
@@ -57,21 +60,32 @@ import           Data.Avro.Zig
 encodeAvro :: EncodeAvro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
 
+-- | Generates a new synchronization marker for encoding Avro containers
+newSyncBytes :: IO BL.ByteString
+newSyncBytes = BL.fromStrict <$> getEntropy 16
+
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers.
 encodeContainer :: EncodeAvro a => Schema -> [[a]] -> IO BL.ByteString
 encodeContainer sch xss =
-  do sync <- getEntropy 16
-     return $ encodeContainerWithSync sch (BL.fromStrict sync) xss
+  do sync <- newSyncBytes
+     return $ encodeContainerWithSync sch sync xss
+
+containerHeaderWithSync :: Schema -> BL.ByteString -> Builder
+containerHeaderWithSync sch syncBytes =
+  lazyByteString avroMagicBytes <>
+  putAvro (HashMap.fromList [("avro.schema", A.encode sch), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
+  lazyByteString syncBytes
+  where
+    avroMagicBytes :: BL.ByteString
+    avroMagicBytes = "Obj" <> BL.pack [1]
 
 -- |Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
 encodeContainerWithSync :: EncodeAvro a => Schema -> BL.ByteString -> [[a]] -> BL.ByteString
 encodeContainerWithSync sch syncBytes xss =
  toLazyByteString $
-  lazyByteString avroMagicBytes <>
-  putAvro (HashMap.fromList [("avro.schema", A.encode sch), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
-  lazyByteString syncBytes <>
+  containerHeaderWithSync sch syncBytes <>
   foldMap putBlocks xss
  where
   putBlocks ys =
@@ -82,8 +96,7 @@ encodeContainerWithSync sch syncBytes xss =
        putAvro nrBytes <>
        lazyByteString theBytes <>
        lazyByteString syncBytes
-  avroMagicBytes :: BL.ByteString
-  avroMagicBytes = "Obj" <> BL.pack [1]
+
 
 -- XXX make an instance 'EncodeAvro Schema'
 -- Would require a schema schema...
