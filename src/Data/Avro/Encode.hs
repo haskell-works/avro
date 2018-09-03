@@ -13,6 +13,7 @@ module Data.Avro.Encode
   , newSyncBytes
   , encodeContainerWithSync
   , containerHeaderWithSync
+  , packContainerWithSync
   -- * Lower level interface
   , EncodeAvro(..)
   , Zag(..)
@@ -97,6 +98,22 @@ encodeContainerWithSync sch syncBytes xss =
        putAvro nrBytes <>
        lazyByteString theBytes <>
        lazyByteString syncBytes
+
+-- | Packs the container from a given list of already encoded Avro blocks
+packContainerWithSync :: Schema -> BL.ByteString -> [[BL.ByteString]] -> BL.ByteString
+packContainerWithSync sch syncBytes xss =
+  toLazyByteString $
+    containerHeaderWithSync sch syncBytes <>
+    foldMap putBlock xss
+  where
+    putBlock ys =
+      let nrObj = P.length ys
+          nrBytes = DL.foldl' (\a b -> BL.length b + a) 0 ys
+          theBytes = mconcat $ lazyByteString <$> ys
+      in putAvro nrObj <>
+         putAvro nrBytes <>
+         theBytes <>
+         lazyByteString syncBytes
 
 putAvro :: EncodeAvro a => a -> Builder
 putAvro = fst . runAvro . avro
