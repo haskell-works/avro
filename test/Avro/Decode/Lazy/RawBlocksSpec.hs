@@ -5,16 +5,17 @@
 module Avro.Decode.Lazy.RawBlocksSpec
 where
 
-import           Data.Avro                     as A
-import           Data.Avro.Decode.Lazy         as DL
-import           Data.Avro.Decode.Lazy.Convert as TC
-import           Data.Avro.Deriving
-import           Data.Either                   (isLeft, isRight)
-import           Data.List                     (unfoldr)
-import           Data.Semigroup                ((<>))
-import           Data.Text                     (pack)
+import Data.Avro                     as A
+import Data.Avro.Decode.Lazy         as DL
+import Data.Avro.Decode.Lazy.Convert as TC
+import Data.Avro.Deriving
+import Data.Avro.Encode              (packContainerBlocks, packContainerValues)
+import Data.Either                   (isLeft, isRight, rights)
+import Data.List                     (unfoldr)
+import Data.Semigroup                ((<>))
+import Data.Text                     (pack)
 
-import           Test.Hspec
+import Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
@@ -40,6 +41,26 @@ spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
     s `shouldBe` schema'Endpoint
     fmap fst <$> bs `shouldBe` [Right 4, Right 4, Right 2]
     sequence bs `shouldSatisfy` isRight
+
+  it "should repack container" $ do
+    let srcValues = mkEndpoint <$> [1..19]
+    srcContainer <- A.encodeContainer (chunksOf 4 srcValues)
+    let Right (s, bs) = DL.decodeRawBlocks srcContainer
+    tgtContainer <- packContainerBlocks s (rights bs)
+    let tgtValues = DL.decodeContainer tgtContainer
+    let allTgtValues = rights tgtValues
+    allTgtValues `shouldBe` srcValues
+
+  it "should pack container with individual values" $ do
+    let srcValues = mkEndpoint <$> [1..19]
+    let values = A.encode <$> srcValues
+    container <- packContainerValues schema'Endpoint (chunksOf 4 values)
+
+    let Right (s, bs) = DL.decodeRawBlocks container
+    s `shouldBe` schema'Endpoint
+    fst <$> rights bs `shouldBe` [4,4,4,4,3]
+
+    rights (DL.decodeContainer container) `shouldBe` srcValues
 
 mkEndpoint :: Int -> Endpoint
 mkEndpoint i =
