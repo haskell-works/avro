@@ -72,6 +72,7 @@ module Data.Avro
   ( FromAvro(..)
   , ToAvro(..)
   , HasAvroSchema(..)
+  , Schema
   , Avro
   , (.:)
   , (.=), record, fixed
