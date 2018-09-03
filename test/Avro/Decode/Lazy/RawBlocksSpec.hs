@@ -31,14 +31,14 @@ spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
     container <- A.encodeContainer [mkEndpoint <$> [1, 2]]
     let Right (s, bs) = DL.decodeRawBlocks container
     s `shouldBe` schema'Endpoint
-    length bs `shouldBe` 1
+    fmap fst <$> bs `shouldBe` [Right 2]
     sequence bs `shouldSatisfy` isRight
 
   it "should decode container with multiple blocks" $ do
     container <- A.encodeContainer (chunksOf 4 $ mkEndpoint <$> [1..10])
     let Right (s, bs) = DL.decodeRawBlocks container
     s `shouldBe` schema'Endpoint
-    length bs `shouldBe` 3
+    fmap fst <$> bs `shouldBe` [Right 4, Right 4, Right 2]
     sequence bs `shouldSatisfy` isRight
 
 mkEndpoint :: Int -> Endpoint

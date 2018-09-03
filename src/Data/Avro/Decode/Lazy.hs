@@ -141,7 +141,17 @@ getContainerValues :: BL.ByteString -> Either String (Schema, [[T.LazyValue Type
 getContainerValues = getContainerValuesWith getAvroOf
 {-# INLINABLE getContainerValues #-}
 
-decodeRawBlocks :: BL.ByteString -> Either String (Schema, [Either String BL.ByteString])
+-- | Reads the container as a list of blocks without decoding them into actual values.
+--
+-- This can be useful for streaming / splitting / merging Avro containers without
+-- paying the cost for Avro encoding/decoding.
+--
+-- Each block is returned as a raw 'ByteString' annotated with the number of Avro values
+-- that are contained in this block.
+--
+-- The "outer" error represents the error in opening the container itself
+-- (including problems like reading schemas embedded into the container.)
+decodeRawBlocks :: BL.ByteString -> Either String (Schema, [Either String (Int, BL.ByteString)])
 decodeRawBlocks bs =
   case runGetOrFail getAvro bs of
     Left (bs', _, err) -> Left err
@@ -156,7 +166,7 @@ decodeRawBlocks bs =
 
     next syncBytes decompress bytes =
       case getNextBlock syncBytes decompress bytes of
-        Right (Just (_, block, rest)) -> Just (Right block, Just rest)
+        Right (Just (numObj, block, rest)) -> Just (Right (numObj, block), Just rest)
         Right Nothing                 -> Nothing
         Left err                      -> Just (Left err, Nothing)
 
@@ -191,43 +201,16 @@ getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValu
                  -> BL.ByteString
                  -> Either String (Schema, [[T.LazyValue Type]])
 getContainerValuesWith schemaToGet bs =
-  case runGetOrFail getAvro bs of
-    Left (bs', _, err) ->
-      Left err
-    Right (bs', _, ContainerHeader {..}) ->
-      Right (containedSchema, snd $ getBlocks (schemaToGet containedSchema) syncBytes bs' decompress)
+  case decodeRawBlocks bs of
+    Left err            -> Left err
+    Right (sch, blocks) -> Right (sch, decodeBlocks (schemaToGet sch) blocks)
   where
-    getRawBlock :: (BL.ByteString -> Get BL.ByteString) -> Get (Int, BL.ByteString)
-    getRawBlock decompress = do
-      nrObj    <- getLong >>= sFromIntegral
-      nrBytes  <- getLong
-      bytes    <- G.getLazyByteString nrBytes >>= decompress
-      pure (nrObj, bytes)
-
-    checkMarker :: BL.ByteString -> BL.ByteString -> Either String BL.ByteString
-    checkMarker sync bs =
-      case BL.splitAt nrSyncBytes bs of
-        (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
-        (_, rest) -> Right rest
-
-    getBlocks :: (BL.ByteString -> (BL.ByteString, T.LazyValue Type)) -- ^ getValue
-              -> BL.ByteString                                        -- ^ sync bytes
-              -> BL.ByteString                                        -- ^ byteString to parse
-              -> (BL.ByteString -> Get BL.ByteString)                 -- ^ how to decompress
-              -> (BL.ByteString, [[T.LazyValue Type]])
-    getBlocks getValue sync bs decompress =
-      if BL.null bs
-        then (bs, [])
-        else case runGetOrFail (getRawBlock decompress) bs of
-          Left (bs', _, err) -> (bs', [[T.Error err]])
-          Right (bs', _, (nrObj, bytes)) ->
-            let (_, vs) = consumeN (fromIntegral nrObj) getValue bytes
-            in case checkMarker sync bs' of
-              Left err -> (bs', [[T.Error err]])
-              Right bs'' | BL.null bs'' -> (bs'', [vs])
-              Right bs'' ->
-                let (rest, vs') = getBlocks getValue sync bs'' decompress
-                in (rest, vs : vs')
+    decodeBlocks getValue blocks = decodeBlock getValue <$> blocks
+    decodeBlock getValue v = case v of
+      Left err -> [T.Error err]
+      Right (nObj, bytes) ->
+        let (_, vs) = consumeN (fromIntegral nObj) getValue bytes
+        in vs
 
 decodeGet :: GetAvro a => (a -> T.LazyValue Type) -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
 decodeGet f bs =

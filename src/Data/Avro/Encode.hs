@@ -71,6 +71,7 @@ encodeContainer sch xss =
   do sync <- newSyncBytes
      return $ encodeContainerWithSync sch sync xss
 
+-- | Creates an Avro container header for a given schema.
 containerHeaderWithSync :: Schema -> BL.ByteString -> Builder
 containerHeaderWithSync sch syncBytes =
   lazyByteString avroMagicBytes <>
@@ -96,12 +97,6 @@ encodeContainerWithSync sch syncBytes xss =
        putAvro nrBytes <>
        lazyByteString theBytes <>
        lazyByteString syncBytes
-
-
--- XXX make an instance 'EncodeAvro Schema'
--- Would require a schema schema...
--- encodeSchema :: EncodeAvro a => a -> BL.ByteString
--- encodeSchema = toLazyByteString . putAvro . getSchema
 
 putAvro :: EncodeAvro a => a -> Builder
 putAvro = fst . runAvro . avro
