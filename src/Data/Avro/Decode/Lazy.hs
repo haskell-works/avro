@@ -19,49 +19,54 @@ module Data.Avro.Decode.Lazy
   -- * Lower level interface
   , getContainerValues
   , getContainerValuesWith
+  , getContainerValuesBytes
+  , getContainerValuesBytes'
   , getAvroOf
   , GetAvro(..)
   ) where
 
-import qualified Codec.Compression.Zlib           as Z
-import           Control.Monad                    (foldM, replicateM, when)
-import qualified Data.Aeson                       as A
-import qualified Data.Array                       as Array
-import           Data.Binary.Get                  (Get, runGetOrFail)
-import qualified Data.Binary.Get                  as G
-import           Data.Binary.IEEE754              as IEEE
+import qualified Codec.Compression.Zlib     as Z
+import           Control.Monad              (foldM, replicateM, when)
+import qualified Data.Aeson                 as A
+import qualified Data.Array                 as Array
+import           Data.Binary.Get            (Get, runGetOrFail)
+import qualified Data.Binary.Get            as G
+import           Data.Binary.IEEE754        as IEEE
 import           Data.Bits
-import           Data.ByteString                  (ByteString)
-import qualified Data.ByteString.Lazy             as BL
-import qualified Data.ByteString.Lazy.Char8       as BL
-import           Data.Either                      (isRight)
-import qualified Data.HashMap.Strict              as HashMap
+import           Data.ByteString            (ByteString)
+import qualified Data.ByteString.Lazy       as BL
+import qualified Data.ByteString.Lazy.Char8 as BL
+import           Data.Either                (isRight)
+import qualified Data.HashMap.Strict        as HashMap
 import           Data.Int
-import           Data.List                        (foldl', unfoldr)
-import qualified Data.List.NonEmpty               as NE
-import qualified Data.Map                         as Map
+import           Data.List                  (foldl', unfoldr)
+import qualified Data.List.NonEmpty         as NE
+import qualified Data.Map                   as Map
 import           Data.Maybe
-import           Data.Monoid                      ((<>))
-import qualified Data.Set                         as Set
-import           Data.Tagged                      (Tagged, untag)
-import           Data.Text                        (Text)
-import qualified Data.Text                        as Text
-import qualified Data.Text.Encoding               as Text
-import qualified Data.Vector                      as V
-import           Prelude                          as P
+import           Data.Monoid                ((<>))
+import qualified Data.Set                   as Set
+import           Data.Tagged                (Tagged, untag)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Encoding         as Text
+import qualified Data.Vector                as V
+import           Prelude                    as P
 
-import qualified Data.Avro.Decode.Lazy.LazyValue  as T
+import qualified Data.Avro.Decode.Lazy.LazyValue as T
 import           Data.Avro.DecodeRaw
-import           Data.Avro.HasAvroSchema          (schema)
-import           Data.Avro.Schema                 as S
+import           Data.Avro.HasAvroSchema         (schema)
+import           Data.Avro.Schema                as S
+import qualified Data.Avro.Types                 as TypesStrict
 import           Data.Avro.Zag
 
-import           Data.Avro.Decode.Get
-import           Data.Avro.Decode.Lazy.Convert    (toStrictValue)
-import           Data.Avro.Decode.Lazy.Deconflict as C
-import           Data.Avro.FromAvro
+import qualified Data.Avro.Decode.Strict.Internal as DecodeStrict
 
-import           Debug.Trace
+import Data.Avro.Decode.Get
+import Data.Avro.Decode.Lazy.Convert    (toStrictValue)
+import Data.Avro.Decode.Lazy.Deconflict as C
+import Data.Avro.FromAvro
+
+import Debug.Trace
 
 -- | Decodes the container as a lazy list of values of the requested type.
 --
@@ -167,8 +172,8 @@ decodeRawBlocks bs =
     next syncBytes decompress bytes =
       case getNextBlock syncBytes decompress bytes of
         Right (Just (numObj, block, rest)) -> Just (Right (numObj, block), Just rest)
-        Right Nothing                 -> Nothing
-        Left err                      -> Just (Left err, Nothing)
+        Right Nothing                      -> Nothing
+        Left err                           -> Just (Left err, Nothing)
 
 getNextBlock :: BL.ByteString
              -> (BL.ByteString -> Get BL.ByteString)
@@ -195,7 +200,7 @@ getNextBlock sync decompress bs =
     checkMarker sync bs =
       case BL.splitAt nrSyncBytes bs of
         (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
-        (_, rest) -> Right rest
+        (_, rest)   -> Right rest
 
 getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Type))
                  -> BL.ByteString
@@ -217,6 +222,50 @@ decodeGet f bs =
   let res = runGetOrFail (f <$> getAvro) bs
   in either (\(rest,_,s) -> (rest, T.Error s)) (\(rest,_,a) -> (rest, a)) res
 {-# INLINE decodeGet #-}
+
+-- | Splits container into a list of individual avro-encoded values.
+--
+-- This is particularly useful when slicing up containers into one or more
+-- smaller files.  By extracting the original bytestring it is possible to
+-- avoid re-encoding data.
+getContainerValuesBytes :: BL.ByteString -> Either String (Schema, [Either String BL.ByteString])
+getContainerValuesBytes =
+  extractContainerValues readBytes
+  where
+    readBytes sch = do
+      start <- G.bytesRead
+      end <- G.lookAhead (DecodeStrict.getAvroOf sch >> G.bytesRead)
+      G.getLazyByteString (end-start)
+
+-- | Splits container into a list of individual avro-encoded values.
+-- This version provides both encoded and decoded values.
+--
+-- This is particularly useful when slicing up containers into one or more
+-- smaller files.  By extracting the original bytestring it is possible to
+-- avoid re-encoding data.
+getContainerValuesBytes' :: BL.ByteString -> Either String (Schema, [Either String (TypesStrict.Value S.Type, BL.ByteString)])
+getContainerValuesBytes' =
+  extractContainerValues readBytes
+  where
+    readBytes sch = do
+      start <- G.bytesRead
+      (val, end) <- G.lookAhead (DecodeStrict.getAvroOf sch >>= (\v -> (v, ) <$> G.bytesRead))
+      res <- G.getLazyByteString (end-start)
+      pure (val, res)
+
+extractContainerValues :: (Schema -> Get a) -> BL.ByteString -> Either String (Schema, [Either String a])
+extractContainerValues f bs =
+  case decodeRawBlocks bs of
+    Left err            -> Left err
+    Right (sch, blocks) -> Right (sch, blocks >>= decodeBlock sch)
+  where
+    decodeBlock _ (Left err)               = undefined
+    decodeBlock sch (Right (nrObj, bytes)) = snd $ consumeN (fromIntegral nrObj) (decodeValue sch) bytes
+
+    decodeValue sch bytes =
+      case G.runGetOrFail (f sch) bytes of
+        Left (bs', _, err)  -> (bs', Left err)
+        Right (bs', _, res) -> (bs', Right res)
 
 consumeN :: Int64 -> (a -> (a, b)) -> a -> (a, [b])
 consumeN n f a =
@@ -262,7 +311,7 @@ getAvroOf ty0 bs = go ty0 bs
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, i)  ->
             case symbolLookup i of
-              Nothing -> (bs', T.Error ("Unknown value {" <> show i <> "} for enum " <> Text.unpack (typeName ty) ))
+              Nothing  -> (bs', T.Error ("Unknown value {" <> show i <> "} for enum " <> Text.unpack (typeName ty) ))
               Just sym -> (bs', T.Enum ty (fromIntegral i) sym)
 
       Union ts unionLookup ->
