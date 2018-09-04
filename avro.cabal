@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 83c35a316bced7d77c45fea0d0d8b228cdff0c26f57a07eedb698798addc4697
+-- hash: 747be5e8b0f44dc230cf83501d140fa5288bbad221d6663e5cb6a3cd8fd289c8
 
 name:           avro
 version:        0.3.5.0
@@ -56,6 +56,8 @@ library
       Data.Avro.Decode.Lazy.Convert
       Data.Avro.Decode.Lazy.Deconflict
       Data.Avro.Decode.Lazy.LazyValue
+      Data.Avro.Decode.Strict
+      Data.Avro.Decode.Strict.Internal
       Data.Avro.DecodeRaw
       Data.Avro.Deconflict
       Data.Avro.Deriving
@@ -122,6 +124,7 @@ test-suite test
       Avro.Codec.ZigZagSpec
       Avro.Decode.Lazy.ContainerSpec
       Avro.Decode.Lazy.RawBlocksSpec
+      Avro.Decode.Lazy.RawValuesSpec
       Avro.Decode.Lazy.ValuesSpec
       Avro.Deconflict.Reader
       Avro.Deconflict.Writer
