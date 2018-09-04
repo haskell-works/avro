@@ -1,5 +1,5 @@
 name: avro
-version: '0.3.5.0'
+version: '0.3.5.1'
 synopsis: Avro serialization support for Haskell
 description: Avro serialization and deserialization support for Haskell
 category: Data
