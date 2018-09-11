@@ -81,7 +81,7 @@ import qualified Data.Avro.Types      as Avro
 fromJSON :: forall a. (FromAvro a) => Aeson.Value -> Result a
 fromJSON json = parseAvroJSON union env schema json >>= fromAvro
   where schema = untag (Avro.schema :: Tagged a Schema)
-        env = Schema.buildTypeEnvironment missing schema . Schema.TN
+        env = Schema.buildTypeEnvironment missing schema
         missing name = fail $ "Type " <> show name <> " not in schema."
 
         union (Schema.Union schemas _) Aeson.Null

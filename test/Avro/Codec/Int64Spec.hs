@@ -33,7 +33,7 @@ newtype OnlyInt64 = OnlyInt64
 onlyInt64Schema :: Schema
 onlyInt64Schema =
   let fld nm = Field nm [] Nothing Nothing
-   in Record "OnlyInt64" (Just "test.contract") [] Nothing Nothing
+   in Record "test.contract.OnlyInt64" [] Nothing Nothing
         [ fld "onlyInt64Value"    Long Nothing
         ]
 

@@ -20,7 +20,7 @@ newtype OnlyFloat = OnlyFloat
 onlyFloatSchema :: Schema
 onlyFloatSchema =
   let fld nm = Field nm [] Nothing Nothing
-  in Record "OnlyFloat" (Just "test.contract") [] Nothing Nothing
+  in Record "test.contract.OnlyFloat" [] Nothing Nothing
         [ fld "onlyFloatValue" Float Nothing
         ]
 
