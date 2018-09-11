@@ -4,12 +4,12 @@
   },
   "nullable": null,
   "records": {
-    "Foo": {
+    "haskell.avro.example.Foo": {
       "stuff": "stuff"
     }
   },
   "sameFields": {
-    "Foo": {
+    "haskell.avro.example.Foo": {
       "stuff": "foo stuff"
     }
   }

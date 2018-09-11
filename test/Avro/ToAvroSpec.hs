@@ -32,7 +32,7 @@ data TypesTestMessage = TypesTestMessage
 tmSchema :: Schema
 tmSchema =
   let fld nm = Field nm [] Nothing Nothing
-   in Record "TypesTestMessage" (Just "avro.haskell.test") [] Nothing Nothing
+   in Record "avro.haskell.test.TypesTestMessage" [] Nothing Nothing
         [ fld "id" Long Nothing
         , fld "name" String Nothing
         , fld "timestamp" (mkUnion (Null :| [Long])) Nothing
