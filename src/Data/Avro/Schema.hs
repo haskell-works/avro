@@ -60,7 +60,7 @@ import qualified Data.List                  as L
 import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NE
 import           Data.Maybe                 (catMaybes, fromMaybe, isJust)
-import           Data.Monoid                (First (..), (<>))
+import           Data.Monoid                (First (..))
 import           Data.Semigroup
 import qualified Data.Set                   as S
 import           Data.String
