@@ -1,6 +1,7 @@
 .*
 
 ### Haskell ###
+result
 dist
 cabal-dev
 *.o

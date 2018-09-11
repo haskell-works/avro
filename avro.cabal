@@ -1,0 +1,182 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: df77e046e65bd987123d33da69b0e843f877bd76dea4406b0e1fd22d9fd5a8f8
+
+name:           avro
+version:        0.3.5.1
+synopsis:       Avro serialization support for Haskell
+description:    Avro serialization and deserialization support for Haskell
+category:       Data
+homepage:       https://github.com/GaloisInc/avro#readme
+bug-reports:    https://github.com/GaloisInc/avro/issues
+author:         Thomas M. DuBuisson
+maintainer:     Alexey Raga <alexey.raga@gmail.com>
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    ChangeLog.md
+    test/data/deconflict/reader.avsc
+    test/data/deconflict/writer.avsc
+    test/data/enums-object.json
+    test/data/enums.avsc
+    test/data/karma.avsc
+    test/data/logical.avsc
+    test/data/maybe.avsc
+    test/data/record.avsc
+    test/data/reused.avsc
+    test/data/small.avsc
+    test/data/unions-object-a.json
+    test/data/unions-object-b.json
+    test/data/unions.avsc
+
+source-repository head
+  type: git
+  location: https://github.com/GaloisInc/avro
+
+flag dev
+  description: Use development GHC flags
+  manual: True
+  default: False
+
+flag templatehaskell
+  description: Build Avro.Deriving, which uses Template Haskell.
+  manual: False
+  default: True
+
+library
+  exposed-modules:
+      Data.Avro
+      Data.Avro.Decode
+      Data.Avro.Decode.Get
+      Data.Avro.Decode.Lazy
+      Data.Avro.Decode.Lazy.Convert
+      Data.Avro.Decode.Lazy.Deconflict
+      Data.Avro.Decode.Lazy.LazyValue
+      Data.Avro.Decode.Strict
+      Data.Avro.Decode.Strict.Internal
+      Data.Avro.DecodeRaw
+      Data.Avro.Deconflict
+      Data.Avro.Deriving
+      Data.Avro.Deriving.NormSchema
+      Data.Avro.EitherN
+      Data.Avro.Encode
+      Data.Avro.EncodeRaw
+      Data.Avro.FromAvro
+      Data.Avro.HasAvroSchema
+      Data.Avro.JSON
+      Data.Avro.Schema
+      Data.Avro.ToAvro
+      Data.Avro.Types
+      Data.Avro.Types.Value
+      Data.Avro.Zag
+      Data.Avro.Zig
+  other-modules:
+      Paths_avro
+  hs-source-dirs:
+      src
+  other-extensions: OverloadedStrings
+  ghc-options: -O2
+  build-depends:
+      aeson
+    , array
+    , base >=4.8 && <5.0
+    , base16-bytestring
+    , binary
+    , bytestring
+    , containers
+    , data-binary-ieee754
+    , entropy
+    , fail
+    , hashable
+    , mtl
+    , pure-zlib
+    , scientific
+    , semigroups
+    , tagged
+    , text
+    , unordered-containers
+    , vector
+  if flag(templatehaskell)
+    other-extensions: TemplateHaskell
+    build-depends:
+        template-haskell >=2.4
+  if flag(dev)
+    ghc-options: -Wall -Werror
+  default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Avro.Codec.ArraySpec
+      Avro.Codec.BoolSpec
+      Avro.Codec.CodecRawSpec
+      Avro.Codec.DoubleSpec
+      Avro.Codec.FloatSpec
+      Avro.Codec.Int64Spec
+      Avro.Codec.MaybeSpec
+      Avro.Codec.NestedSpec
+      Avro.Codec.TextSpec
+      Avro.Codec.ZigZagSpec
+      Avro.Decode.Lazy.ContainerSpec
+      Avro.Decode.Lazy.RawBlocksSpec
+      Avro.Decode.Lazy.RawValuesSpec
+      Avro.Decode.Lazy.ValuesSpec
+      Avro.Deconflict.Reader
+      Avro.Deconflict.Writer
+      Avro.DeconflictSpec
+      Avro.DefaultsSpec
+      Avro.EncodeRawSpec
+      Avro.JSONSpec
+      Avro.NormSchemaSpec
+      Avro.THEncodeContainerSpec
+      Avro.THEnumSpec
+      Avro.THLogicalTypeSpec
+      Avro.THReusedSpec
+      Avro.THSimpleSpec
+      Avro.THUnionSpec
+      Avro.ToAvroSpec
+      DecodeContainer
+      Example1
+      Paths_avro
+  hs-source-dirs:
+      test
+  ghc-options: -threaded
+  build-depends:
+      QuickCheck
+    , aeson
+    , array
+    , avro
+    , base >=4.6 && <5
+    , base16-bytestring
+    , binary
+    , bytestring
+    , containers
+    , directory
+    , entropy
+    , extra
+    , fail
+    , hashable
+    , hspec
+    , lens
+    , lens-aeson
+    , mtl
+    , pure-zlib
+    , scientific
+    , semigroups
+    , tagged
+    , text
+    , transformers
+    , unordered-containers
+    , vector
+  if flag(templatehaskell)
+    other-extensions: TemplateHaskell
+    build-depends:
+        template-haskell
+  if flag(dev)
+    ghc-options: -Wall -Werror
+  default-language: Haskell2010

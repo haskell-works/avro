@@ -1,79 +1,99 @@
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE RecordWildCards      #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Data.Avro.Encode
   ( -- * High level interface
     getSchema
   , encodeAvro
-  , encodeContainer, encodeContainerWithSync
+  , encodeContainer
+  , newSyncBytes
+  , encodeContainerWithSync
+  -- * Packing containers
+  , containerHeaderWithSync
+  , packContainerBlocks
+  , packContainerBlocksWithSync
+  , packContainerValues
+  , packContainerValuesWithSync
   -- * Lower level interface
   , EncodeAvro(..)
   , Zag(..)
   , putAvro
   ) where
 
-import Prelude as P
-import qualified Data.Aeson as A
-import qualified Data.Array              as Ar
-import           Data.Ix                 (Ix)
+import qualified Data.Aeson                 as A
+import qualified Data.Array                 as Ar
+import qualified Data.Binary.IEEE754        as IEEE
 import           Data.Bits
-import           Data.ByteString.Lazy    as BL
-import qualified Data.Binary.IEEE754     as IEEE
-import           Data.ByteString.Lazy.Char8 ()
-import qualified Data.ByteString         as B
+import qualified Data.ByteString            as B
 import           Data.ByteString.Builder
-import qualified Data.Foldable           as F
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as HashMap
+import           Data.ByteString.Lazy       as BL
+import           Data.ByteString.Lazy.Char8 ()
+import qualified Data.Foldable              as F
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as HashMap
 import           Data.Int
-import           Data.List               as DL
-import           Data.List.NonEmpty      (NonEmpty(..))
-import qualified Data.List.NonEmpty      as NE
+import           Data.Ix                    (Ix)
+import           Data.List                  as DL
+import           Data.List.NonEmpty         (NonEmpty (..))
+import qualified Data.List.NonEmpty         as NE
+import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Monoid
-import           Data.Maybe              (catMaybes, mapMaybe)
-import qualified Data.Set                as S
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import qualified Data.Text.Encoding      as T
-import qualified Data.Text.Lazy          as TL
-import qualified Data.Text.Lazy.Encoding as TL
-import qualified Data.Vector             as V
-import qualified Data.Vector.Unboxed     as U
-import           Data.Word
 import           Data.Proxy
-import           System.Entropy (getEntropy)
+import qualified Data.Set                   as S
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import qualified Data.Text.Encoding         as T
+import qualified Data.Text.Lazy             as TL
+import qualified Data.Text.Lazy.Encoding    as TL
+import qualified Data.Vector                as V
+import qualified Data.Vector.Unboxed        as U
+import           Data.Word
+import           Prelude                    as P
+import           System.Entropy             (getEntropy)
 
 import Data.Avro.EncodeRaw
-import Data.Avro.Schema as S
-import Data.Avro.Types  as T
+import Data.Avro.HasAvroSchema
+import Data.Avro.Schema        as S
+import Data.Avro.Types         as T
 import Data.Avro.Zag
 import Data.Avro.Zig
 
 encodeAvro :: EncodeAvro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
 
+-- | Generates a new synchronization marker for encoding Avro containers
+newSyncBytes :: IO BL.ByteString
+newSyncBytes = BL.fromStrict <$> getEntropy 16
+
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers.
-encodeContainer :: EncodeAvro a => [[a]] -> IO BL.ByteString
-encodeContainer xss =
-  do sync <- getEntropy 16
-     return $ encodeContainerWithSync (BL.fromStrict sync) xss
+encodeContainer :: EncodeAvro a => Schema -> [[a]] -> IO BL.ByteString
+encodeContainer sch xss =
+  do sync <- newSyncBytes
+     return $ encodeContainerWithSync sch sync xss
+
+-- | Creates an Avro container header for a given schema.
+containerHeaderWithSync :: Schema -> BL.ByteString -> Builder
+containerHeaderWithSync sch syncBytes =
+  lazyByteString avroMagicBytes <>
+  putAvro (HashMap.fromList [("avro.schema", A.encode sch), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
+  lazyByteString syncBytes
+  where
+    avroMagicBytes :: BL.ByteString
+    avroMagicBytes = "Obj" <> BL.pack [1]
 
 -- |Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
-encodeContainerWithSync :: EncodeAvro a => BL.ByteString -> [[a]] -> BL.ByteString
-encodeContainerWithSync syncBytes xss =
+encodeContainerWithSync :: EncodeAvro a => Schema -> BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync sch syncBytes xss =
  toLazyByteString $
-  lazyByteString avroMagicBytes <>
-  putAvro (HashMap.fromList [("avro.schema", A.encode objSchema), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
-  lazyByteString syncBytes <>
+  containerHeaderWithSync sch syncBytes <>
   foldMap putBlocks xss
  where
-  objSchema    = getSchema (P.head (P.head xss))
   putBlocks ys =
     let nrObj    = P.length ys
         nrBytes  = BL.length theBytes
@@ -82,13 +102,51 @@ encodeContainerWithSync syncBytes xss =
        putAvro nrBytes <>
        lazyByteString theBytes <>
        lazyByteString syncBytes
-  avroMagicBytes :: BL.ByteString
-  avroMagicBytes = "Obj" <> BL.pack [1]
 
--- XXX make an instance 'EncodeAvro Schema'
--- Would require a schema schema...
--- encodeSchema :: EncodeAvro a => a -> BL.ByteString
--- encodeSchema = toLazyByteString . putAvro . getSchema
+-- | Packs a new container from a list of already encoded Avro blocks.
+-- Each block is denoted as a pair of a number of objects within that block and the block content.
+packContainerBlocks :: Schema -> [(Int, BL.ByteString)] -> IO BL.ByteString
+packContainerBlocks sch blocks = do
+  sync <- newSyncBytes
+  pure $ packContainerBlocksWithSync sch sync blocks
+
+-- | Packs a new container from a list of already encoded Avro blocks.
+-- Each block is denoted as a pair of a number of objects within that block and the block content.
+packContainerBlocksWithSync :: Schema -> BL.ByteString -> [(Int, BL.ByteString)] -> BL.ByteString
+packContainerBlocksWithSync sch syncBytes blocks =
+  toLazyByteString $
+    containerHeaderWithSync sch syncBytes <>
+    foldMap putBlock blocks
+  where
+    putBlock (nrObj, bytes) =
+      putAvro nrObj <>
+      putAvro (BL.length bytes) <>
+      lazyByteString bytes <>
+      lazyByteString syncBytes
+
+-- | Packs a container from a given list of already encoded Avro values
+-- Each bytestring should represent exactly one one value serialised to Avro.
+packContainerValues :: Schema -> [[BL.ByteString]] -> IO BL.ByteString
+packContainerValues sch values = do
+  sync <- newSyncBytes
+  pure $ packContainerValuesWithSync sch sync values
+
+-- | Packs a container from a given list of already encoded Avro values
+-- Each bytestring should represent exactly one one value serialised to Avro.
+packContainerValuesWithSync :: Schema -> BL.ByteString -> [[BL.ByteString]] -> BL.ByteString
+packContainerValuesWithSync sch syncBytes values =
+  toLazyByteString $
+    containerHeaderWithSync sch syncBytes <>
+    foldMap putBlock values
+  where
+    putBlock ys =
+      let nrObj = P.length ys
+          nrBytes = DL.foldl' (\a b -> BL.length b + a) 0 ys
+          theBytes = mconcat $ lazyByteString <$> ys
+      in putAvro nrObj <>
+         putAvro nrBytes <>
+         theBytes <>
+         lazyByteString syncBytes
 
 putAvro :: EncodeAvro a => a -> Builder
 putAvro = fst . runAvro . avro
@@ -106,9 +164,6 @@ newtype AvroM = AvroM { runAvro :: (Builder,Type) }
 
 class EncodeAvro a where
   avro :: a -> AvroM
-
--- class PutAvro a where
---   putAvro :: a -> Builder
 
 avroInt :: forall a. (FiniteBits a, Integral a, EncodeRaw a) => a -> AvroM
 avroInt n = AvroM (encodeRaw n, S.Int)

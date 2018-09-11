@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -7,11 +8,11 @@ where
 import           Data.Avro
 import           Data.Avro.Deriving
 
-import Test.Hspec
+import           Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
-deriveAvroWithNamespaces "test/data/reused.avsc"
+deriveAvroWithOptions (defaultDeriveOptions { namespaceBehavior = HandleNamespaces }) "test/data/reused.avsc"
 
 spec :: Spec
 spec = describe "Avro.THReusedSpec: Schema with named types" $ do
@@ -24,10 +25,11 @@ spec = describe "Avro.THReusedSpec: Schema with named types" $ do
                 , boo'ReusedWrapperInner = container
                 }
   it "wrapper should do roundtrip" $
-    fromAvro (toAvro wrapper)         `shouldBe` pure wrapper
+    fromAvro (toAvro wrapper) `shouldBe` pure wrapper
 
   it "child should do rundtrip" $
-    fromAvro (toAvro container)       `shouldBe` pure container
+    fromAvro (toAvro container) `shouldBe` pure container
 
   it "innermost element should do roundtrip" $
     fromAvro (toAvro (Boo'ReusedChild 7)) `shouldBe` pure (Boo'ReusedChild 7)
+

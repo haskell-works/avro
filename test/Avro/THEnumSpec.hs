@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -7,11 +8,10 @@ where
 import           Data.Avro
 import           Data.Avro.Deriving
 
-import Test.Hspec
+import           Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
-
-deriveAvroWithNamespaces "test/data/enums.avsc"
+deriveAvroWithOptions (defaultDeriveOptions { namespaceBehavior = HandleNamespaces }) "test/data/enums.avsc"
 
 spec :: Spec
 spec = describe "Avro.THEnumSpec: Schema with enums" $ do

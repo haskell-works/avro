@@ -1,13 +1,14 @@
+{-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Avro.THEncodeContainerSpec where
 
-import Data.Avro
-import Data.Avro.Deriving
+import           Data.Avro
+import           Data.Avro.Deriving
 
-import Test.Hspec
+import           Test.Hspec
 
-import Control.Monad (void)
-import Control.Exception
+import           Control.Exception
+import           Control.Monad      (void)
 
 deriveAvro "test/data/record.avsc"
 

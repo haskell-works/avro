@@ -28,6 +28,7 @@ module Data.Avro.Schema
   , typeName
   , buildTypeEnvironment
   , Result(..)
+  , resultToEither
 
   , matches
 
@@ -60,6 +61,7 @@ import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NE
 import           Data.Maybe                 (catMaybes, fromMaybe, isJust)
 import           Data.Monoid                (First (..), (<>))
+import           Data.Semigroup
 import qualified Data.Set                   as S
 import           Data.String
 import           Data.Text                  (Text)
@@ -319,39 +321,43 @@ parseSchemaJSON context = \case
       mkUnion . NE.fromList <$> mapM (parseSchemaJSON context) (V.toList arr)
     | otherwise        -> fail "Unions must have at least one type."
   A.Object o -> do
-    ty :: String <- o .: "type"
-    case ty of
-      "map"    -> Map <$> (parseSchemaJSON context =<< o .: "values")
-      "array"  -> Array <$> (parseSchemaJSON context =<< o .: "items")
-      "record" -> do
-        name      <- o .: "name"
-        namespace <- o .:? "namespace"
-        let typeName = mkTypeName context name namespace
-            mkAlias name = mkTypeName (Just typeName) name Nothing
-        aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-        doc     <- o .:? "doc"
-        order   <- o .:? "order"
-        fields  <- mapM (parseField typeName) =<< o .: "fields"
-        pure $ Record typeName aliases doc order fields
-      "enum"   -> do
-        name      <- o .: "name"
-        namespace <- o .:? "namespace"
-        let typeName = mkTypeName context name namespace
-            mkAlias name = mkTypeName (Just typeName) name Nothing
-        aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-        doc     <- o .:? "doc"
-        symbols <- o .: "symbols"
-        pure $ mkEnum typeName aliases doc symbols
-      "fixed"  -> do
-        name      <- o .: "name"
-        namespace <- o .:? "namespace"
-        let typeName = mkTypeName context name namespace
-            mkAlias name = mkTypeName (Just typeName) name Nothing
-        aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-        size    <- o .: "size"
-        pure $ Fixed typeName aliases size
+    logicalType :: Maybe Text <- o .:? "logicalType"
+    ty                        <- o .: "type"
 
-      s        -> fail $ "Unrecognized object type: " <> s
+    case logicalType of
+      Just _  -> parseJSON (A.String ty)
+      Nothing -> case ty of
+        "map"    -> Map <$> (parseSchemaJSON context =<< o .: "values")
+        "array"  -> Array <$> (parseSchemaJSON context =<< o .: "items")
+        "record" -> do
+          name      <- o .: "name"
+          namespace <- o .:? "namespace"
+          let typeName = mkTypeName context name namespace
+              mkAlias name = mkTypeName (Just typeName) name Nothing
+          aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
+          doc     <- o .:? "doc"
+          order   <- o .:? "order" .!= Just Ascending
+          fields  <- mapM (parseField typeName) =<< o .: "fields"
+          pure $ Record typeName aliases doc order fields
+        "enum"   -> do
+          name      <- o .: "name"
+          namespace <- o .:? "namespace"
+          let typeName = mkTypeName context name namespace
+              mkAlias name = mkTypeName (Just typeName) name Nothing
+          aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
+          doc     <- o .:? "doc"
+          symbols <- o .: "symbols"
+          pure $ mkEnum typeName aliases doc symbols
+        "fixed"  -> do
+          name      <- o .: "name"
+          namespace <- o .:? "namespace"
+          let typeName = mkTypeName context name namespace
+              mkAlias name = mkTypeName (Just typeName) name Nothing
+          aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
+          size    <- o .: "size"
+          pure $ Fixed typeName aliases size
+        s        -> fail $ "Unrecognized object type: " <> T.unpack s
+
   invalid    -> typeMismatch "Invalid JSON for Avro Schema" invalid
 
 -- | Parse aliases, inferring the namespace based on the type being aliases.
@@ -468,7 +474,14 @@ instance ToJSON (Ty.Value Type) where
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
-  deriving (Eq,Ord,Show)
+  deriving (Eq, Ord, Show)
+
+resultToEither :: Result b -> Either String b
+resultToEither r =
+  case r of
+    Success v -> Right v
+    Error err -> Left err
+{-# INLINE resultToEither #-}
 
 instance Monad Result where
   return = pure
@@ -518,8 +531,8 @@ parseFieldDefault :: (TypeName -> Maybe Type)
                      -- ^ JSON encoding of an Avro value.
                   -> Result (Ty.Value Schema)
 parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
-  where defaultUnion (Union (t :| _) _) val = parseFieldDefault env t val
-        defaultUnion _ _                    = error "Impossible: not Union."
+  where defaultUnion (Union ts@(t :| _) _) val = Ty.Union ts t <$> parseFieldDefault env t val
+        defaultUnion _ _                       = error "Impossible: not Union."
 
 -- | Parse JSON-encoded avro data.
 parseAvroJSON :: (Type -> A.Value -> Result (Ty.Value Type))

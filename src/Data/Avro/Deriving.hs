@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -8,14 +9,26 @@
 -- | This module lets us derive Haskell types from an Avro schema that
 -- can be serialized/deserialzed to Avro.
 module Data.Avro.Deriving
-  ( deriveAvro
-  , deriveAvroWithNamespaces
-  , deriveAvro'
+  ( -- * Deriving options
+    DeriveOptions(..)
+  , FieldStrictness(..)
+  , FieldUnpackedness(..)
+  , NamespaceBehavior(..)
+  , defaultDeriveOptions
+  , mkPrefixedFieldName
+  , mkAsIsFieldName
+  , mkLazyField
+  , mkStrictPrimitiveField
 
+  -- * Deriving Haskell types from Avro schema
+  , makeSchema
+  , deriveAvroWithOptions
+  , deriveAvroWithOptions'
+  , deriveFromAvroWithOptions
+  , deriveAvro
+  , deriveAvro'
   , deriveFromAvro
-  , deriveFromAvroWithNamespaces
-  , deriveFromAvro'
-  )
+)
 where
 
 import           Control.Monad                 (join)
@@ -35,15 +48,21 @@ import           Data.Maybe                    (fromMaybe)
 import           Data.Semigroup                ((<>))
 import qualified Data.Text                     as Text
 
-import           Language.Haskell.TH           as TH
+
+import           GHC.Generics                  (Generic)
+
+import           Language.Haskell.TH           as TH hiding (notStrict)
+import           Language.Haskell.TH.Lib       as TH hiding (notStrict)
 import           Language.Haskell.TH.Syntax
 
 import           Data.Avro.Deriving.NormSchema
+import           Data.Avro.EitherN
 
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Lazy          as LBS
 import qualified Data.ByteString.Lazy.Char8    as LBSC8
 import qualified Data.HashMap.Strict           as HM
+import qualified Data.Set                      as S
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
@@ -55,10 +74,118 @@ data NamespaceBehavior =
     -- generated from types' base names. This produces nicer types but
     -- fails on valid Avro schemas where the same base name occurs in
     -- different namespaces.
+    --
+    -- The Avro type @com.example.Foo@ would generate the Haskell type
+    -- @Foo@. If @Foo@ had a field called @bar@, the generated Haskell
+    -- record would have a field called @fooBar@.
   | HandleNamespaces
     -- ^ Haskell types and field names are generated with
     -- namespaces. See 'deriveAvroWithNamespaces' for an example of
     -- how this works.
+    --
+    -- The Avro type @com.example.Foo@ would generate the Haskell type
+    -- @Com'example'Foo@. If @Foo@ had a field called @bar@, the
+    -- generated Haskell record would have the field
+    -- @com'example'FooBar@.
+
+-- | Describes the strictness of a field for a derived
+-- data type. The field will be derived as if it were
+-- written with a @!@.
+data FieldStrictness = StrictField | LazyField
+  deriving Generic
+
+-- | Describes the representation of a field for a derived
+-- data type. The field will be derived as if it were written
+-- with an @{-# UNPACK #-}@ pragma.
+data FieldUnpackedness = UnpackedField | NonUnpackedField
+  deriving Generic
+
+-- | Derives Avro from a given schema file.
+-- Generates data types, FromAvro and ToAvro instances.
+data DeriveOptions = DeriveOptions
+  { -- | How to build field names for generated data types. The first
+    -- argument is the type name to use as a prefix, rendered
+    -- according to the 'namespaceBehavior' setting.
+    fieldNameBuilder :: Text -> Field -> T.Text
+
+    -- | Determines field representation of generated data types
+  , fieldRepresentation  :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+
+    -- | Controls how we handle namespaces when defining Haskell type
+    -- and field names.
+  , namespaceBehavior :: NamespaceBehavior
+  } deriving Generic
+
+-- | Default deriving options
+--
+-- @
+-- defaultDeriveOptions = 'DeriveOptions'
+--   { fieldNameBuilder  = 'mkPrefixedFieldName'
+--   , fieldStrictness   = 'mkLazyField'
+--   , namespaceBehavior = 'IgnoreNamespaces'
+--   }
+-- @
+defaultDeriveOptions = DeriveOptions
+  { fieldNameBuilder    = mkPrefixedFieldName
+  , fieldRepresentation = mkLazyField
+  , namespaceBehavior   = IgnoreNamespaces
+  }
+
+-- | Generates a field name that is prefixed with the type name.
+--
+-- For example, if the schema defines type 'Person' that has a field 'firstName',
+-- then the generated Haskell type will be like
+--
+-- @
+-- Person { personFirstName :: Text }
+-- @
+mkPrefixedFieldName :: Text -> Field -> T.Text
+mkPrefixedFieldName prefix fld =
+  sanitiseName $ updateFirst T.toLower prefix <> updateFirst T.toUpper (fldName fld)
+
+-- | Marks any field as non-strict in the generated data types.
+mkLazyField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+mkLazyField _ _ =
+  (LazyField, NonUnpackedField)
+
+
+-- | Make a field strict and unpacked if it has a primitive representation.
+-- Primitive types are types which GHC has either a static or an unlifted
+-- representation: `()`, `Boolean`, `Int32`, `Int64`, `Float`, `Double`.
+mkStrictPrimitiveField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+mkStrictPrimitiveField _ field =
+  if shouldStricten
+  then (StrictField, unpackedness)
+  else (LazyField, NonUnpackedField)
+  where
+    unpackedness =
+      case S.fldType field of
+        S.Null    -> NonUnpackedField
+        S.Boolean -> NonUnpackedField
+        _         -> UnpackedField
+
+    shouldStricten =
+      case S.fldType field of
+        S.Null    -> True
+        S.Boolean -> True
+        S.Int     -> True
+        S.Long    -> True
+        S.Float   -> True
+        S.Double  -> True
+        _         -> False
+
+-- | Generates a field name that matches the field name in schema
+-- (sanitised for Haskell, so first letter is lower cased)
+--
+-- For example, if the schema defines type 'Person' that has a field 'firstName',
+-- then the generated Haskell type will be like
+--
+-- @
+-- Person { firstName :: Text }
+-- @
+-- You may want to enable 'DuplicateRecordFields' if you want to use this method.
+mkAsIsFieldName :: TypeName -> Field -> Text
+mkAsIsFieldName _ = sanitiseName . updateFirst T.toLower . fldName
 
 -- | Derives Haskell types from the given Avro schema file. These
 -- Haskell types support both reading and writing to Avro.
@@ -66,7 +193,9 @@ data NamespaceBehavior =
 -- For an Avro schema with a top-level record called
 -- @com.example.Foo@, this generates:
 --
---   * a 'Schema' with the name @schema'Foo@
+--   * a 'Schema' with the name @schema'Foo@ or
+--     @schema'com'example'Foo@, depending on the 'namespaceBehavior'
+--     setting.
 --
 --   * Haskell types for each named type defined in the schema
 --     * 'HasSchema' instances for each type
@@ -82,40 +211,10 @@ data NamespaceBehavior =
 -- The type @com.example.Foo@ will generate a Haskell type @Foo@. If
 -- @com.example.Foo@ has a field named @Bar@, the field in the Haskell
 -- record will be called @fooBar@.
-deriveAvro :: FilePath -> Q [Dec]
-deriveAvro p = readSchema p >>= deriveAvro' IgnoreNamespaces
+deriveAvroWithOptions :: DeriveOptions -> FilePath -> Q [Dec]
+deriveAvroWithOptions o p = readSchema p >>= deriveAvroWithOptions' o
 
--- | Derives Haskell types from the given Avro schema file. These
--- Haskell types support both reading and writing to Avro.
---
--- For an Avro schema with a top-level record called
--- @com.example.Foo@, this generates:
---
---   * a 'Schema' with the name @schema'com'example'Foo@
---
---   * Haskell types for each named type defined in the schema
---     * 'HasSchema' instances for each type
---     * 'FromAvro' instances for each type
---     * 'ToAvro' instances for each type
---
--- This function uses /fullnames/ (name + namespace) to generate
--- Haskell type and field names. This results in more verbose Haskell
--- identifiers but will work correctly for most Avro schemas. (The one
--- exception is schemas that have types with the same fullnames with
--- different capitalization in the first letter.)
---
--- A type like @com.example.Foo@ turns into the Haskell type
--- @Com'example'Foo@.
---
--- Field names are transformed similarly, corrected for
--- capitalization. If 'com.example.Foo' has a field called 'Bar', the
--- generated record in Haskell will have a field called
--- @com'example'FooBar@.
-deriveAvroWithNamespaces :: FilePath -> Q [Dec]
-deriveAvroWithNamespaces p = readSchema p >>= deriveAvro' HandleNamespaces
-
--- | Derive Haskell types from the given Avro schema with configurable
--- behavior for handling namespaces.
+-- | Derive Haskell types from the given Avro schema.
 --
 -- For an Avro schema with a top-level definition @com.example.Foo@, this
 -- generates:
@@ -127,16 +226,13 @@ deriveAvroWithNamespaces p = readSchema p >>= deriveAvro' HandleNamespaces
 --     * 'HasSchema' instances for each type
 --     * 'FromAvro' instances for each type
 --     * 'ToAvro' instances for each type
---
--- See 'deriveAvro' and 'deriveAvroWithNamespaces' for details on
--- namespace handling.
-deriveAvro' :: NamespaceBehavior -> Schema -> Q [Dec]
-deriveAvro' namespaceBehavior s = do
+deriveAvroWithOptions' :: DeriveOptions -> Schema -> Q [Dec]
+deriveAvroWithOptions' o s = do
   let schemas = extractDerivables s
-  types     <- traverse (genType namespaceBehavior) schemas
-  hasSchema <- traverse (genHasAvroSchema namespaceBehavior) schemas
-  fromAvros <- traverse (genFromAvro namespaceBehavior) schemas
-  toAvros   <- traverse (genToAvro namespaceBehavior) schemas
+  types     <- traverse (genType o) schemas
+  hasSchema <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
+  fromAvros <- traverse (genFromAvro $ namespaceBehavior o) schemas
+  toAvros   <- traverse (genToAvro o) schemas
   pure $ join types <> join hasSchema <> join fromAvros <> join toAvros
 
 -- | Derives "read only" Avro from a given schema file. For a schema
@@ -147,43 +243,8 @@ deriveAvro' namespaceBehavior s = do
 --  * Haskell types for each named type defined in the schema
 --    * 'HasSchema' instances for each type
 --    * 'FromAvro' instances for each type
---
--- This function ignores namespaces when generated Haskell type and
--- field names. This will fail on valid Avro schemas which contain
--- types with the same base name in different namespaces. It will also
--- fail for schemas that contain types with base names that are the
--- same except for the capitalization of the first letter.
---
--- The type @com.example.Foo@ will generate a Haskell type @Foo@. If
--- @com.example.Foo@ has a field named @Bar@, the field in the Haskell
--- record will be called @fooBar@.
-deriveFromAvro :: FilePath -> Q [Dec]
-deriveFromAvro p = readSchema p >>= deriveFromAvro' IgnoreNamespaces
-
--- | Derives "read only" Avro from a given schema file. For a schema
--- with a top-level definition @com.example.Foo@, this generates:
---
---  * a 'Schema' value with the name @schema'com'example'Foo@
---
---  * Haskell types for each named type defined in the schema
---    * 'HasSchema' instances for each type
---    * 'FromAvro' instances for each type
---
--- This function uses /fullnames/ (name + namespace) to generate
--- Haskell type and field names. This results in more verbose Haskell
--- identifiers but will work correctly for most Avro schemas. (The one
--- exception is schemas that have types with the same fullnames with
--- different capitalization in the first letter.)
---
--- A type like @com.example.Foo@ turns into the Haskell type
--- @Com'example'Foo@.
---
--- Field names are transformed similarly, corrected for
--- capitalization. If 'com.example.Foo' has a field called 'Bar', the
--- generated record in Haskell will have a field called
--- @com'example'FooBar@.
-deriveFromAvroWithNamespaces :: FilePath -> Q [Dec]
-deriveFromAvroWithNamespaces p = readSchema p >>= deriveFromAvro' HandleNamespaces
+deriveFromAvroWithOptions :: DeriveOptions -> FilePath -> Q [Dec]
+deriveFromAvroWithOptions o p = readSchema p >>= deriveFromAvroWithOptions' o
 
 -- | Derive "read only" Haskell types from the given Avro schema with
 -- configurable behavior for handling namespaces.
@@ -197,16 +258,48 @@ deriveFromAvroWithNamespaces p = readSchema p >>= deriveFromAvro' HandleNamespac
 --   * Haskell types for each named type defined in the schema
 --     * 'HasSchema' instances for each type
 --     * 'FromAvro' instances for each type
---
--- See 'deriveAvro' and 'deriveAvroWithNamespaces' for details on
--- namespace handling.
-deriveFromAvro' :: NamespaceBehavior -> Schema -> Q [Dec]
-deriveFromAvro' namespaceBehavior s = do
+deriveFromAvroWithOptions' :: DeriveOptions -> Schema -> Q [Dec]
+deriveFromAvroWithOptions' o s = do
   let schemas = extractDerivables s
-  types     <- traverse (genType namespaceBehavior) schemas
-  hasSchema <- traverse (genHasAvroSchema namespaceBehavior) schemas
-  fromAvros <- traverse (genFromAvro namespaceBehavior) schemas
+  types     <- traverse (genType o) schemas
+  hasSchema <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
+  fromAvros <- traverse (genFromAvro $ namespaceBehavior o) schemas
   pure $ join types <> join hasSchema <> join fromAvros
+
+-- | Same as 'deriveAvroWithOptions' but uses 'defaultDeriveOptions'
+--
+-- @
+-- deriveAvro = 'deriveAvroWithOptions' 'defaultDeriveOptions'
+-- @
+deriveAvro :: FilePath -> Q [Dec]
+deriveAvro = deriveAvroWithOptions defaultDeriveOptions
+
+-- | Same as 'deriveAvroWithOptions'' but uses 'defaultDeriveOptions'
+--
+-- @
+-- deriveAvro' = 'deriveAvroWithOptions'' 'defaultDeriveOptions'
+-- @
+deriveAvro' :: Schema -> Q [Dec]
+deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
+
+-- | Same as 'deriveFromAvroWithOptions' but uses
+-- 'defaultDeriveOptions'.
+--
+-- @
+-- deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
+-- @
+deriveFromAvro :: FilePath -> Q [Dec]
+deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
+
+-- | Generates the value of type 'Schema' that it can later be used with
+-- 'deriveAvro'' or 'deriveAvroWithOptions''.
+--
+-- @
+-- mySchema :: Schema
+-- mySchema = $(makeSchema "schemas/my-schema.avsc")
+-- @
+makeSchema :: FilePath -> Q Exp
+makeSchema p = readSchema p >>= schemaDef'
 
 readSchema :: FilePath -> Q Schema
 readSchema p = do
@@ -237,6 +330,7 @@ genFromAvro namespaceBehavior (S.Fixed n _ s) =
 genFromAvro _ _                             = pure []
 
 genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
+genFromAvroFieldsExp n []     = [| (return . return) $(conE n) |]
 genFromAvroFieldsExp n (x:xs) =
   [| \r ->
     $(let extract fld = [| r .: T.pack $(mkTextLit (fldName fld))|]
@@ -257,49 +351,62 @@ genHasAvroSchema namespaceBehavior s = do
             schema = pure $(varE sname)
       |]
 
-genToAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genToAvro namespaceBehavior s@(Enum n _ _ vs _) =
-  toAvroInstance (mkSchemaValueName namespaceBehavior n)
+newNames :: String
+            -- ^ base name
+         -> Int
+            -- ^ count
+         -> Q [Name]
+newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
+
+genToAvro :: DeriveOptions -> Schema -> Q [Dec]
+genToAvro opts s@(Enum n _ _ vs _) =
+  toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    conP' = flip conP [] . mkAdtCtorName namespaceBehavior n
+    conP' = flip conP [] . mkAdtCtorName (namespaceBehavior opts) n
     toAvroInstance sname =
-      [d| instance ToAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $([| \x ->
               let convert = AT.Enum $(varE sname) (fromEnum $([|x|]))
               in $(caseE [|x|] ((\v -> match (conP' v)
                                (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> vs))
               |])
       |]
-
-genToAvro namespaceBehavior s@(Record n _ _ _ fs) =
-  toAvroInstance (mkSchemaValueName namespaceBehavior n)
+genToAvro opts s@(Record n _ _ _ fs) =
+  toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     toAvroInstance sname =
-      [d| instance ToAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $(genToAvroFieldsExp sname)
       |]
-    genToAvroFieldsExp sname = [| \r -> record $(varE sname)
-        $(let assign fld = [| T.pack $(mkTextLit (fldName fld)) .= $(varE $ mkFieldTextName namespaceBehavior n fld) r |]
-          in listE $ assign <$> fs
-        )
-      |]
+    genToAvroFieldsExp sname = do
+      names <- newNames "p_" (length fs)
+      let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
+      lamE [con]
+            [| record $(varE sname)
+                $(let assign (fld, n) = [| T.pack $(mkTextLit (fldName fld)) .= $(varE n) |]
+                  in listE $ assign <$> zip fs names
+                )
+            |]
 
-genToAvro namespaceBehavior s@(Fixed n _ size) =
-  toAvroInstance (mkSchemaValueName namespaceBehavior n)
+genToAvro opts s@(Fixed n _ size) =
+  toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     toAvroInstance sname =
-      [d| instance ToAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $(do
               x <- newName "x"
-              lamE [conP (mkDataTypeName namespaceBehavior n) [varP x]] [| AT.Fixed $(varE sname) $(varE x) |])
+              lamE [conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| AT.Fixed $(varE sname) $(varE x) |])
       |]
 
 schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
   [d|
       x :: Schema
-      x = $(mkSchema sch)
+      x = $(schemaDef' sch)
   |]
+
+schemaDef' :: S.Type -> ExpQ
+schemaDef' = mkSchema
   where mkSchema = \case
           Null           -> [e| Null |]
           Boolean        -> [e| Boolean |]
@@ -368,7 +475,7 @@ schemaDef sname sch = setName sname $
           AT.Array vec    -> [e| AT.Array $ V.fromList $(ListE <$> mapM mkDefaultValue (V.toList vec)) |]
           AT.Map m        -> [e| AT.Map $ $(mkMap m) |]
           AT.Record s m   -> [e| AT.Record $(mkSchema s) $(mkMap m) |]
-          AT.Union _ _ v  -> mkDefaultValue v
+          AT.Union ts t v -> [e| AT.Union $(mkNE ts) $(mkSchema t) $(mkDefaultValue v) |]
           AT.Fixed s bs   -> [e| AT.Fixed $(mkSchema s) $(mkByteString bs) |]
           AT.Enum s n sym -> [e| AT.Enum $(mkSchema s) $(litE $ IntegerL $ fromIntegral n) $(mkText sym) |]
 
@@ -376,7 +483,7 @@ schemaDef sname sch = setName sname $
           where numericLit = litE . IntegerL . fromIntegral
 
         mkMap (HM.toList -> xs) = [e| HM.fromList $(ListE <$> mapM mkKVPair xs) |]
-        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) e|]
+        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) |]
 
         mkNE (NE.toList -> xs) = [e| NE.fromList $(ListE <$> mapM mkSchema xs) |]
 
@@ -390,16 +497,16 @@ setName = fmap . map . sn
     sn n (ValD (VarP _) x y) = ValD (VarP n) x y
     sn _ d                   = d
 
-genType :: NamespaceBehavior -> Schema -> Q [Dec]
-genType namespaceBehavior (S.Record n _ _ _ fs) = do
-  flds <- traverse (mkField namespaceBehavior n) fs
-  let dname = mkDataTypeName namespaceBehavior n
+genType :: DeriveOptions -> Schema -> Q [Dec]
+genType opts (S.Record n _ _ _ fs) = do
+  flds <- traverse (mkField opts n) fs
+  let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genDataType dname flds]
-genType namespaceBehavior (S.Enum n _ _ vs _) = do
-  let dname = mkDataTypeName namespaceBehavior n
-  sequenceA [genEnum dname (mkAdtCtorName namespaceBehavior n <$> vs)]
-genType namespaceBehavior (S.Fixed n _ s) = do
-  let dname = mkDataTypeName namespaceBehavior n
+genType opts (S.Enum n _ _ vs _) = do
+  let dname = mkDataTypeName (namespaceBehavior opts) n
+  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> vs)]
+genType opts (S.Fixed n _ s) = do
+  let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genNewtype dname]
 genType _ _ = pure []
 
@@ -478,73 +585,85 @@ mkDataTypeName' :: Text -> Name
 mkDataTypeName' =
   mkTextName . sanitiseName . updateFirst T.toUpper . T.takeWhileEnd (/='.')
 
-mkFieldTextName :: NamespaceBehavior -> TypeName -> Field -> Name
-mkFieldTextName namespaceBehavior (renderName namespaceBehavior -> dn) fld =
-  mkTextName . sanitiseName $ updateFirst T.toLower dn
-                           <> updateFirst T.toUpper (fldName fld)
+mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
+mkField opts typeName field = do
+  ftype <- mkFieldTypeName (namespaceBehavior opts) (fldType field)
+  let prefix = renderName (namespaceBehavior opts) typeName
+      fName = mkTextName $ (fieldNameBuilder opts) prefix field
+      (fieldStrictness, fieldUnpackedness) =
+        fieldRepresentation opts typeName field
+      strictness =
+        case fieldStrictness of
+          StrictField -> strict fieldUnpackedness
+          LazyField   -> notStrict
 
-mkField :: NamespaceBehavior -> TypeName -> Field -> Q VarStrictType
-mkField namespaceBehavior prefix field = do
-  ftype <- mkFieldTypeName namespaceBehavior (fldType field)
-  let fName = mkFieldTextName namespaceBehavior prefix field
-  pure (fName, defaultStrictness, ftype)
+  pure (fName, strictness, ftype)
 
 genNewtype :: Name -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genNewtype dn = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genNewtype dn = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] Nothing ctor ders
 #else
 genNewtype dn = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
-  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), defaultStrictness, fldType)]
+  let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
   pure $ NewtypeD [] dn [] ctor [eq, sh]
 #endif
 
 genEnum :: Name -> [Name] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
 #else
 genEnum dn vs = do
-  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|]]
+  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
   pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en]
 #endif
 
 genDataType :: Name -> [VarStrictType] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genDataType dn flds = do
-  ders <- sequenceA [[t|Eq|], [t|Show|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing [RecC dn flds] ders
 #else
 genDataType dn flds = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|]]
+  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
 #endif
 
-defaultStrictness :: Strict
+notStrict :: Strict
 #if MIN_VERSION_template_haskell(2,11,0)
-defaultStrictness = Bang SourceNoUnpack NoSourceStrictness
+notStrict = Bang SourceNoUnpack NoSourceStrictness
 #else
-defaultStrictness = NotStrict
+notStrict = NotStrict
+#endif
+
+strict :: FieldUnpackedness -> Strict
+#if MIN_VERSION_template_haskell(2,11,0)
+strict UnpackedField    = Bang SourceUnpack SourceStrict
+strict NonUnpackedField = Bang SourceNoUnpack SourceStrict
+#else
+strict UnpackedField    = Unpacked
+strict NonUnpackedField = IsStrict
 #endif
 
 mkTextName :: Text -> Name

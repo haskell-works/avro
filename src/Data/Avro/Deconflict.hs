@@ -3,12 +3,16 @@ module Data.Avro.Deconflict
   ( deconflict
   ) where
 
+import           Control.Applicative ((<|>))
 import           Data.Avro.Schema    as S
 import           Data.Avro.Types     as T
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.List.NonEmpty as NE
-import           Data.List.NonEmpty (NonEmpty(..))
+import           Data.List           (find)
+import           Data.List.NonEmpty  (NonEmpty (..))
+import qualified Data.List.NonEmpty  as NE
+import qualified Data.Map            as M
+import qualified Data.Set            as Set
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
 import qualified Data.Text.Encoding  as Text
@@ -16,25 +20,27 @@ import qualified Data.Text.Encoding  as Text
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
 -- reader's schema.
-deconflict :: Schema -> Schema -> T.Value Type -> Either String (T.Value Type)
-deconflict writerType readerType val =
-  resolveSchema writerType readerType val
+deconflict :: Schema        -- ^ Writer schema
+           -> Schema        -- ^ Reader schema
+           -> T.Value Type
+           -> Either String (T.Value Type)
+deconflict = resolveSchema
 
 resolveSchema :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveSchema e d v
-  | e == d    = Right v
-  | otherwise = go e d v
+resolveSchema writerSchema readerSchema v
+  | writerSchema == readerSchema    = Right v
+  | otherwise = go writerSchema readerSchema v
   where
   go :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
   go (S.Array aTy) (S.Array bTy) (T.Array vec) =
        T.Array <$> mapM (go aTy bTy) vec
   go (S.Map aTy) (S.Map bTy) (T.Map mp)    =
        T.Map <$> mapM (go aTy bTy) mp
-  go a@(S.Enum {}) b@(S.Enum {}) val
+  go a@S.Enum {} b@S.Enum {} val
        | name a == name b = resolveEnum a b val
-  go a@(S.Fixed {}) b@(S.Fixed {}) val
+  go a@S.Fixed {} b@S.Fixed {} val
        | name a == name b && size a == size b = Right val
-  go a@(S.Record {}) b@(S.Record {}) val
+  go a@S.Record {} b@S.Record {} val
        | name a == name b = resolveRecord a b val
   go (S.Union _ _) (S.Union ys _) val =
        resolveTwoUnions ys val
@@ -69,16 +75,16 @@ resolveReaderUnion e ds val =
     let hdl [] = Left "Impossible: empty non-empty list."
         hdl (d:rest) =
               case resolveSchema e d val of
-                Right v   -> Right (T.Union ds d v)
-                Left _    -> hdl rest
+                Right v -> Right (T.Union ds d v)
+                Left _  -> hdl rest
     in hdl (NE.toList ds)
 
 resolveWriterUnion :: Type -> T.Value Type -> Either String (T.Value Type)
 resolveWriterUnion reader (T.Union _ ty val) = resolveSchema ty reader val
 
 resolveRecord :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveRecord eRec dRec (T.Record ty fldVals)  =
- T.Record ty . HashMap.fromList <$> mapM (resolveFields fldVals (fields eRec)) (fields dRec)
+resolveRecord writerSchema readerSchema (T.Record ty fldVals)  =
+  T.Record ty . HashMap.fromList <$> mapM (resolveFields fldVals (fields writerSchema)) (fields readerSchema)
 
 -- For each field of the decoders, lookup the field in the hash map
 --  1) If the field exists, call 'resolveSchema'
@@ -87,8 +93,22 @@ resolveRecord eRec dRec (T.Record ty fldVals)  =
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
 resolveFields :: HashMap Text (T.Value Type) -> [Field] -> Field -> Either String (Text,T.Value Type)
-resolveFields hm eFlds d =
-  case (HashMap.lookup (fldName d) hm, fldDefault d) of
-    (Just x,_)        -> Right (fldName d, x)
-    (_,Just def)      -> Right (fldName d,def)
-    (Nothing,Nothing) -> Left $ "No field and no default for " ++ show (fldName d)
+resolveFields hm writerFields readerField =
+  let
+    mbWriterField = findField readerField writerFields
+    mbValue = HashMap.lookup (fldName readerField) hm
+  in case (mbWriterField, mbValue, fldDefault readerField) of
+    (Just w, Just x,_)   -> (fldName readerField,) <$> resolveSchema (fldType w) (fldType readerField) x
+    (_, Just x,_)  -> Right (fldName readerField, x)
+    (_, _,Just def)      -> Right (fldName readerField, def)
+    (_,Nothing,Nothing)  -> Left $ "No field and no default for " ++ show (fldName readerField)
+
+findField :: Field -> [Field] -> Maybe Field
+findField f fs =
+  let
+    byName = find (\x -> fldName x == fldName f) fs
+    allNames fld = Set.fromList (fldName fld : fldAliases fld)
+    fNames = allNames f
+    sameField = not . Set.null . Set.intersection fNames . allNames
+    byAliases = find sameField fs
+  in byName <|> byAliases

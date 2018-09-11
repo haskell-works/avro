@@ -8,6 +8,7 @@ import           Control.Monad.State.Strict
 import           Data.Avro.Schema
 import qualified Data.List                  as L
 import           Data.List.NonEmpty         (NonEmpty ((:|)))
+import qualified Data.Map.Strict            as M
 import           Data.Maybe                 (catMaybes, fromMaybe)
 import           Data.Semigroup             ((<>))
 import qualified Data.Set                   as S
@@ -21,42 +22,45 @@ import qualified Data.Text                  as T
 -- namespaces (including inlined into full names) will be ignored
 -- during names resolution.
 extractDerivables :: Schema -> [Schema]
-extractDerivables s = flip evalState S.empty . normSchema rawRecs <$> rawRecs
+extractDerivables s = flip evalState state . normSchema . snd <$> rawRecs
   where
     rawRecs = getTypes s
-    getTypes rec = case rec of
-      r@(Record _ _ _ _ fs) -> r : (fs >>= (getTypes . fldType))
-      Array t               -> getTypes t
-      Union (t1 :| ts) _    -> getTypes t1 <> concatMap getTypes ts
-      Map t                 -> getTypes t
-      e@Enum{}              -> [e]
-      f@Fixed{}             -> [f]
-      _                     -> []
+    state = M.fromList rawRecs
 
--- TODO: Currently ensures normalisation: only in one way
--- that is needed for "extractRecord".
--- it ensures that an "extracted" record is self-contained and
+getTypes :: Type -> [(TypeName, Type)]
+getTypes rec = case rec of
+  r@Record{name, fields} -> (name,r) : (fields >>= (getTypes . fldType))
+  Array t                -> getTypes t
+  Union (t1 :| ts) _     -> getTypes t1 <> concatMap getTypes ts
+  Map t                  -> getTypes t
+  e@Enum{name}           -> [(name, e)]
+  f@Fixed{name}          -> [(name, f)]
+  _                      -> []
+
+-- Ensures normalisation: "extracted" record is self-contained and
 -- all the named types are resolvable within the scope of the schema.
--- The other way around (to each record is inlined only once and is referenced
--- as a named type after that) is not implemented.
-normSchema :: [Schema] -- ^ List of all possible records
-           -> Schema   -- ^ Schema to normalise
-           -> State (S.Set TypeName) Schema
-normSchema schemas = \case
-  t@(NamedType name) -> do
+normSchema :: Schema -> State (M.Map TypeName Schema) Schema
+normSchema r = case r of
+  t@(NamedType tn) -> do
     resolved <- get
-    if S.member name resolved
-      then pure t
-      else do
-        modify' $ S.insert name
-        let unresolved = error $ "Unable to resolve schema: " <> show (typeName t)
-        pure $ fromMaybe unresolved $ findSchema name
-  Array s           -> Array <$> normSchema schemas s
-  Map s             -> Map <$> normSchema schemas s
-  r@Record { name } -> do
-    modify' $ S.insert name
-    flds <- mapM (\fld -> setType fld <$> normSchema schemas (fldType fld)) (fields r)
+    case M.lookup tn resolved of
+      Just rs ->
+        -- use the looked up schema (which might be a full record) and replace
+        -- it in the state with NamedType for future resolves
+        -- because only one full definition per schema is needed
+        modify' (M.insert tn t) >> pure rs
+
+        -- NamedType but no corresponding record?! Baaad!
+      Nothing ->
+        error $ "Unable to resolve schema: " <> show (typeName t)
+
+  Array s   -> Array <$> normSchema s
+  Map s     -> Map <$> normSchema s
+  Union l f -> flip Union f <$> traverse normSchema l
+  r@Record{name = tn}  -> do
+    modify' (M.insert tn (NamedType tn))
+    flds <- mapM (\fld -> setType fld <$> normSchema (fldType fld)) (fields r)
     pure $ r { fields = flds }
   s         -> pure s
-  where setType fld t = fld { fldType = t}
-        findSchema tn = L.find (\ s -> name s == tn) schemas
+  where
+    setType fld t = fld { fldType = t}
