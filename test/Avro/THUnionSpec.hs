@@ -10,6 +10,7 @@ import qualified Data.List.NonEmpty   as NE
 import qualified Data.Aeson           as Aeson
 import           Data.Avro
 import           Data.Avro.Deriving
+import           Data.Avro.EitherN
 import qualified Data.Avro.Schema     as Schema
 import qualified Data.Avro.Types      as Avro
 import qualified Data.ByteString.Lazy as LBS
@@ -25,18 +26,24 @@ deriveAvro "test/data/unions.avsc"
 spec :: Spec
 spec = describe "Avro.THUnionSpec: Schema with unions." $ do
   let objA = Unions
-        { unionsScalars = Left "foo"
-        , unionsNullable = Nothing
-        , unionsRecords = Left $ Foo { fooStuff = "stuff" }
+        { unionsScalars    = Left "foo"
+        , unionsNullable   = Nothing
+        , unionsRecords    = Left $ Foo { fooStuff = "stuff" }
         , unionsSameFields = Left $ Foo { fooStuff = "more stuff" }
+        , unionsThree      = E3_1 37
+        , unionsFour       = E4_2 "foo"
+        , unionsFive       = E5_4 $ Foo { fooStuff = "foo stuff" }
         }
       objB = Unions
-        { unionsScalars = Right 42
-        , unionsNullable = Just 37
-        , unionsRecords = Right $ Bar { barStuff = "stuff"
-                                      , barThings = Foo { fooStuff = "things" }
-                                      }
+        { unionsScalars    = Right 42
+        , unionsNullable   = Just 37
+        , unionsRecords    = Right $ Bar { barStuff  = "stuff"
+                                         , barThings = Foo { fooStuff = "things" }
+                                       }
         , unionsSameFields = Right $ NotFoo { notFooStuff = "different from Foo" }
+        , unionsThree      = E3_3 37
+        , unionsFour       = E4_4 $ Foo { fooStuff = "foo stuff" }
+        , unionsFive       = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
         }
 
       field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) schema def
@@ -44,11 +51,17 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         Schema.Record name [] Nothing (Just Schema.Ascending) fields
       named = Schema.NamedType
 
+      foo    = named "haskell.avro.example.Foo"
+      notFoo = named "haskell.avro.example.NotFoo"
       expectedSchema = record "haskell.avro.example.Unions"
         [ field "scalars"    (Schema.mkUnion (NE.fromList [Schema.String, Schema.Long])) scalarsDefault
         , field "nullable"   (Schema.mkUnion (NE.fromList [Schema.Null, Schema.Int]))    nullableDefault
         , field "records"    (Schema.mkUnion (NE.fromList [fooSchema, barSchema]))       Nothing
-        , field "sameFields" (Schema.mkUnion (NE.fromList [named "haskell.avro.example.Foo", notFooSchema]))  Nothing
+        , field "sameFields" (Schema.mkUnion (NE.fromList [foo, notFooSchema]))          Nothing
+
+        , field "three" (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long]))              Nothing
+        , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long, foo]))         Nothing
+        , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long, foo, notFoo])) Nothing
         ]
       scalarsDefault  = Just $ Avro.Union (NE.fromList [Schema.String, Schema.Long]) Schema.String (Avro.String "foo")
       nullableDefault = Just $ Avro.Union (NE.fromList [Schema.Null, Schema.Int])    Schema.Null   Avro.Null
