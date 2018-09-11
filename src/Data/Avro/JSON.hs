@@ -80,7 +80,7 @@ decodeAvroJSON schema json =
   parseAvroJSON union env schema json
   where
     env =
-      Schema.buildTypeEnvironment missing schema . Schema.TN
+      Schema.buildTypeEnvironment missing schema
     missing name =
       fail ("Type " <> show name <> " not in schema")
 

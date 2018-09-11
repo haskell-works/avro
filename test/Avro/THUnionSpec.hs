@@ -40,25 +40,25 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         }
 
       field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) schema def
-      record name namespace fields =
-        Schema.Record name namespace [] Nothing (Just Schema.Ascending) fields
-      named = Schema.NamedType . Schema.TN
+      record name fields =
+        Schema.Record name [] Nothing (Just Schema.Ascending) fields
+      named = Schema.NamedType
 
-      expectedSchema = record "Unions" (Just "haskell.avro.example")
+      expectedSchema = record "haskell.avro.example.Unions"
         [ field "scalars"    (Schema.mkUnion (NE.fromList [Schema.String, Schema.Long])) scalarsDefault
         , field "nullable"   (Schema.mkUnion (NE.fromList [Schema.Null, Schema.Int]))    nullableDefault
         , field "records"    (Schema.mkUnion (NE.fromList [fooSchema, barSchema]))       Nothing
-        , field "sameFields" (Schema.mkUnion (NE.fromList [named "Foo", notFooSchema]))  Nothing
+        , field "sameFields" (Schema.mkUnion (NE.fromList [named "haskell.avro.example.Foo", notFooSchema]))  Nothing
         ]
       scalarsDefault  = Just $ Avro.Union (NE.fromList [Schema.String, Schema.Long]) Schema.String (Avro.String "foo")
       nullableDefault = Just $ Avro.Union (NE.fromList [Schema.Null, Schema.Int])    Schema.Null   Avro.Null
 
-      fooSchema = record "Foo" Nothing [field "stuff" Schema.String Nothing]
-      barSchema = record "Bar" Nothing
+      fooSchema = record "haskell.avro.example.Foo" [field "stuff" Schema.String Nothing]
+      barSchema = record "haskell.avro.example.Bar"
         [ field "stuff"  Schema.String Nothing
-        , field "things" (named "Foo") Nothing
+        , field "things" (named "haskell.avro.example.Foo") Nothing
         ]
-      notFooSchema = record "NotFoo" Nothing [field "stuff" Schema.String Nothing]
+      notFooSchema = record "haskell.avro.example.NotFoo" [field "stuff" Schema.String Nothing]
 
   unionsSchemaFile <- runIO $ getFileName "test/data/unions.avsc" >>= LBS.readFile
   let Just unionsSchemaFromJSON = Aeson.decode unionsSchemaFile

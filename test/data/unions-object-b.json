@@ -6,7 +6,7 @@
     "int": 42
   },
   "records": {
-    "Bar": {
+    "haskell.avro.example.Bar": {
       "stuff": "stuff",
       "things": {
         "stuff": "things"
@@ -14,7 +14,7 @@
     }
   },
   "sameFields": {
-    "NotFoo": {
+    "haskell.avro.example.NotFoo": {
       "stuff": "not foo stuff"
     }
   }

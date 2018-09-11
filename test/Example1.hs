@@ -17,11 +17,11 @@ data MyStruct = MyStruct (Either MyEnum Text) Int deriving (Eq,Ord,Show)
 -- Schema's often come from an external JSON definition (.avsc files) or
 -- embedded in object files.
 meSchema :: Schema
-meSchema = mkEnum "MyEnum" [] Nothing Nothing ["A","B","C","D"]
+meSchema = mkEnum "MyEnum" [] Nothing ["A","B","C","D"]
 
 msSchema  :: Schema
 msSchema =
-  Record "MyStruct" Nothing [] Nothing Nothing
+  Record "MyStruct" [] Nothing Nothing
       [ fld "enumOrString" eOrS (Just $ Ty.String "The Default")
       , fld "intvalue" Long Nothing
       ]

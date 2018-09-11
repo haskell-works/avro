@@ -22,7 +22,7 @@ deriveAvro "test/data/karma.avsc"
 spec :: Spec
 spec = describe "Avro.NormSchemaSpec" $ do
   it "should have one full inner schema for each type" $
-    (fldType <$> fields schema'ContainerChild) `shouldBe` [schema'ReusedChild, NamedType "ReusedChild"]
+    (fldType <$> fields schema'ContainerChild) `shouldBe` [schema'ReusedChild, NamedType "Boo.ReusedChild"]
 
   it "should normalise schemas from unions" $
      fldType <$> fields schema'Curse `shouldBe` [mkUnion (Null :| [schema'Geo])]

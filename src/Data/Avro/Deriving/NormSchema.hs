@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Avro.Deriving.NormSchema
@@ -38,18 +39,16 @@ getTypes rec = case rec of
 
 -- Ensures normalisation: "extracted" record is self-contained and
 -- all the named types are resolvable within the scope of the schema.
--- TODO: Improve story with namespaces
 normSchema :: Schema -> State (M.Map TypeName Schema) Schema
 normSchema r = case r of
   t@(NamedType tn) -> do
-    let sn = shortName tn
     resolved <- get
-    case M.lookup sn resolved of
+    case M.lookup tn resolved of
       Just rs ->
         -- use the looked up schema (which might be a full record) and replace
         -- it in the state with NamedType for future resolves
         -- because only one full definition per schema is needed
-        modify' (M.insert sn t) >> pure rs
+        modify' (M.insert tn t) >> pure rs
 
         -- NamedType but no corresponding record?! Baaad!
       Nothing ->
@@ -59,12 +58,9 @@ normSchema r = case r of
   Map s     -> Map <$> normSchema s
   Union l f -> flip Union f <$> traverse normSchema l
   r@Record{name = tn}  -> do
-    let sn = shortName tn
-    modify' (M.insert sn (NamedType tn))
+    modify' (M.insert tn (NamedType tn))
     flds <- mapM (\fld -> setType fld <$> normSchema (fldType fld)) (fields r)
     pure $ r { fields = flds }
   s         -> pure s
   where
-    shortName tn = TN $ T.takeWhileEnd (/='.') (unTN tn)
     setType fld t = fld { fldType = t}
-    fullName s = TN $ maybe (typeName s) (\n -> typeName s <> "." <> n) (namespace s)

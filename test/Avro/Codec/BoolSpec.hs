@@ -26,7 +26,7 @@ newtype OnlyBool = OnlyBool
 onlyBoolSchema :: Schema
 onlyBoolSchema =
   let fld nm = Field nm [] Nothing Nothing
-   in Record "OnlyBool" (Just "test.contract") [] Nothing Nothing
+   in Record "test.contract.OnlyBool" [] Nothing Nothing
         [ fld "onlyBoolValue" Boolean Nothing
         ]
 

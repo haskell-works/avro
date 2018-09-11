@@ -11,15 +11,14 @@ import           Data.Avro.Deriving
 import           Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
-
-deriveAvro "test/data/enums.avsc"
+deriveAvroWithOptions (defaultDeriveOptions { namespaceBehavior = HandleNamespaces }) "test/data/enums.avsc"
 
 spec :: Spec
 spec = describe "Avro.THEnumSpec: Schema with enums" $ do
   it "should do roundtrip" $ do
-    let msg = EnumWrapper
-              { enumWrapperId   = 42
-              , enumWrapperName = "Text"
-              , enumWrapperReason = EnumReasonBecause
+    let msg = Haskell'avro'example'EnumWrapper
+              { haskell'avro'example'EnumWrapperId   = 42
+              , haskell'avro'example'EnumWrapperName = "Text"
+              , haskell'avro'example'EnumWrapperReason = Haskell'avro'example'EnumReasonBecause
               }
     fromAvro (toAvro msg) `shouldBe` pure msg
