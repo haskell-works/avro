@@ -396,63 +396,76 @@ parseField record = \case
   invalid    -> typeMismatch "Field" invalid
 
 instance ToJSON Type where
-  toJSON bt =
-    case bt of
-      Null     -> A.String "null"
-      Boolean  -> A.String "boolean"
-      Int      -> A.String "int"
-      Long     -> A.String "long"
-      Float    -> A.String "float"
-      Double   -> A.String "double"
-      Bytes    -> A.String "bytes"
-      String   -> A.String "string"
-      Array tn -> object [ "type" .= ("array" :: Text), "items" .= tn ]
-      Map tn   -> object [ "type" .= ("map" :: Text), "values" .= tn ]
-      NamedType name -> A.String $ renderFullname name
-      Record {..} ->
-        let opts = catMaybes
-               [ ("order" .=)     <$> order
-               , ("doc" .=)       <$> doc
-               ]
-         in object $ opts ++
-               [ "type"      .= ("record" :: Text)
-               , "name"      .= name
-               , "aliases"   .= aliases
-               , "fields"    .= fields
-               ]
-      Enum   {..} ->
-        let opts = catMaybes
-               [ ("doc" .=)       <$> doc
-               ]
-         in object $ opts ++
-               [ "type"      .= ("enum" :: Text)
-               , "name"      .= name
-               , "aliases"   .= aliases
-               , "symbols"   .= symbols
-               ]
-      Union  {..} -> A.Array $ V.fromList $ P.map toJSON (NE.toList options)
-      Fixed  {..} ->
-         object [ "type"      .= ("fixed" :: Text)
-                , "name"      .= name
-                , "aliases"   .= aliases
-                , "size"      .= size
-                ]
+  toJSON = schemaToJSON Nothing
 
-instance ToJSON TypeName where
-  toJSON name = A.String $ renderFullname name
-
-instance ToJSON Field where
-  toJSON Field {..} =
+-- | Serializes a 'Schema' to JSON.
+--
+-- The optional name is used as the context for namespace
+-- inference. If the context has the namespace @com.example@, then any
+-- names in the @com.example@ namespace will be rendered without an
+-- explicit namespace.
+schemaToJSON :: Maybe TypeName
+                -- ^ The context used for keeping track of namespace
+                -- inference.
+             -> Schema
+                -- ^ The schema to serialize to JSON.
+             -> A.Value
+schemaToJSON context = \case
+  Null           -> A.String "null"
+  Boolean        -> A.String "boolean"
+  Int            -> A.String "int"
+  Long           -> A.String "long"
+  Float          -> A.String "float"
+  Double         -> A.String "double"
+  Bytes          -> A.String "bytes"
+  String         -> A.String "string"
+  Array tn       ->
+    object [ "type" .= ("array" :: Text), "items" .= schemaToJSON context tn ]
+  Map tn         ->
+    object [ "type" .= ("map" :: Text), "values" .= schemaToJSON context tn ]
+  NamedType name -> toJSON $ render context name
+  Record {..}    ->
     let opts = catMaybes
-           [ ("order" .=)     <$> fldOrder
-           , ("doc" .=)       <$> fldDoc
-           , ("default" .=)   <$> fldDefault
+          [ ("order" .=) <$> order
+          , ("doc" .=)   <$> doc
+          ]
+    in object $ opts ++
+       [ "type"    .= ("record" :: Text)
+       , "name"    .= render context name
+       , "aliases" .= (render (Just name) <$> aliases)
+       , "fields"  .= (fieldToJSON name <$> fields)
+       ]
+  Enum   {..} ->
+    let opts = catMaybes [("doc" .=) <$> doc]
+    in object $ opts ++
+       [ "type"    .= ("enum" :: Text)
+       , "name"    .= render context name
+       , "aliases" .= (render (Just name) <$> aliases)
+       , "symbols" .= symbols
+       ]
+  Union  {..} -> toJSON $ schemaToJSON context <$> options
+  Fixed  {..} ->
+    object [ "type"    .= ("fixed" :: Text)
+           , "name"    .= render context name
+           , "aliases" .= (render (Just name) <$> aliases)
+           , "size"    .= size
            ]
-     in object $ opts ++
-           [ "name"    .= fldName
-           , "type"    .= fldType
-           , "aliases" .= fldAliases
-           ]
+  where render context typeName
+          | Just ctx <- context
+          , namespace ctx == namespace typeName = baseName typeName
+          | otherwise                           = renderFullname typeName
+
+        fieldToJSON context Field {..} =
+          let opts = catMaybes
+                [ ("order" .=)     <$> fldOrder
+                , ("doc" .=)       <$> fldDoc
+                , ("default" .=)   <$> fldDefault
+                ]
+          in object $ opts ++
+             [ "name"    .= fldName
+             , "type"    .= schemaToJSON (Just context) fldType
+             , "aliases" .= fldAliases
+             ]
 
 instance ToJSON (Ty.Value Type) where
   toJSON av =
