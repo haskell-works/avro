@@ -36,6 +36,8 @@ module Data.Avro.Schema
   , serializeBytes
 
   , parseAvroJSON
+
+  , overlay
   ) where
 
 import           Control.Applicative
@@ -667,17 +669,7 @@ buildTypeEnvironment failure from =
                  Nothing  -> failure forTy
                  Just res -> pure res
   where
-    env = HashMap.fromList $ go from
-
-    go :: Type -> [(TypeName, Type)]
-    go = \case
-      r@Record {..} -> zip (name : aliases) (repeat r) <> concatMap (go . fldType) fields
-      e@Enum {..}   -> zip (name : aliases) (repeat e)
-      Union {..}    -> concatMap go options
-      f@Fixed {..}  -> zip (name : aliases) (repeat f)
-      Array {..}    -> go item
-      Map {..}      -> go values
-      _             -> []
+    env = extractBindings from
 
 -- | Checks that two schemas match. This is like equality of schemas,
 -- except 'NamedTypes' match against other types /with the same name/.
@@ -696,3 +688,48 @@ matches a@Record{} b@Record{}       =
   where fieldMatches = matches `on` fldType
 matches a@Union{} b@Union{}         = and $ NE.zipWith matches (options a) (options b)
 matches t1 t2                       = t1 == t2
+
+-- | @extractBindings schema@ traverses a schema and builds a map of all declared
+-- types.
+--
+-- Types declared implicitly in record field definitions are also included. No distinction
+-- is made between aliases and normal names.
+extractBindings :: Type -> HashMap.HashMap TypeName Type
+extractBindings = typeBindings HashMap.empty
+  where
+    insertAll :: (Eq k, Hashable k) => [k] -> v -> HashMap.HashMap k v -> HashMap.HashMap k v
+    insertAll keys value table = foldl (\hashmap key -> HashMap.insert key value hashmap) table keys
+
+    fieldBindings :: HashMap.HashMap TypeName Type -> Field -> HashMap.HashMap TypeName Type
+    fieldBindings table Field{..} = typeBindings table fldType
+
+    typeBindings :: HashMap.HashMap TypeName Type -> Type -> HashMap.HashMap TypeName Type
+    typeBindings table t@Record{..} =
+      let withRecord = insertAll (name : aliases) t table
+      in HashMap.unions $ map (fieldBindings withRecord) fields
+    typeBindings table e@Enum{..}  = insertAll (name : aliases) e table
+    typeBindings table Union{..}   = HashMap.unions $ NE.toList $ NE.map (typeBindings table) options
+    typeBindings table f@Fixed{..} = insertAll (name : aliases) f table
+    typeBindings table _           = table
+
+-- | Merge two schemas to produce a third.
+-- Specifically, @overlay schema reference@ fills in 'NamedTypes' in 'schema' using any matching definitions from 'reference'.
+
+overlay :: Type -> Type -> Type
+overlay input supplement = overlayType input
+  where
+    overlayField f@Field{..}      = f { fldType = overlayType fldType }
+    overlayType  a@Array{..}      = a { item    = overlayType item }
+    overlayType  m@Map{..}        = m { values  = overlayType values }
+    overlayType  r@Record{..}     = r { fields  = map overlayField fields }
+    overlayType  u@Union{..}      = u {
+                                      options     = NE.map overlayType options,
+                                      unionLookup = \i -> case unionLookup i of
+                                                            Just named@(NamedType _) -> Just $ rebind named
+                                                            other                    -> other
+                                   }
+    overlayType  nt@(NamedType _) = rebind nt
+    overlayType  other            = other
+
+    rebind (NamedType tn) = HashMap.lookupDefault (NamedType tn) tn bindings
+    bindings              = extractBindings supplement

@@ -1,0 +1,39 @@
+{
+  "type": "record",
+  "name": "composite",
+  "fields": [
+    {
+      "name": "foo-bar-field",
+      "type": "avro.test.data.overlay.primitive.foo-bar"
+    },
+    {
+      "name": "foo-enum-field",
+      "type": "avro.test.data.overlay.primitive.foo-enumeration"
+    },
+    {
+      "name": "foo-fixed-field",
+      "type": "avro.test.data.overlay.primitive.foo-fixed"
+    },
+    {
+      "name": "foo-union-1",
+      "type": "avro.test.data.overlay.primitive.foo-union-1"
+    },
+    {
+      "name": "foo-bar-array",
+      "type": "array",
+      "items": "avro.test.data.overlay.primitive.foo-bar"
+    },
+    {
+      "name": "foo-bar-map",
+      "type": "map",
+      "values": "avro.test.data.overlay.primitive.foo-bar"
+    },
+    {
+      "name": "foo-bar-int-union",
+      "type": [
+        "int",
+        "avro.test.data.overlay.primitive.foo-bar"
+      ]
+    }
+  ]
+}
