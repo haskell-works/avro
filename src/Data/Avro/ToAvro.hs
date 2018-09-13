@@ -21,6 +21,7 @@ import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
 import           Data.Tagged
 import qualified Data.Vector          as V
+import qualified Data.Vector.Unboxed  as U
 import           Data.Word
 
 class HasAvroSchema a => ToAvro a where
@@ -97,3 +98,8 @@ instance (ToAvro a) => ToAvro (Maybe a) where
 instance (ToAvro a) => ToAvro [a] where
   toAvro = T.Array . V.fromList . (toAvro <$>)
 
+instance (ToAvro a) => ToAvro (V.Vector a) where
+  toAvro = T.Array . V.map toAvro
+
+instance (U.Unbox a, ToAvro a) => ToAvro (U.Vector a) where
+  toAvro = T.Array . V.map toAvro . U.convert
