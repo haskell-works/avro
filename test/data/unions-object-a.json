@@ -12,5 +12,10 @@
     "haskell.avro.example.Foo": {
       "stuff": "foo stuff"
     }
+  },
+  "three": { "int": 37 },
+  "four": { "string": "foo" },
+  "five": {
+    "haskell.avro.example.Foo": { "stuff": "foo stuff" }
   }
 }

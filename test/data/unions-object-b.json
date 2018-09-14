@@ -17,5 +17,12 @@
     "haskell.avro.example.NotFoo": {
       "stuff": "not foo stuff"
     }
+  },
+  "three": { "long": 37 },
+  "four": {
+    "haskell.avro.example.Foo": { "stuff" : "foo stuff" }
+  },
+  "five": {
+    "haskell.avro.example.NotFoo": { "stuff": "not foo stuff" }
   }
 }

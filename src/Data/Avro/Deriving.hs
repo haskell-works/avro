@@ -511,25 +511,32 @@ genType opts (S.Fixed n _ s) = do
 genType _ _ = pure []
 
 mkFieldTypeName :: NamespaceBehavior -> S.Type -> Q TH.Type
-mkFieldTypeName namespaceBehavior t = case t of
-  S.Boolean                     -> [t| Bool |]
-  S.Long                        -> [t| Int64 |]
-  S.Int                         -> [t| Int32 |]
-  S.Float                       -> [t| Float |]
-  S.Double                      -> [t| Double |]
-  S.Bytes                       -> [t| ByteString |]
-  S.String                      -> [t| Text |]
-  S.Union (Null :| [x]) _       -> [t| Maybe $(mkFieldTypeName namespaceBehavior x) |]
-  S.Union (x :| [Null]) _       -> [t| Maybe $(mkFieldTypeName namespaceBehavior x) |]
-  S.Union (x :| [y]) _          -> [t| Either $(mkFieldTypeName namespaceBehavior x) $(mkFieldTypeName namespaceBehavior y) |]
-  S.Union (_ :| _) _            -> error "Unions with more than 2 elements are not yet supported"
-  S.Record n _ _ _ _            -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
-  S.Map x                       -> [t| Map Text $(mkFieldTypeName namespaceBehavior x) |]
-  S.Array x                     -> [t| [$(mkFieldTypeName namespaceBehavior x)] |]
-  S.NamedType n                 -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Fixed n _ _                 -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Enum n _ _ _ _              -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  _                             -> error $ "Avro type is not supported: " <> show t
+mkFieldTypeName namespaceBehavior = \case
+  S.Boolean          -> [t| Bool |]
+  S.Long             -> [t| Int64 |]
+  S.Int              -> [t| Int32 |]
+  S.Float            -> [t| Float |]
+  S.Double           -> [t| Double |]
+  S.Bytes            -> [t| ByteString |]
+  S.String           -> [t| Text |]
+  S.Union branches _ -> union branches
+  S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
+  S.Map x            -> [t| Map Text $(go x) |]
+  S.Array x          -> [t| [$(go x)] |]
+  S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
+  S.Fixed n _ _      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
+  S.Enum n _ _ _ _   -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
+  t                  -> error $ "Avro type is not supported: " <> show t
+  where go = mkFieldTypeName namespaceBehavior
+        union = \case
+          Null :| [x]       -> [t| Maybe $(go x) |]
+          x :| [Null]       -> [t| Maybe $(go x) |]
+          x :| [y]          -> [t| Either $(go x) $(go y) |]
+          a :| [b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
+          a :| [b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
+          a :| [b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
+          _                 ->
+            error "Unions with more than 5 elements are not yet supported"
 
 updateFirst :: (Text -> Text) -> Text -> Text
 updateFirst f t =

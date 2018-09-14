@@ -43,6 +43,9 @@
           ]
         }
       ]
-    }
+    },
+    { "name" : "three", "type" : ["int", "string", "long"] },
+    { "name" : "four", "type" : ["int", "string", "long", "Foo"] },
+    { "name" : "five", "type" : ["int", "string", "long", "Foo", "NotFoo"] }
   ]
 }
