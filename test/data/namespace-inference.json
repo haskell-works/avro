@@ -1,0 +1,154 @@
+[
+  {
+    "type" : "record",
+    "name" : "com.example.Foo",
+    "aliases" : ["FooBar", "com.example.not.Bar"],
+    "doc" : "An example schema to test namespace handling.",
+    "order" : "ascending",
+    "fields" : [
+      {
+        "name" : "bar",
+        "aliases" : [],
+        "order" : "ascending",
+        "type" : {
+          "type" : "record",
+          "name" : "Bar",
+          "order" : "ascending",
+          "aliases" : ["Bar2", "com.example.not.Foo"],
+          "fields" : [
+            {
+              "name" : "baz",
+              "aliases" : [],
+              "order" : "ascending",
+              "type" : {
+                "type" : "record",
+                "order" : "ascending",
+                "name" : "com.example.baz.Baz",
+                "aliases" : ["com.example.Bazzy"],
+                "fields" : [
+                  {
+                    "name"    : "baz",
+                    "type"    : "Baz",
+                    "aliases" : [],
+                    "order"   : "ascending"
+                  },
+                  {
+                    "name"    : "bazzy",
+                    "type"    : "com.example.Bazzy",
+                    "aliases" : [],
+                    "order"   : "ascending"
+                  }
+                ]
+              }
+            },
+            {
+              "name"    : "bazzy",
+              "type"    : "Bazzy",
+              "aliases" : [],
+              "order"   : "ascending"
+            }
+          ]
+        }
+      },
+      {
+        "name"    : "baz",
+        "type"    : "com.example.baz.Baz",
+        "aliases" : [],
+        "order"   : "ascending"
+      }
+    ]
+  },
+  {
+    "type" : "record",
+    "name" : "Foo",
+    "namespace" : "com.example",
+    "aliases" : ["FooBar", "com.example.not.Bar"],
+    "doc" : "An example schema to test namespace handling.",
+    "fields" : [
+      {
+        "name" : "bar",
+        "namespace" : "com.example",
+        "type" : {
+          "type" : "record",
+          "name" : "Bar",
+          "aliases" : ["Bar2", "com.example.not.Foo"],
+          "fields" : [
+            {
+              "name" : "baz",
+              "type" : {
+                "type" : "record",
+                "name" : "Baz",
+                "namespace" : "com.example.baz",
+                "aliases" : ["com.example.Bazzy"],
+                "fields" : [
+                  {
+                    "name" : "baz",
+                    "type" : "Baz"
+                  },
+                  {
+                    "name" : "bazzy",
+                    "type" : "com.example.Bazzy"
+                  }
+                ]
+              }
+            },
+            {
+              "name" : "bazzy",
+              "type" : "Bazzy"
+            }
+          ]
+        }
+      },
+      {
+        "name" : "baz",
+        "type" : "com.example.baz.Baz"
+      }
+    ]
+  },
+  {
+    "type" : "record",
+    "name" : "com.example.Foo",
+    "namespace" : "should.be.ignored",
+    "aliases" : ["FooBar", "com.example.not.Bar"],
+    "doc" : "An example schema to test namespace handling.",
+    "fields" : [
+      {
+        "name" : "bar",
+        "type" : {
+          "type" : "record",
+          "name" : "Bar",
+          "aliases" : ["Bar2", "com.example.not.Foo"],
+          "fields" : [
+            {
+              "name" : "baz",
+              "type" : {
+                "type" : "record",
+                "name" : "com.example.baz.Baz",
+                "namespace" : "should.be.ignored",
+                "aliases" : ["com.example.Bazzy"],
+                "fields" : [
+                  {
+                    "name" : "baz",
+                    "type" : "Baz"
+                  },
+                  {
+                    "name" : "bazzy",
+                    "type" : "com.example.Bazzy"
+                  }
+                ]
+              }
+            },
+            {
+              "name" : "bazzy",
+              "type" : "Bazzy"
+            }
+          ]
+        }
+      },
+      {
+        "name" : "baz",
+        "type" : "com.example.baz.Baz"
+      }
+    ]
+  }
+]
