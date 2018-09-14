@@ -25,6 +25,7 @@ import qualified Data.Text            as Text
 import qualified Data.Text.Lazy       as TL
 import           Data.Tagged
 import qualified Data.Vector          as V
+import qualified Data.Vector.Unboxed  as U
 import           Data.Word
 
 class HasAvroSchema a => FromAvro a where
@@ -85,6 +86,14 @@ instance FromAvro a => FromAvro (Maybe a) where
 instance FromAvro a => FromAvro [a] where
   fromAvro (T.Array vec) = mapM fromAvro $ toList vec
   fromAvro v = badValue v "[a]"
+
+instance FromAvro a => FromAvro (V.Vector a) where
+  fromAvro (T.Array vec) = mapM fromAvro vec
+  fromAvro v             = badValue v "Vector a"
+
+instance (U.Unbox a, FromAvro a) => FromAvro (U.Vector a) where
+  fromAvro (T.Array vec) = U.convert <$> mapM fromAvro vec
+  fromAvro v             = badValue v "Unboxed Vector a"
 
 instance FromAvro Text where
   fromAvro (T.String txt) = pure txt
