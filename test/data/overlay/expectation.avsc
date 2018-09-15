@@ -1,0 +1,91 @@
+{
+  "type": "record",
+  "name": "composite",
+  "fields": [
+    {
+      "name": "foo-bar-field",
+      "type": {
+        "type": "record",
+        "name": "avro.test.data.overlay.primitive.foo-bar",
+        "fields": [
+          {
+            "name": "field2.1",
+            "type": "int"
+          }
+        ]
+      }
+    },
+    {
+      "name": "foo-enum-field",
+      "type": {
+        "type": "enum",
+        "name": "avro.test.data.overlay.primitive.foo-enumeration",
+        "symbols": ["fe1", "fe2"]
+      }
+    },
+    {
+      "name": "foo-fixed-field",
+      "type": {
+        "type": "fixed",
+        "name": "avro.test.data.overlay.primitive.foo-fixed",
+        "size": 2
+      }
+    },
+    {
+      "name": "foo-union-1",
+      "type": {
+        "type": "record",
+        "name": "avro.test.data.overlay.primitive.foo-union-1",
+        "fields": [ { "name" : "foo-union-1.1", "type": "int"} ]
+      }
+    },
+    {
+      "name": "foo-bar-array",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "avro.test.data.overlay.primitive.foo-bar",
+          "fields": [
+            {
+              "name": "field2.1",
+              "type": "int"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "foo-bar-map",
+      "type": {
+        "type": "map",
+        "values": {
+          "type": "record",
+          "name": "avro.test.data.overlay.primitive.foo-bar",
+          "fields": [
+            {
+              "name": "field2.1",
+              "type": "int"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "foo-bar-int-union",
+      "type": [
+        "int",
+        {
+          "type": "record",
+          "name": "avro.test.data.overlay.primitive.foo-bar",
+          "fields": [
+            {
+              "name": "field2.1",
+              "type": "int"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "type": "record",
+  "name": "foo",
+  "namespace": "avro.test.data.overlay.primitive",
+  "fields": [
+    {
+      "name": "field1",
+      "type": "int"
+    },
+    {
+      "name": "field2",
+      "type": {
+        "type": "record",
+        "name": "foo-bar",
+        "fields": [
+          {
+            "name": "field2.1",
+            "type": "int"
+          }
+        ]
+      }
+    },
+    {
+      "name": "field3",
+      "type": {
+        "type": "enum",
+        "name": "foo-enumeration",
+        "symbols": ["fe1", "fe2"]
+      }
+    },
+    {
+      "name": "field4",
+      "type": {
+        "type": "fixed",
+        "name": "foo-fixed",
+        "size": 2
+      }
+    },
+    {
+      "name": "field5",
+      "type": [
+        "string",
+        {
+          "type": "record",
+          "name": "foo-union-1",
+          "fields": [ { "name" : "foo-union-1.1", "type": "int"} ]
+        }
+      ]
+    }
+  ]
+}
