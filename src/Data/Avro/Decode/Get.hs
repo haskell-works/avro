@@ -147,7 +147,11 @@ getBytes =
     G.getByteString (fromIntegral w)
 
 getString :: Get Text
-getString = Text.decodeUtf8 <$> getBytes
+getString = do
+  bytes <- getBytes
+  case Text.decodeUtf8' bytes of
+    Left unicodeExc -> fail (show unicodeExc)
+    Right text -> return text
 
 -- a la Java:
 --  Bit 31 (the bit that is selected by the mask 0x80000000) represents the
