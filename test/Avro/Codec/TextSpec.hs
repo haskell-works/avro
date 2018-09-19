@@ -6,6 +6,7 @@ module Avro.Codec.TextSpec (spec) where
 import           Data.Avro
 import           Data.Avro.Schema
 import           Data.Text
+import qualified Data.ByteString.Lazy as BSL
 import           Data.Tagged
 import           Test.Hspec
 import qualified Data.Avro.Types      as AT
@@ -46,3 +47,10 @@ spec = describe "Avro.Codec.TextSpec" $ do
   it "Can decode encoded Text values" $ do
     Q.property $ \(t :: String) ->
       decode (encode (OnlyText (pack t))) == Success (OnlyText (pack t))
+
+  it "Can process corrupted Text values without crashing" $ do
+    Q.property $ \bytes ->
+      let result                   = decode (BSL.pack bytes) :: Result Text
+          isSafeResult (Success _) = True
+          isSafeResult (Error _)   = True
+      in result `shouldSatisfy` isSafeResult
