@@ -38,6 +38,7 @@ module Data.Avro.Schema
   , parseAvroJSON
 
   , overlay
+  , subdefinition
   ) where
 
 import           Control.Applicative
@@ -746,3 +747,7 @@ overlay input supplement = overlayType input
 
     rebind (NamedType tn) = HashMap.lookupDefault (NamedType tn) tn bindings
     bindings              = extractBindings supplement
+
+-- | Extract the named inner type definition as its own schema.
+subdefinition :: Type -> Text -> Maybe Type
+subdefinition schema name = mkTypeName Nothing name Nothing `HashMap.lookup` extractBindings schema

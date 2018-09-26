@@ -22,6 +22,7 @@ module Data.Avro.Deriving
 
   -- * Deriving Haskell types from Avro schema
   , makeSchema
+  , makeSchemaFrom
   , deriveAvroWithOptions
   , deriveAvroWithOptions'
   , deriveFromAvroWithOptions
@@ -300,6 +301,14 @@ deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
 -- @
 makeSchema :: FilePath -> Q Exp
 makeSchema p = readSchema p >>= schemaDef'
+
+makeSchemaFrom :: FilePath -> Text -> Q Exp
+makeSchemaFrom p name = do
+  s <- readSchema p
+
+  case subdefinition s name of
+    Nothing -> fail $ "No such entity '" <> T.unpack name <> "' defined in " <> p
+    Just ss -> schemaDef' ss
 
 readSchema :: FilePath -> Q Schema
 readSchema p = do
