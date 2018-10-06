@@ -1,10 +1,8 @@
-cabal-version: >= 1.10
-
--- This file has been generated from package.yaml by hpack version 0.29.7.
+-- This file has been generated from package.yaml by hpack version 0.28.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 30e0babcd4c8a6a23201f461f21db13c1a6f0eac1b6e5245ad28b9c1eb71318b
+-- hash: 9d908b7e52e701e6f32c6a5690d63cf2926a13331643ef3e72690d2b75791408
 
 name:           avro
 version:        0.3.5.1
@@ -18,6 +16,7 @@ maintainer:     Alexey Raga <alexey.raga@gmail.com>
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+cabal-version:  >= 1.10
 extra-source-files:
     ChangeLog.md
     test/data/deconflict/reader.avsc
@@ -136,9 +135,11 @@ test-suite test
       Avro.JSONSpec
       Avro.NamespaceSpec
       Avro.NormSchemaSpec
+      Avro.SchemaSpec
       Avro.THEncodeContainerSpec
       Avro.THEnumSpec
       Avro.THLogicalTypeSpec
+      Avro.THMakeSchemaFromSpec
       Avro.THReusedSpec
       Avro.THSimpleSpec
       Avro.THUnionSpec
