@@ -27,6 +27,7 @@ module Data.Avro.Schema
   -- * Lower level utilities
   , typeName
   , buildTypeEnvironment
+  , extractBindings
   , Result(..)
   , resultToEither
 
@@ -709,22 +710,16 @@ matches t1 t2                       = t1 == t2
 -- Types declared implicitly in record field definitions are also included. No distinction
 -- is made between aliases and normal names.
 extractBindings :: Type -> HashMap.HashMap TypeName Type
-extractBindings = typeBindings HashMap.empty
-  where
-    insertAll :: (Eq k, Hashable k) => [k] -> v -> HashMap.HashMap k v -> HashMap.HashMap k v
-    insertAll keys value table = foldl (\hashmap key -> HashMap.insert key value hashmap) table keys
-
-    fieldBindings :: HashMap.HashMap TypeName Type -> Field -> HashMap.HashMap TypeName Type
-    fieldBindings table Field{..} = typeBindings table fldType
-
-    typeBindings :: HashMap.HashMap TypeName Type -> Type -> HashMap.HashMap TypeName Type
-    typeBindings table t@Record{..} =
-      let withRecord = insertAll (name : aliases) t table
-      in HashMap.unions $ map (fieldBindings withRecord) fields
-    typeBindings table e@Enum{..}  = insertAll (name : aliases) e table
-    typeBindings table Union{..}   = HashMap.unions $ NE.toList $ NE.map (typeBindings table) options
-    typeBindings table f@Fixed{..} = insertAll (name : aliases) f table
-    typeBindings table _           = table
+extractBindings = \case
+  t@Record{..} ->
+    let withRecord = HashMap.fromList $ (name : aliases) `zip` repeat t
+    in HashMap.unions $ withRecord : (extractBindings . fldType <$> fields)
+  e@Enum{..}   -> HashMap.fromList $ (name : aliases) `zip` repeat e
+  Union{..}    -> HashMap.unions $ NE.toList $ extractBindings <$> options
+  f@Fixed{..}  -> HashMap.fromList $ (name : aliases) `zip` repeat f
+  Array{..}    -> extractBindings item
+  Map{..}      -> extractBindings values
+  _            -> HashMap.empty
 
 -- | Merge two schemas to produce a third.
 -- Specifically, @overlay schema reference@ fills in 'NamedTypes' in 'schema' using any matching definitions from 'reference'.
