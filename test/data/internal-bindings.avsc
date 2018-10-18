@@ -1,0 +1,105 @@
+{
+  "name" : "InternalBindings",
+  "type" : "record",
+  "doc" : "A test record that includes subdefinitions nested in different ways.",
+  "fields" : [
+    {
+      "name" : "inField",
+      "doc" : "A record definition nested in a field of a record.",
+      "type" : {
+        "name" : "InField",
+        "type" : "record",
+        "fields" : [
+          {
+            "name" : "nestedInField",
+            "doc" : "A record definition nested in two other records.",
+            "type" : {
+              "name" : "NestedInField",
+              "type" : "record",
+              "aliases" : ["AliasNestedInField"],
+              "fields" : []
+            }
+          },
+          {
+            "name" : "nestedEnum",
+            "doc" : "An enum definition nested in a nested record.",
+            "type" : {
+              "type" : "enum",
+              "name" : "NestedEnum",
+              "symbols" : ["Foo", "Bar"]
+            }
+          },
+          {
+            "name" : "nestedFixed",
+            "doc" : "A fixed definition nested in a nested record.",
+            "type" : {
+              "type" : "fixed",
+              "size" : 42,
+              "name" : "NestedFixed"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name" : "inArray",
+      "doc" : "A record definition nested in an array type.",
+      "type" : {
+        "type" : "array",
+        "items" : {
+          "name" : "InArray",
+          "type" : "record",
+          "fields" : [
+            {
+              "name" : "nestedInArray",
+              "doc" : "A record definition nested inside a record defined in an array.",
+              "type" : {
+                "name" : "NestedInArray",
+                "type" : "record",
+                "fields" : []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name" : "inMap",
+      "doc" : "A record definition nested in a map type.",
+      "type" : {
+        "type" : "map",
+        "values" : {
+          "name" : "InMap",
+          "type" : "record",
+          "fields" : [
+            {
+              "name" : "nestedInMap",
+              "doc" : "A record definition nested inside a record defined in a map.",
+              "type" : {
+                "name" : "NestedInMap",
+                "type" : "record",
+                "fields" : []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name" : "inUnion",
+      "doc" : "Record definitions nested in a union.",
+      "type" : [
+        {
+          "name" : "InUnionA",
+          "type" : "record",
+          "fields" : []
+        },
+        {
+          "name" : "InUnionB",
+          "type" : "record",
+          "fields" : []
+        }
+      ]
+    }
+  ]
+}
