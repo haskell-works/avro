@@ -9,21 +9,8 @@ license: BSD3
 github: GaloisInc/avro
 extra-source-files:
 - ChangeLog.md
-- test/data/reused.avsc
-- test/data/small.avsc
-- test/data/enums.avsc
-- test/data/maybe.avsc
-- test/data/unions.avsc
-- test/data/karma.avsc
-- test/data/record.avsc
-- test/data/logical.avsc
-- test/data/enums-object.json
-- test/data/unions-object-a.json
-- test/data/unions-object-b.json
-- test/data/deconflict/writer.avsc
-- test/data/deconflict/reader.avsc
-- test/data/namespace-inference.json
-- test/data/internal-bindings.avsc
+- test/data/*.avsc
+- test/data/*/*.avsc
 dependencies:
 - aeson
 - array

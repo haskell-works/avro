@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 686c91bf89cf070fdd57de52066edac6394a61472b3927e5c8fab77a5c009ba1
+-- hash: 70b4468aa133c8dc67598676745852fa445ca9ee5a79cf745b27997c6b7fbffd
 
 name:           avro
 version:        0.3.6.1
@@ -21,18 +21,17 @@ extra-source-files:
     ChangeLog.md
     test/data/deconflict/reader.avsc
     test/data/deconflict/writer.avsc
-    test/data/enums-object.json
     test/data/enums.avsc
     test/data/internal-bindings.avsc
     test/data/karma.avsc
     test/data/logical.avsc
     test/data/maybe.avsc
-    test/data/namespace-inference.json
+    test/data/overlay/composite.avsc
+    test/data/overlay/expectation.avsc
+    test/data/overlay/primitives.avsc
     test/data/record.avsc
     test/data/reused.avsc
     test/data/small.avsc
-    test/data/unions-object-a.json
-    test/data/unions-object-b.json
     test/data/unions.avsc
 
 source-repository head
