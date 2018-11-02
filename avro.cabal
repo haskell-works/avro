@@ -5,7 +5,7 @@
 -- hash: 307ace222c16e9660fc8fd8f1d3b126a4254daea39bb616b93782a86b81d73b0
 
 name:           avro
-version:        0.3.4.2
+version:        0.3.4.3
 synopsis:       Avro serialization support for Haskell
 description:    Avro serialization and deserialization support for Haskell
 category:       Data
@@ -23,6 +23,7 @@ extra-source-files:
     test/data/deconflict/writer.avsc
     test/data/enums-object.json
     test/data/enums.avsc
+    test/data/internal-bindings.avsc
     test/data/karma.avsc
     test/data/logical.avsc
     test/data/maybe.avsc
@@ -136,6 +137,7 @@ test-suite test
       Avro.THSimpleSpec
       Avro.THUnionSpec
       Avro.ToAvroSpec
+      Avro.SchemaSpec
       DecodeContainer
       Example1
       Paths_avro

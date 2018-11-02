@@ -544,6 +544,7 @@ buildTypeEnvironment failure from =
         Union {..}  -> concatMap go options
         Fixed {..}  -> mk name aliases namespace
         Array {..}  -> go item
+        Map {..}    -> go values
         _           -> []
 
 -- | Checks that two schemas match. This is like equality of schemas,
