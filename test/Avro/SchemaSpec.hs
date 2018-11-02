@@ -19,7 +19,7 @@ spec = describe "Avro.SchemaSpec" $ do
     it "should contain definitions for all internal types" $ do
       let schema      = $(makeSchema "test/data/internal-bindings.avsc")
           environment = buildTypeEnvironment err schema
-          err name    = fail $ "Missing " <> show name <> " in environment."
+          err name    = fail $ "Missing " ++ show name ++ " in environment."
           expected    =
             [ "InternalBindings"
             , "InField"
