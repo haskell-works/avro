@@ -1,5 +1,5 @@
 name: avro
-version: '0.4.0.0'
+version: '0.4.1.0'
 synopsis: Avro serialization support for Haskell
 description: Avro serialization and deserialization support for Haskell
 category: Data
@@ -10,6 +10,7 @@ github: GaloisInc/avro
 extra-source-files:
 - ChangeLog.md
 - test/data/*.avsc
+- test/data/*.json
 - test/data/*/*.avsc
 dependencies:
 - aeson
