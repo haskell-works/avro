@@ -1,6 +1,6 @@
 # Revision history for avro
 
-## 0.4.1.0  -- 2018-11-07
+## HEAD  -- 2018-11-07
 
 * Fixed an omitted data fixture from the cabal sdist
 
