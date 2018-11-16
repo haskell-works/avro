@@ -323,6 +323,8 @@ readSchema p = do
     Left err  -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
     Right sch -> pure sch
 
+---------------------------- FromAvro -----------------------------------------
+
 genFromAvro :: NamespaceBehavior -> Schema -> Q [Dec]
 genFromAvro namespaceBehavior (S.Enum n _ _ _ _) =
   [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
@@ -343,27 +345,36 @@ genFromAvro namespaceBehavior (S.Fixed n _ s) =
   |]
 genFromAvro _ _                             = pure []
 
---- EXPERIMENTAL :: LAZY
+genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
+genFromAvroFieldsExp n []     = [| (return . return) $(conE n) |]
+genFromAvroFieldsExp n (x:xs) =
+  [| \r ->
+    $(let extract fld = [| r .: T.pack $(mkTextLit (fldName fld))|]
+          ctor = [| $(conE n) <$> $(extract x) |]
+      in foldl (\expr fld -> [| $expr <*> $(extract fld) |]) ctor xs
+     )
+  |]
+
+-------------------------------- FromLazyAvro ---------------------------------
 genFromLazyAvro :: NamespaceBehavior -> Schema -> Q [Dec]
 genFromLazyAvro namespaceBehavior (S.Enum n _ _ _ _) =
   [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromLazyAvro (LV.Enum _ i _) = $([| pure . toEnum|]) i
-        fromLazyAvro value           = $( [|\v -> badLazyValue v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromLazyAvro namespaceBehavior (S.Record n _ _ _ fs) =
   [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromLazyAvro (LV.Record _ r) =
            $(genFromLazyAvroFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
-        fromLazyAvro value           = $( [|\v -> badLazyValue v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromLazyAvro namespaceBehavior (S.Fixed n _ s) =
   [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromLazyAvro (LV.Fixed _ v)
           | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
-        fromLazyAvro value = $( [|\v -> badLazyValue v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromLazyAvro value = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromLazyAvro _ _                             = pure []
-
 
 genFromLazyAvroFieldsExp :: Name -> [Field] -> Q Exp
 genFromLazyAvroFieldsExp n []     = [| (return . return) $(conE n) |]
@@ -375,17 +386,7 @@ genFromLazyAvroFieldsExp n (x:xs) =
      )
   |]
 
--------------------------------------------------------------------------------
-
-genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
-genFromAvroFieldsExp n []     = [| (return . return) $(conE n) |]
-genFromAvroFieldsExp n (x:xs) =
-  [| \r ->
-    $(let extract fld = [| r .: T.pack $(mkTextLit (fldName fld))|]
-          ctor = [| $(conE n) <$> $(extract x) |]
-      in foldl (\expr fld -> [| $expr <*> $(extract fld) |]) ctor xs
-     )
-  |]
+----------------------- HasAvroSchema ----------------------------------------
 
 genHasAvroSchema :: NamespaceBehavior -> Schema -> Q [Dec]
 genHasAvroSchema namespaceBehavior s = do
@@ -405,6 +406,8 @@ newNames :: String
             -- ^ count
          -> Q [Name]
 newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
+
+------------------------- ToAvro ----------------------------------------------
 
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
 genToAvro opts s@(S.Enum n _ _ vs _) =

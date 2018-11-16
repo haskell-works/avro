@@ -28,9 +28,16 @@ import qualified Data.Vector                     as V
 import qualified Data.Vector.Unboxed             as U
 import           Data.Word
 
+-- |  'FromLazyAvro' is a clone of 'FromAvro' except that
+-- it works for lazy values ('LazyValue').
+--
+-- Decoding from 'LazyValue` directly
+-- without converting to strict `Value` and then 'FromAvro'
+-- can be very beneficial from the performance point of view.
 class HasAvroSchema a => FromLazyAvro a where
   fromLazyAvro :: LazyValue Type -> Result a
 
+--  | Same as '(.:)' but works on `LazyValue`.
 (.~:) :: FromLazyAvro a => HashMap.HashMap Text (LazyValue Type) -> Text -> Result a
 (.~:) obj key =
   case HashMap.lookup key obj of
@@ -41,74 +48,78 @@ instance (FromLazyAvro a, FromLazyAvro b) => FromLazyAvro (Either a b) where
   fromLazyAvro e@(T.Union _ branch x)
     | S.matches branch schemaA = Left  <$> fromLazyAvro x
     | S.matches branch schemaB = Right <$> fromLazyAvro x
-    | otherwise              = badLazyValue e "either"
+    | otherwise              = badValue e "Either"
     where Tagged schemaA = schema :: Tagged a Type
           Tagged schemaB = schema :: Tagged b Type
-  fromLazyAvro x = badLazyValue x "either"
+  fromLazyAvro x = badValue x "Either"
+
 instance FromLazyAvro Bool where
   fromLazyAvro (T.Boolean b) = pure b
-  fromLazyAvro v             = badLazyValue v "Bool"
+  fromLazyAvro v             = badValue v "Bool"
+
 instance FromLazyAvro B.ByteString where
   fromLazyAvro (T.Bytes b) = pure b
-  fromLazyAvro v           = badLazyValue v "ByteString"
+  fromLazyAvro v           = badValue v "ByteString"
+
 instance FromLazyAvro BL.ByteString where
   fromLazyAvro (T.Bytes b) = pure (BL.fromStrict b)
-  fromLazyAvro v           = badLazyValue v "Lazy ByteString"
+  fromLazyAvro v           = badValue v "Lazy ByteString"
+
 instance FromLazyAvro Int where
   fromLazyAvro (T.Int i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
   fromLazyAvro (T.Long i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
-  fromLazyAvro v          = badLazyValue v "Int"
+  fromLazyAvro v          = badValue v "Int"
+
 instance FromLazyAvro Int32 where
   fromLazyAvro (T.Int i) = pure (fromIntegral i)
-  fromLazyAvro v         = badLazyValue v "Int32"
+  fromLazyAvro v         = badValue v "Int32"
+
 instance FromLazyAvro Int64 where
   fromLazyAvro (T.Long i) = pure i
   fromLazyAvro (T.Int i)  = pure (fromIntegral i)
-  fromLazyAvro v          = badLazyValue v "Int64"
+  fromLazyAvro v          = badValue v "Int64"
+
 instance FromLazyAvro Double where
   fromLazyAvro (T.Double d) = pure d
-  fromLazyAvro v            = badLazyValue v "Double"
+  fromLazyAvro v            = badValue v "Double"
 
 instance FromLazyAvro Float where
   fromLazyAvro (T.Float f) = pure f
-  fromLazyAvro v           = badLazyValue v "Float"
+  fromLazyAvro v           = badValue v "Float"
 
 instance FromLazyAvro a => FromLazyAvro (Maybe a) where
   fromLazyAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
   fromLazyAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromLazyAvro v
-  fromLazyAvro v                                   = badLazyValue v "Maybe a"
+  fromLazyAvro v                                   = badValue v "Maybe a"
 
 instance FromLazyAvro a => FromLazyAvro [a] where
   fromLazyAvro (T.Array vec) = mapM fromLazyAvro $ toList vec
-  fromLazyAvro v             = badLazyValue v "[a]"
+  fromLazyAvro v             = badValue v "[a]"
 
 instance FromLazyAvro a => FromLazyAvro (V.Vector a) where
   fromLazyAvro (T.Array vec) = mapM fromLazyAvro vec
-  fromLazyAvro v             = badLazyValue v "Vector a"
+  fromLazyAvro v             = badValue v "Vector a"
 
 instance (U.Unbox a, FromLazyAvro a) => FromLazyAvro (U.Vector a) where
   fromLazyAvro (T.Array vec) = U.convert <$> mapM fromLazyAvro vec
-  fromLazyAvro v             = badLazyValue v "Unboxed Vector a"
+  fromLazyAvro v             = badValue v "Unboxed Vector a"
 
 instance FromLazyAvro Text where
   fromLazyAvro (T.String txt) = pure txt
-  fromLazyAvro v              = badLazyValue v "Text"
+  fromLazyAvro v              = badValue v "Text"
 
 instance FromLazyAvro TL.Text where
   fromLazyAvro (T.String txt) = pure (TL.fromStrict txt)
-  fromLazyAvro v              = badLazyValue v "Lazy Text"
+  fromLazyAvro v              = badValue v "Lazy Text"
 
 instance (FromLazyAvro a) => FromLazyAvro (Map.Map Text a) where
   fromLazyAvro (T.Record _ mp) = mapM fromLazyAvro $ Map.fromList (HashMap.toList mp)
   fromLazyAvro (T.Map mp)      = mapM fromLazyAvro $ Map.fromList (HashMap.toList mp)
-  fromLazyAvro v               = badLazyValue v "Map Text a"
+  fromLazyAvro v               = badValue v "Map Text a"
 
 instance (FromLazyAvro a) => FromLazyAvro (HashMap.HashMap Text a) where
   fromLazyAvro (T.Record _ mp) = mapM fromLazyAvro mp
   fromLazyAvro (T.Map mp)      = mapM fromLazyAvro mp
-  fromLazyAvro v               = badLazyValue v "HashMap Text a"
-
-badLazyValue :: LazyValue Type -> String -> Result a
-badLazyValue v t = fail $ "Unexpected value when decoding for '" <> t <> "': " <> show v
+  fromLazyAvro v               = badValue v "HashMap Text a"
