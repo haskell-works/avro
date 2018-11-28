@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfec925895943164224c08cad0c74436c45b1a75efd82d149d9643542ed7289d
+-- hash: 4a4c0411085a3834287f648dd8976f15d72294196b6aeef1509ba08dd67e6fbd
 
 name:           avro
 version:        0.4.0.0
@@ -60,6 +60,7 @@ library
       Data.Avro.Decode.Lazy
       Data.Avro.Decode.Lazy.Convert
       Data.Avro.Decode.Lazy.Deconflict
+      Data.Avro.Decode.Lazy.FromLazyAvro
       Data.Avro.Decode.Lazy.LazyValue
       Data.Avro.Decode.Strict
       Data.Avro.Decode.Strict.Internal
@@ -90,6 +91,7 @@ library
     , array
     , base >=4.8 && <5.0
     , base16-bytestring
+    , bifunctors
     , binary
     , bytestring
     , containers
@@ -160,6 +162,7 @@ test-suite test
     , avro
     , base >=4.6 && <5
     , base16-bytestring
+    , bifunctors
     , binary
     , bytestring
     , containers

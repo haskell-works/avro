@@ -47,7 +47,7 @@ spec = describe "Avro.Decode.Lazy.ContainerSpec" $ do
     res <- encodeThenDecode chunks
     sequence res `shouldBe` Right msgs
 
-encodeThenDecode :: (FromAvro a, ToAvro a) => [[a]] -> IO [Either String a]
+encodeThenDecode :: (FromLazyAvro a, ToAvro a) => [[a]] -> IO [Either String a]
 encodeThenDecode as =
   DL.decodeContainer <$> A.encodeContainer as
 

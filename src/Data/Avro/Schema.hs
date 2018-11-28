@@ -28,7 +28,9 @@ module Data.Avro.Schema
   , typeName
   , buildTypeEnvironment
   , extractBindings
+
   , Result(..)
+  , badValue
   , resultToEither
 
   , matches
@@ -492,6 +494,9 @@ instance ToJSON (Ty.Value Type) where
 
 data Result a = Success a | Error String
   deriving (Eq, Ord, Show)
+
+badValue :: Show t => t -> String -> Result a
+badValue v t = fail $ "Unexpected value for '" <> t <> "': " <> show v
 
 resultToEither :: Result b -> Either String b
 resultToEither r =

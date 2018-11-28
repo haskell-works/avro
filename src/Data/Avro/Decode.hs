@@ -14,38 +14,38 @@ module Data.Avro.Decode
   , GetAvro(..)
   ) where
 
-import qualified Codec.Compression.Zlib     as Z
-import           Control.Monad              (replicateM, when)
-import qualified Data.Aeson                 as A
-import qualified Data.Array                 as Array
-import           Data.Binary.Get            (Get, runGetOrFail)
-import qualified Data.Binary.Get            as G
-import           Data.Binary.IEEE754        as IEEE
+import qualified Codec.Compression.Zlib           as Z
+import           Control.Monad                    (replicateM, when)
+import qualified Data.Aeson                       as A
+import qualified Data.Array                       as Array
+import           Data.Binary.Get                  (Get, runGetOrFail)
+import qualified Data.Binary.Get                  as G
+import           Data.Binary.IEEE754              as IEEE
 import           Data.Bits
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString.Lazy       as BL
-import qualified Data.ByteString.Lazy.Char8 as BC
-import qualified Data.HashMap.Strict        as HashMap
+import           Data.ByteString                  (ByteString)
+import qualified Data.ByteString.Lazy             as BL
+import qualified Data.ByteString.Lazy.Char8       as BC
+import qualified Data.HashMap.Strict              as HashMap
 import           Data.Int
-import           Data.List                  (foldl')
-import qualified Data.List.NonEmpty         as NE
-import qualified Data.Map                   as Map
+import           Data.List                        (foldl')
+import qualified Data.List.NonEmpty               as NE
+import qualified Data.Map                         as Map
 import           Data.Maybe
-import           Data.Monoid                ((<>))
-import qualified Data.Set                   as Set
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import qualified Data.Text.Encoding         as Text
-import qualified Data.Vector                as V
-import           Prelude                    as P
+import           Data.Monoid                      ((<>))
+import qualified Data.Set                         as Set
+import           Data.Text                        (Text)
+import qualified Data.Text                        as Text
+import qualified Data.Text.Encoding               as Text
+import qualified Data.Vector                      as V
+import           Prelude                          as P
 
 import           Data.Avro.Decode.Get
 import           Data.Avro.DecodeRaw
-import           Data.Avro.Schema     as S
-import qualified Data.Avro.Types      as T
+import           Data.Avro.Schema                 as S
+import qualified Data.Avro.Types                  as T
 import           Data.Avro.Zag
 
-import Data.Avro.Decode.Strict.Internal
+import           Data.Avro.Decode.Strict.Internal
 
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)

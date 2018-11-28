@@ -23,6 +23,10 @@ module Data.Avro.Decode.Lazy
   , getContainerValuesBytes'
   , getAvroOf
   , GetAvro(..)
+  , FromLazyAvro(..)
+  , (.~:)
+  , T.LazyValue(..)
+  , badValue
   ) where
 
 import qualified Codec.Compression.Zlib     as Z
@@ -62,11 +66,10 @@ import           Data.Avro.Zag
 import qualified Data.Avro.Decode.Strict.Internal as DecodeStrict
 
 import Data.Avro.Decode.Get
-import Data.Avro.Decode.Lazy.Convert    (toStrictValue)
-import Data.Avro.Decode.Lazy.Deconflict as C
+import Data.Avro.Decode.Lazy.Convert      (toStrictValue)
+import Data.Avro.Decode.Lazy.Deconflict   as C
+import Data.Avro.Decode.Lazy.FromLazyAvro
 import Data.Avro.FromAvro
-
-import Debug.Trace
 
 -- | Decodes the container as a lazy list of values of the requested type.
 --
@@ -77,7 +80,7 @@ import Debug.Trace
 -- error. This means that the consumer will get all the "good" content from
 -- the container until the error is detected, then this error and then the list
 -- is finished.
-decodeContainer :: forall a. FromAvro a => BL.ByteString -> [Either String a]
+decodeContainer :: forall a. FromLazyAvro a => BL.ByteString -> [Either String a]
 decodeContainer bs =
   let vals = either (\err -> [Left err]) concat (decodeContainer' bs)
   in takeWhileInclusive isRight vals
@@ -102,7 +105,7 @@ decodeContainer bs =
 -- continue after errors (most likely it will not be correct).
 --
 -- 'decodeContainer' function makes a choice to stop after the first error.
-decodeContainer' :: forall a. FromAvro a => BL.ByteString -> Either String [[Either String a]]
+decodeContainer' :: forall a. FromLazyAvro a => BL.ByteString -> Either String [[Either String a]]
 decodeContainer' = decodeContainerWithSchema' (untag (schema :: Tagged a Schema))
 
 -- | Same as 'decodeContainer' but uses provided schema as a reader schema for the container
@@ -110,7 +113,7 @@ decodeContainer' = decodeContainerWithSchema' (untag (schema :: Tagged a Schema)
 --
 -- It is up to the user to make sure that the provided schema is compatible with 'a'
 -- and with the container's writer schema.
-decodeContainerWithSchema :: FromAvro a => Schema -> BL.ByteString -> [Either String a]
+decodeContainerWithSchema :: FromLazyAvro a => Schema -> BL.ByteString -> [Either String a]
 decodeContainerWithSchema s bs =
   either (\err -> [Left err]) concat (decodeContainerWithSchema' s bs)
 
@@ -119,12 +122,12 @@ decodeContainerWithSchema s bs =
 --
 -- It is up to the user to make sure that the provided schema is compatible with 'a'
 -- and with the container's writer schema.
-decodeContainerWithSchema' :: FromAvro a => Schema -> BL.ByteString -> Either String [[Either String a]]
+decodeContainerWithSchema' :: FromLazyAvro a => Schema -> BL.ByteString -> Either String [[Either String a]]
 decodeContainerWithSchema' readerSchema bs = do
   (writerSchema, vals) <- getContainerValues bs
   pure $ (fmap . fmap) (convertValue writerSchema) vals
   where
-    convertValue w v = toStrictValue (C.deconflict w readerSchema v) >>= (resultToEither . fromAvro)
+    convertValue w v = resultToEither $ fromLazyAvro (C.deconflict w readerSchema v) -- >>= (resultToEither . fromLazyAvro)
 
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Type
@@ -200,7 +203,7 @@ getNextBlock sync decompress bs =
     checkMarker sync bs =
       case BL.splitAt nrSyncBytes bs of
         (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
-        (_, rest)   -> Right rest
+        (_, rest)                    -> Right rest
 
 getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Type))
                  -> BL.ByteString

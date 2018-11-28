@@ -1,5 +1,5 @@
 name: avro
-version: '0.4.1.0'
+version: '0.4.0.0'
 synopsis: Avro serialization support for Haskell
 description: Avro serialization and deserialization support for Haskell
 category: Data
@@ -16,6 +16,7 @@ dependencies:
 - aeson
 - array
 - base16-bytestring
+- bifunctors
 - binary
 - bytestring
 - containers
