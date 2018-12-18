@@ -189,6 +189,9 @@ mkUnion os = Union os (\i -> IM.lookup (fromIntegral i) mp)
 -- as @"com.example.Foo"@.
 --
 -- Fullnames have to be globally unique inside an Avro schema.
+--
+-- A namespace of @[]@ or @[""]@ is the "null namespace". In avro
+-- an explicitly null-namespaced identifier is written as ".Foo"
 data TypeName = TN { baseName  :: T.Text
                    , namespace :: [T.Text]
                    }
@@ -205,8 +208,15 @@ instance Show TypeName where
 -- > renderFullname (TN "Foo" ["com", "example"])
 -- "com.example.Foo"
 -- @
+--
+-- @
+-- > renderFullname (TN "Foo" [])
+-- ".Foo"
+-- @
 renderFullname :: TypeName -> T.Text
-renderFullname TN { baseName, namespace } = T.intercalate "." $ namespace <> [baseName]
+renderFullname TN { baseName, namespace } = case namespace of
+  [] -> "." <> baseName
+  xs -> T.intercalate "." $ namespace <> [baseName]
 
 -- | Parses a fullname into a 'TypeName', assuming the string
 -- representation is valid.
@@ -216,10 +226,13 @@ renderFullname TN { baseName, namespace } = T.intercalate "." $ namespace <> [ba
 -- TN { baseName = "Foo", components = ["com", "example"] }
 -- @
 parseFullname :: T.Text -> TypeName
-parseFullname (T.splitOn "." -> components) = TN
-  { baseName  = last components
-  , namespace = init components
-  }
+parseFullname (T.splitOn "." -> components) = TN bn ns
+  where
+    bn = last components
+    ns = case init components of
+      []   -> []
+      [""] -> []
+      xs   -> xs
 
 -- | Build a type name out of the @name@ and @namespace@ fields of an
 -- Avro record, enum or fixed definition.
