@@ -52,8 +52,9 @@ import qualified Data.Text.Lazy.Encoding    as TL
 import qualified Data.Vector                as V
 import qualified Data.Vector.Unboxed        as U
 import           Data.Word
+import           System.Random.TF.Init      (initTFGen)
+import           System.Random.TF.Instances (randoms)
 import           Prelude                    as P
-import           System.Entropy             (getEntropy)
 
 import Data.Avro.EncodeRaw
 import Data.Avro.HasAvroSchema
@@ -67,7 +68,7 @@ encodeAvro = toLazyByteString . putAvro
 
 -- | Generates a new synchronization marker for encoding Avro containers
 newSyncBytes :: IO BL.ByteString
-newSyncBytes = BL.fromStrict <$> getEntropy 16
+newSyncBytes = BL.pack . DL.take 16 . randoms <$> initTFGen
 
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers.
