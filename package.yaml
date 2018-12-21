@@ -21,7 +21,6 @@ dependencies:
 - binary
 - bytestring
 - containers
-- entropy
 - fail
 - hashable
 - mtl
@@ -30,6 +29,7 @@ dependencies:
 - semigroups
 - tagged
 - text
+- tf-random
 - unordered-containers
 - vector
 library:
