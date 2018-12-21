@@ -1,5 +1,9 @@
 # Revision history for avro
 
+## HEAD
+
+- Replace `entropy` library with `tf-random`, which is easier to use with ghcjs
+
 ## 0.4.1.1
 
 - Fixed bugs in handling of namespaces when parsing and printing avro types

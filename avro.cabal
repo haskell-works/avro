@@ -98,7 +98,6 @@ library
     , bytestring
     , containers
     , data-binary-ieee754
-    , entropy
     , fail
     , hashable
     , mtl
@@ -107,6 +106,7 @@ library
     , semigroups
     , tagged
     , text
+    , tf-random
     , unordered-containers
     , vector
   if flag(templatehaskell)
@@ -169,7 +169,6 @@ test-suite test
     , bytestring
     , containers
     , directory
-    , entropy
     , extra
     , fail
     , hashable
