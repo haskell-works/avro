@@ -20,13 +20,17 @@
     },
     {
       "name": "foo-bar-array",
-      "type": "array",
-      "items": "avro.test.data.overlay.primitive.foo-bar"
+      "type": {
+        "type": "array",
+        "items": "avro.test.data.overlay.primitive.foo-bar"
+      }
     },
     {
       "name": "foo-bar-map",
-      "type": "map",
-      "values": "avro.test.data.overlay.primitive.foo-bar"
+      "type": {
+        "type": "map",
+        "values": "avro.test.data.overlay.primitive.foo-bar"
+      }
     },
     {
       "name": "foo-bar-int-union",
