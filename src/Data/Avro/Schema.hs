@@ -214,9 +214,8 @@ instance Show TypeName where
 -- ".Foo"
 -- @
 renderFullname :: TypeName -> T.Text
-renderFullname TN { baseName, namespace } = case namespace of
-  [] -> "." <> baseName
-  xs -> T.intercalate "." $ namespace <> [baseName]
+renderFullname TN { baseName, namespace } =
+  T.intercalate "." namespace <> "." <> baseName
 
 -- | Parses a fullname into a 'TypeName', assuming the string
 -- representation is valid.
@@ -226,13 +225,10 @@ renderFullname TN { baseName, namespace } = case namespace of
 -- TN { baseName = "Foo", components = ["com", "example"] }
 -- @
 parseFullname :: T.Text -> TypeName
-parseFullname (T.splitOn "." -> components) = TN bn ns
+parseFullname (T.splitOn "." -> components) = TN { baseName, namespace }
   where
-    bn = last components
-    ns = case init components of
-      []   -> []
-      [""] -> []
-      xs   -> xs
+    baseName  = last components
+    namespace = filter (/= "") (init components)
 
 -- | Build a type name out of the @name@ and @namespace@ fields of an
 -- Avro record, enum or fixed definition.
