@@ -1,0 +1,24 @@
+{
+  "type" : "record",
+  "name" : "UnionsNoNamespace",
+  "doc" : "An example schema that has a union whose components are types with no namespace. This was causing problems with our JSON parsing code.",
+  "fields" : [
+    {
+      "name" : "unionField",
+      "type" : [
+        {
+          "type" : "record",
+          "name" : "TypeA",
+          "doc" : "TypeA is in the null namespace but has no leading dot in the schema.",
+          "fields" : []
+        },
+        {
+          "type" : "record",
+          "name" : ".TypeB",
+          "doc" : "Note the leading dot—semantically this is the same as having no namespace, but it caused parsing issues in the past.",
+          "fields" : []
+        }
+      ]
+    }
+  ]
+}

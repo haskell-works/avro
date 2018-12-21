@@ -24,6 +24,7 @@ deriveAvro "test/data/enums.avsc"
 deriveAvro "test/data/reused.avsc"
 deriveAvro "test/data/small.avsc"
 deriveAvro "test/data/unions.avsc"
+deriveAvro "test/data/unions-no-namespace.avsc"
 
 spec :: Spec
 spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
@@ -95,6 +96,20 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
   it "should parse (unions)" $ do
     parseJSON unionsJsonA `shouldBe` pure unionsExampleA
     parseJSON unionsJsonB `shouldBe` pure unionsExampleB
+
+  let unionsNoNamespaceA = UnionsNoNamespace (Left TypeA)
+      unionsNoNamespaceB = UnionsNoNamespace (Right TypeB)
+  it "should roundtrip (unions-no-namespace)" $ do
+    parseJSON (Aeson.encode (toJSON unionsNoNamespaceA)) `shouldBe`
+      pure unionsNoNamespaceA
+    parseJSON (Aeson.encode (toJSON unionsNoNamespaceB)) `shouldBe`
+      pure unionsNoNamespaceB
+  let noNamespace = "test/data/unions-no-namespace-object.json"
+      objectA = "{ \"unionField\" : { \"TypeA\" : {} } }"
+      objectB = "{ \"unionField\" : { \"TypeB\" : {} } }"
+  it "should parse (unions-no-namespace)" $ do
+    parseJSON objectA `shouldBe` pure unionsNoNamespaceA
+    parseJSON objectB `shouldBe` pure unionsNoNamespaceB
 
 getFileName :: FilePath -> IO FilePath
 getFileName p = do
