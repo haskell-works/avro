@@ -96,11 +96,14 @@ decodeAvroJSON schema json =
           fail "Invalid encoding of union: object with too many fields."
       | otherwise      =
           let
+            canonicalize name
+              | Just _ <- Schema.primitiveType name = name
+              | otherwise = Schema.renderFullname $ Schema.parseFullname name
             branch =
-              head (HashMap.keys obj)
+              head $ HashMap.keys obj
             names =
               HashMap.fromList [(Schema.typeName t, t) | t <- NE.toList schemas]
-          in case HashMap.lookup branch names of
+          in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
               nested <- parseAvroJSON union env t (obj ! branch)
               return (Avro.Union schemas t nested)

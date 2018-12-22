@@ -34,6 +34,8 @@ extra-source-files:
     test/data/namespace-inference.json
     test/data/unions-object-a.json
     test/data/unions-object-b.json
+    test/data/unions.avsc
+    test/data/unions-no-namespace.avsc
     test/data/deconflict/reader.avsc
     test/data/deconflict/writer.avsc
     test/data/overlay/composite.avsc

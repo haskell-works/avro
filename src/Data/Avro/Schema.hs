@@ -22,10 +22,12 @@ module Data.Avro.Schema
   , Field(..), Order(..)
   , TypeName(..)
   , renderFullname
+  , parseFullname
   , mkEnum, mkUnion
   , validateSchema
   -- * Lower level utilities
   , typeName
+  , primitiveType
   , buildTypeEnvironment
   , extractBindings
 
@@ -294,6 +296,27 @@ typeName bt =
     NamedType name -> renderFullname name
     Union (x:|_) _ -> typeName x
     _              -> renderFullname $ name bt
+
+-- | If the given string is the name of a primitive type, return the
+-- type, otherwise return 'Nothing'.
+--
+-- @
+-- λ> primitiveType "string"
+-- Just String
+-- λ> primitiveType "foo"
+-- Nothing
+-- @
+primitiveType :: Text -> Maybe Type
+primitiveType = \case
+  "null"    -> Just Null
+  "boolean" -> Just Boolean
+  "int"     -> Just Int
+  "long"    -> Just Long
+  "float"   -> Just Float
+  "double"  -> Just Double
+  "bytes"   -> Just Bytes
+  "string"  -> Just String
+  _         -> Nothing
 
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
