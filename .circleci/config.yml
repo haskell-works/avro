@@ -1,97 +1,42 @@
-defaults: &defaults
-  working_directory: ~/build
-  docker:
-    - image: quay.io/haskell_works/stack-build-python
+version: 2.1
 
-  steps:
-    - checkout
-
-    - restore_cache:
-        keys:
-          - dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
-          - dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}
-
-    - restore_cache:
-        key: stack-work-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
-
-    - run: stack setup --resolver ${LTS}
-    - run: stack build --test --no-run-tests --haddock --no-haddock-deps --resolver ${LTS}
-
-    - save_cache:
-        key: dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}
-        paths:
-          - ~/.stack
-
-    - run:
-        name: Running unit tests
-        command: stack test --resolver ${LTS}
-
-    - save_cache:
-        key: dot-stack-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
-        paths:
-          - ~/.stack
-
-    - save_cache:
-        key: stack-work-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package.yaml" }}
-        paths: ~/build/.stack-work
-
-version: 2.0
-jobs:
-  lts-7:
-    environment:
-      - LTS: "lts-7"
-    <<: *defaults
-
-  lts-9:
-    environment:
-      - LTS: "lts-9"
-    <<: *defaults
-
-  lts-11:
-    environment:
-      - LTS: "lts-11"
-    <<: *defaults
-
-  lts-12:
-    environment:
-      - LTS: "lts-12"
-    <<: *defaults
-
-  nightly:
-    environment:
-      - LTS: "nightly"
-    <<: *defaults
-
-  release:
-    working_directory: ~/build
-    docker:
-      - image: quay.io/haskell_works/stack-build-python
-
-    steps:
-      - checkout
-
-      - run:
-          name: Making a release
-          command: ./scripts/release
-
+orbs:
+  haskell: haskell-works/haskell-build@1.3.1
+  github: haskell-works/github-release@1.2.1
+  hackage: haskell-works/hackage@1.0.0
 
 workflows:
-  version: 2
   multiple-ghcs:
     jobs:
-      - lts-7
-      - lts-9
-      - lts-11
-      - lts-12
-      - nightly
-      - release:
+      - haskell/build:
+          name: GHC 8.4.4
+          executor: haskell/ghc-8_4_4
+
+      - haskell/build:
+          name: GHC 8.6.3
+          executor: haskell/ghc-8_6_3
+
+      - haskell/build:
+          name: GHC 7.10.3
+          executor: haskell/ghc-7_10_3
+
+      - github/release-cabal:
+          name: GitHub Release
+          checkout: true
           requires:
-            - lts-7
-            - lts-9
-            - lts-11
-            - lts-12
-            # - nightly
+            - GHC 8.4.4
+            - GHC 8.6.3
+            - GHC 7.10.3
           filters:
             branches:
               only: master
 
+      - hackage/upload:
+          publish: true
+          requires:
+            - GitHub Release
+          username: ${HACKAGE_USER}
+          password: ${HACKAGE_PASS}
+          filters:
+            branches:
+              only: master
