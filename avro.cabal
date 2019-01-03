@@ -4,15 +4,15 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0368e22fa6552aa4d9b3ada7a95e8210af8b40090f3244fe99d68ca30f606e8d
+-- hash: ca29cdadb7a7a9edda357686a62ea84b9122a6bedb7fe04890a5d1fcc8719127
 
 name:           avro
-version:        0.4.1.1
+version:        0.4.1.2
 synopsis:       Avro serialization support for Haskell
 description:    Avro serialization and deserialization support for Haskell
 category:       Data
-homepage:       https://github.com/GaloisInc/avro#readme
-bug-reports:    https://github.com/GaloisInc/avro/issues
+homepage:       https://github.com/haskell-works/avro#readme
+bug-reports:    https://github.com/haskell-works/avro/issues
 author:         Thomas M. DuBuisson
 maintainer:     Alexey Raga <alexey.raga@gmail.com>
 license:        BSD3
@@ -29,13 +29,12 @@ extra-source-files:
     test/data/record.avsc
     test/data/reused.avsc
     test/data/small.avsc
+    test/data/unions-no-namespace.avsc
     test/data/unions.avsc
     test/data/enums-object.json
     test/data/namespace-inference.json
     test/data/unions-object-a.json
     test/data/unions-object-b.json
-    test/data/unions.avsc
-    test/data/unions-no-namespace.avsc
     test/data/deconflict/reader.avsc
     test/data/deconflict/writer.avsc
     test/data/overlay/composite.avsc
@@ -44,7 +43,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/GaloisInc/avro
+  location: https://github.com/haskell-works/avro
 
 flag dev
   description: Use development GHC flags
@@ -183,6 +182,7 @@ test-suite test
     , semigroups
     , tagged
     , text
+    , tf-random
     , transformers
     , unordered-containers
     , vector
