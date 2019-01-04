@@ -1,11 +1,5 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
---
--- see: https://github.com/sol/hpack
---
--- hash: ca29cdadb7a7a9edda357686a62ea84b9122a6bedb7fe04890a5d1fcc8719127
-
 name:           avro
 version:        0.4.1.2
 synopsis:       Avro serialization support for Haskell
@@ -88,7 +82,6 @@ library
   hs-source-dirs:
       src
   other-extensions: OverloadedStrings
-  ghc-options: -O2
   build-depends:
       aeson
     , array

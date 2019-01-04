@@ -11,10 +11,13 @@ cabal-dev
 .virthualenv
 .hsenv
 .cabal-sandbox/
+dist/
+dist-newstyle/
 cabal.sandbox.config
 cabal.config
 .stack-work/
-*.cabal
+.ghc.ennvironment*
+cabal.project.local
 
 # Emacs files
 *~
