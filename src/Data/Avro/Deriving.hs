@@ -32,41 +32,41 @@ module Data.Avro.Deriving
 )
 where
 
-import           Control.Monad                      (join)
-import           Data.Aeson                         (eitherDecode)
-import qualified Data.Aeson                         as J
-import           Data.Avro                          hiding (decode, encode)
-import           Data.Avro.Schema                   as S
-import qualified Data.Avro.Types                    as AT
-import           Data.ByteString                    (ByteString)
-import qualified Data.ByteString                    as B
-import           Data.Char                          (isAlphaNum)
+import           Control.Monad      (join)
+import           Data.Aeson         (eitherDecode)
+import qualified Data.Aeson         as J
+import           Data.Avro          hiding (decode, encode)
+import           Data.Avro.Schema   as S
+import qualified Data.Avro.Types    as AT
+import           Data.ByteString    (ByteString)
+import qualified Data.ByteString    as B
+import           Data.Char          (isAlphaNum)
 import           Data.Int
-import           Data.List.NonEmpty                 (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty                 as NE
-import           Data.Map                           (Map)
-import           Data.Maybe                         (fromMaybe)
-import           Data.Semigroup                     ((<>))
-import qualified Data.Text                          as Text
+import           Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NE
+import           Data.Map           (Map)
+import           Data.Maybe         (fromMaybe)
+import           Data.Semigroup     ((<>))
+import qualified Data.Text          as Text
 
 
-import           GHC.Generics                       (Generic)
+import GHC.Generics (Generic)
 
-import           Language.Haskell.TH                as TH hiding (notStrict)
-import           Language.Haskell.TH.Lib            as TH hiding (notStrict)
-import           Language.Haskell.TH.Syntax
+import Language.Haskell.TH        as TH hiding (notStrict)
+import Language.Haskell.TH.Lib    as TH hiding (notStrict)
+import Language.Haskell.TH.Syntax
 
-import           Data.Avro.Deriving.NormSchema
-import           Data.Avro.EitherN
+import Data.Avro.Deriving.NormSchema
+import Data.Avro.EitherN
 
-import qualified Data.ByteString                    as BS
-import qualified Data.ByteString.Lazy               as LBS
-import qualified Data.ByteString.Lazy.Char8         as LBSC8
-import qualified Data.HashMap.Strict                as HM
-import qualified Data.Set                           as S
-import           Data.Text                          (Text)
-import qualified Data.Text                          as T
-import qualified Data.Vector                        as V
+import qualified Data.ByteString            as BS
+import qualified Data.ByteString.Lazy       as LBS
+import qualified Data.ByteString.Lazy.Char8 as LBSC8
+import qualified Data.HashMap.Strict        as HM
+import qualified Data.Set                   as S
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import qualified Data.Vector                as V
 
 import           Data.Avro.Decode.Lazy.FromLazyAvro
 import qualified Data.Avro.Decode.Lazy.LazyValue    as LV
@@ -110,14 +110,14 @@ data DeriveOptions = DeriveOptions
   { -- | How to build field names for generated data types. The first
     -- argument is the type name to use as a prefix, rendered
     -- according to the 'namespaceBehavior' setting.
-    fieldNameBuilder :: Text -> Field -> T.Text
+    fieldNameBuilder    :: Text -> Field -> T.Text
 
     -- | Determines field representation of generated data types
-  , fieldRepresentation  :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
+  , fieldRepresentation :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
 
     -- | Controls how we handle namespaces when defining Haskell type
     -- and field names.
-  , namespaceBehavior :: NamespaceBehavior
+  , namespaceBehavior   :: NamespaceBehavior
   } deriving Generic
 
 -- | Default deriving options
@@ -672,10 +672,10 @@ genNewtype dn = do
   pure $ NewtypeD [] dn [] Nothing ctor ders
 #else
 genNewtype dn = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
+  [ConT eq, ConT sh, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
   fldType <- [t|ByteString|]
   let ctor = RecC dn [(mkName ("un" ++ nameBase dn), notStrict, fldType)]
-  pure $ NewtypeD [] dn [] ctor [eq, sh]
+  pure $ NewtypeD [] dn [] ctor [eq, sh, gen]
 #endif
 
 genEnum :: Name -> [Name] -> Q Dec
@@ -689,8 +689,8 @@ genEnum dn vs = do
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
 #else
 genEnum dn vs = do
-  [ConT eq, ConT sh, ConT or, ConT en] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
-  pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en]
+  [ConT eq, ConT sh, ConT or, ConT en, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en, gen]
 #endif
 
 genDataType :: Name -> [VarStrictType] -> Q Dec
@@ -704,8 +704,8 @@ genDataType dn flds = do
   pure $ DataD [] dn [] Nothing [RecC dn flds] ders
 #else
 genDataType dn flds = do
-  [ConT eq, ConT sh] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
-  pure $ DataD [] dn [] [RecC dn flds] [eq, sh]
+  [ConT eq, ConT sh, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Generic|]]
+  pure $ DataD [] dn [] [RecC dn flds] [eq, sh, gen]
 #endif
 
 notStrict :: Strict
