@@ -221,7 +221,7 @@ instance Show TypeName where
 -- @
 renderFullname :: TypeName -> T.Text
 renderFullname TN { baseName, namespace } =
-  T.intercalate "." namespace <> "." <> baseName
+  T.intercalate "." $ namespace ++ [baseName]
 
 -- | Parses a fullname into a 'TypeName', assuming the string
 -- representation is valid.
