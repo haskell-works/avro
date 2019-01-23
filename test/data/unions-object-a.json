@@ -13,6 +13,9 @@
       "stuff": "foo stuff"
     }
   },
+  "arrayAndMap" : {
+    "array" : ["foo"]
+  },
   "three": { "int": 37 },
   "four": { "string": "foo" },
   "five": {

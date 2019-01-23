@@ -27,7 +27,7 @@ module Data.Avro.Schema
   , validateSchema
   -- * Lower level utilities
   , typeName
-  , primitiveType
+  , isPrimitiveType
   , buildTypeEnvironment
   , extractBindings
 
@@ -296,26 +296,29 @@ typeName bt =
     Union (x:|_) _ -> typeName x
     _              -> renderFullname $ name bt
 
--- | If the given string is the name of a primitive type, return the
--- type, otherwise return 'Nothing'.
+-- | Returns whether the given 'Text' is the name of a primitive type.
 --
 -- @
--- λ> primitiveType "string"
--- Just String
--- λ> primitiveType "foo"
--- Nothing
+-- λ> isPrimitiveType "string"
+-- True
+-- λ> isPrimitiveType "array"
+-- True
+-- λ> isPrimitiveType "foo"
+-- False
 -- @
-primitiveType :: Text -> Maybe Type
-primitiveType = \case
-  "null"    -> Just Null
-  "boolean" -> Just Boolean
-  "int"     -> Just Int
-  "long"    -> Just Long
-  "float"   -> Just Float
-  "double"  -> Just Double
-  "bytes"   -> Just Bytes
-  "string"  -> Just String
-  _         -> Nothing
+isPrimitiveType :: Text -> Bool
+isPrimitiveType = (`elem` names)
+  where names = [ "null"
+                , "boolean"
+                , "int"
+                , "long"
+                , "float"
+                , "double"
+                , "bytes"
+                , "string"
+                , "array"
+                , "map"
+                ]
 
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]

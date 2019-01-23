@@ -97,7 +97,7 @@ decodeAvroJSON schema json =
       | otherwise      =
           let
             canonicalize name
-              | Just _ <- Schema.primitiveType name = name
+              | Schema.isPrimitiveType name = name
               | otherwise = Schema.renderFullname $ Schema.parseFullname name
             branch =
               head $ HashMap.keys obj
