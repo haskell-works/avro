@@ -8,6 +8,7 @@ import           Control.Monad        (forM_)
 
 import qualified Data.Aeson           as Aeson
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Map             as Map
 
 import           Data.Avro.Deriving
 import           Data.Avro.EitherN
@@ -69,24 +70,26 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
     let expected = EnumWrapper 37 "blarg" EnumReasonInstead
     parseJSON enumsExampleJSON `shouldBe` pure expected
   let unionsExampleA = Unions
-        { unionsScalars    = Left "blarg"
-        , unionsNullable   = Nothing
-        , unionsRecords    = Left $ Foo { fooStuff = "stuff" }
-        , unionsSameFields = Left $ Foo { fooStuff = "foo stuff" }
-        , unionsThree      = E3_1 37
-        , unionsFour       = E4_2 "foo"
-        , unionsFive       = E5_4 $ Foo { fooStuff = "foo stuff" }
+        { unionsScalars     = Left "blarg"
+        , unionsNullable    = Nothing
+        , unionsRecords     = Left $ Foo { fooStuff = "stuff" }
+        , unionsSameFields  = Left $ Foo { fooStuff = "foo stuff" }
+        , unionsArrayAndMap = Left ["foo"]
+        , unionsThree       = E3_1 37
+        , unionsFour        = E4_2 "foo"
+        , unionsFive        = E5_4 $ Foo { fooStuff = "foo stuff" }
         }
       unionsExampleB = Unions
-        { unionsScalars    = Right 37
-        , unionsNullable   = Just 42
-        , unionsRecords    = Right $ Bar { barStuff = "stuff"
-                                      , barThings = Foo "things"
-                                      }
-        , unionsSameFields = Right $ NotFoo { notFooStuff = "not foo stuff" }
-        , unionsThree      = E3_3 37
-        , unionsFour       = E4_4 $ Foo { fooStuff = "foo stuff" }
-        , unionsFive       = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
+        { unionsScalars     = Right 37
+        , unionsNullable    = Just 42
+        , unionsRecords     = Right $ Bar { barStuff = "stuff"
+                                          , barThings = Foo "things"
+                                          }
+        , unionsSameFields  = Right $ NotFoo { notFooStuff = "not foo stuff" }
+        , unionsArrayAndMap = Right $ Map.fromList [("a", 5)]
+        , unionsThree       = E3_3 37
+        , unionsFour        = E4_4 $ Foo { fooStuff = "foo stuff" }
+        , unionsFive        = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
         }
   it "should roundtrip (unions)" $ do
     forM_ [unionsExampleA, unionsExampleB] $ \ msg ->

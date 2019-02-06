@@ -18,6 +18,9 @@
       "stuff": "not foo stuff"
     }
   },
+  "arrayAndMap" : {
+    "map" : { "a" : 5 }
+  },
   "three": { "long": 37 },
   "four": {
     "haskell.avro.example.Foo": { "stuff" : "foo stuff" }

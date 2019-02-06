@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Avro supports a JSON representation of Avro objects alongside the
 -- Avro binary format. An Avro schema can be used to generate and
@@ -97,8 +98,8 @@ decodeAvroJSON schema json =
       | otherwise      =
           let
             canonicalize name
-              | Just _ <- Schema.primitiveType name = name
-              | otherwise = Schema.renderFullname $ Schema.parseFullname name
+              | isBuiltIn name = name
+              | otherwise      = Schema.renderFullname $ Schema.parseFullname name
             branch =
               head $ HashMap.keys obj
             names =
@@ -112,6 +113,9 @@ decodeAvroJSON schema json =
       Avro.Error "Invalid JSON representation for union: has to be a JSON object with exactly one field."
     union _ _ =
       error "Impossible: function given non-union schema."
+
+    isBuiltIn name = name `elem` [ "null", "boolean", "int", "long", "float"
+                                 , "double", "bytes", "string", "array", "map" ]
 
 -- | Convert a 'Aeson.Value' into a type that has an Avro schema. The
 -- schema is used to validate the JSON and will return an 'Error' if
