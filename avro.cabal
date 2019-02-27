@@ -95,7 +95,6 @@ library
     , fail
     , hashable
     , mtl
-    , pure-zlib
     , scientific
     , semigroups
     , tagged
@@ -103,6 +102,7 @@ library
     , tf-random
     , unordered-containers
     , vector
+    , zlib
   if flag(templatehaskell)
     other-extensions: TemplateHaskell
     build-depends:
