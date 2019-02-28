@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Avro.Decode.Get
@@ -31,6 +32,7 @@ import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 import           Prelude                    as P
 
+import           Data.Avro.Codec
 import           Data.Avro.DecodeRaw
 import           Data.Avro.Schema           as S
 import           Data.Avro.Zag
@@ -80,7 +82,7 @@ instance (GetAvro a, Ord a) => GetAvro (Set.Set a) where
 
 data ContainerHeader = ContainerHeader
   { syncBytes       :: !BL.ByteString
-  , decompress      :: BL.ByteString -> Get BL.ByteString
+  , decompress      :: forall a. BL.ByteString -> Get a -> Get a
   , containedSchema :: !Schema
   }
 
@@ -100,7 +102,10 @@ instance GetAvro ContainerHeader where
                   Just s  -> case A.eitherDecode' s of
                                 Left e  -> fail ("Can not decode container schema: " <> e)
                                 Right x -> return x
-      return ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
+      return ContainerHeader { syncBytes = sync
+                             , decompress = codecDecompress codec
+                             , containedSchema = schema
+                             }
    where avroMagicSize :: Integral a => a
          avroMagicSize = 4
 
@@ -111,14 +116,11 @@ instance GetAvro ContainerHeader where
          getFixed = G.getByteString
 
 
-getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
-getCodec code | Just "null"    <- code =
-                     return return
-              | Just "deflate" <- code =
-                     return (either (fail . show) return . Z.decompress)
-              | Just x <- code =
-                     fail ("Unrecognized codec: " <> BC.unpack x)
-              | otherwise = return return
+getCodec :: Monad m => Maybe BL.ByteString -> m Codec
+getCodec (Just "null") = pure nullCodec
+getCodec (Just "deflate") = pure deflateCodec
+getCodec (Just x) = fail $ "Unrecognized codec: " <> BC.unpack x
+getCodec Nothing = pure nullCodec
 
 
 --------------------------------------------------------------------------------

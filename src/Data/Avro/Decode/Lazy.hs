@@ -179,7 +179,7 @@ decodeRawBlocks bs =
         Left err                           -> Just (Left err, Nothing)
 
 getNextBlock :: BL.ByteString
-             -> (BL.ByteString -> Get BL.ByteString)
+             -> (BL.ByteString -> Get BL.ByteString -> Get BL.ByteString)
              -> BL.ByteString
              -> Either String (Maybe (Int, BL.ByteString, BL.ByteString))
 getNextBlock sync decompress bs =
@@ -192,11 +192,12 @@ getNextBlock sync decompress bs =
           Left err   -> Left err
           Right rest -> Right $ Just (nrObj, bytes, rest)
   where
-    getRawBlock :: (BL.ByteString -> Get BL.ByteString) -> Get (Int, BL.ByteString)
+    getRawBlock :: (BL.ByteString -> Get BL.ByteString -> Get BL.ByteString) -> Get (Int, BL.ByteString)
     getRawBlock decompress = do
       nrObj    <- getLong >>= sFromIntegral
       nrBytes  <- getLong
-      bytes    <- G.getLazyByteString nrBytes >>= decompress
+      compressed <- G.getLazyByteString nrBytes
+      bytes <- decompress compressed G.getRemainingLazyByteString
       pure (nrObj, bytes)
 
     checkMarker :: BL.ByteString -> BL.ByteString -> Either String BL.ByteString
