@@ -25,7 +25,8 @@ data Codec = Codec
     -- the chunk incrementally.
     --
     -- The API is somewhat more complex than say `codecCompress` to allow
-    -- interleaving of decompression and binary decoding.
+    -- interleaving of decompression and binary decoding while still allowing 
+    -- proper error handling without resorting to async exceptions.
   , codecDecompress :: forall a. LBS.ByteString -> G.Get a -> G.Get a
 
     -- | Compresses a lazy stream of bytes.
@@ -62,7 +63,7 @@ deflateCompress =
   Zlib.compress Zlib.rawFormat Zlib.defaultCompressParams
 
 
--- | Internal type to help constructy a lazy list of
+-- | Internal type to help construct a lazy list of
 -- decompressed bytes interleaved with errors if any.
 data Chunk
   = ChunkRest LBS.ByteString
@@ -73,7 +74,7 @@ data Chunk
 deflateDecompress :: forall a. LBS.ByteString -> G.Get a -> G.Get a
 deflateDecompress bytes parser = do
   let
-    -- N.B. this list is lazily created thus allowing us to
+    -- N.B. this list is lazily created which allows us to
     -- interleave decompression and binary decoding.
     chunks :: [Chunk]
     chunks =
