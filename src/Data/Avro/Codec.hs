@@ -9,7 +9,6 @@ module Data.Avro.Codec (
   ) where
 
 import           Codec.Compression.Zlib.Internal as Zlib
-import           Control.Monad.ST.Lazy
 import qualified Data.Binary.Get                 as G
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
