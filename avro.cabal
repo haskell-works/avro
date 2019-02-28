@@ -52,6 +52,7 @@ flag templatehaskell
 library
   exposed-modules:
       Data.Avro
+      Data.Avro.Codec
       Data.Avro.Decode
       Data.Avro.Decode.Get
       Data.Avro.Decode.Lazy
