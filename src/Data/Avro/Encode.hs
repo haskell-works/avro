@@ -56,6 +56,7 @@ import           System.Random.TF.Init      (initTFGen)
 import           System.Random.TF.Instances (randoms)
 import           Prelude                    as P
 
+import Data.Avro.Codec
 import Data.Avro.EncodeRaw
 import Data.Avro.HasAvroSchema
 import Data.Avro.Schema        as S
@@ -72,33 +73,39 @@ newSyncBytes = BL.pack . DL.take 16 . randoms <$> initTFGen
 
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers.
-encodeContainer :: EncodeAvro a => Schema -> [[a]] -> IO BL.ByteString
-encodeContainer sch xss =
+encodeContainer :: EncodeAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
+encodeContainer codec sch xss =
   do sync <- newSyncBytes
-     return $ encodeContainerWithSync sch sync xss
+     return $ encodeContainerWithSync codec sch sync xss
 
 -- | Creates an Avro container header for a given schema.
-containerHeaderWithSync :: Schema -> BL.ByteString -> Builder
-containerHeaderWithSync sch syncBytes =
-  lazyByteString avroMagicBytes <>
-  putAvro (HashMap.fromList [("avro.schema", A.encode sch), ("avro.codec","null")] :: HashMap Text BL.ByteString) <>
-  lazyByteString syncBytes
+containerHeaderWithSync :: Codec -> Schema -> BL.ByteString -> Builder
+containerHeaderWithSync codec sch syncBytes =
+  lazyByteString avroMagicBytes <> putAvro headers <> lazyByteString syncBytes
   where
     avroMagicBytes :: BL.ByteString
     avroMagicBytes = "Obj" <> BL.pack [1]
 
+    headers :: HashMap Text BL.ByteString
+    headers =
+      HashMap.fromList
+        [
+          ("avro.schema", A.encode sch)
+        , ("avro.codec", BL.fromStrict (codecName codec))
+        ]
+
 -- |Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
-encodeContainerWithSync :: EncodeAvro a => Schema -> BL.ByteString -> [[a]] -> BL.ByteString
-encodeContainerWithSync sch syncBytes xss =
+encodeContainerWithSync :: EncodeAvro a => Codec -> Schema -> BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync codec sch syncBytes xss =
  toLazyByteString $
-  containerHeaderWithSync sch syncBytes <>
+  containerHeaderWithSync codec sch syncBytes <>
   foldMap putBlocks xss
  where
   putBlocks ys =
     let nrObj    = P.length ys
         nrBytes  = BL.length theBytes
-        theBytes = toLazyByteString $ foldMap putAvro ys
+        theBytes = codecCompress codec $ toLazyByteString $ foldMap putAvro ys
     in putAvro nrObj <>
        putAvro nrBytes <>
        lazyByteString theBytes <>
@@ -106,47 +113,48 @@ encodeContainerWithSync sch syncBytes xss =
 
 -- | Packs a new container from a list of already encoded Avro blocks.
 -- Each block is denoted as a pair of a number of objects within that block and the block content.
-packContainerBlocks :: Schema -> [(Int, BL.ByteString)] -> IO BL.ByteString
-packContainerBlocks sch blocks = do
+packContainerBlocks :: Codec -> Schema -> [(Int, BL.ByteString)] -> IO BL.ByteString
+packContainerBlocks codec sch blocks = do
   sync <- newSyncBytes
-  pure $ packContainerBlocksWithSync sch sync blocks
+  pure $ packContainerBlocksWithSync codec sch sync blocks
 
 -- | Packs a new container from a list of already encoded Avro blocks.
 -- Each block is denoted as a pair of a number of objects within that block and the block content.
-packContainerBlocksWithSync :: Schema -> BL.ByteString -> [(Int, BL.ByteString)] -> BL.ByteString
-packContainerBlocksWithSync sch syncBytes blocks =
+packContainerBlocksWithSync :: Codec -> Schema -> BL.ByteString -> [(Int, BL.ByteString)] -> BL.ByteString
+packContainerBlocksWithSync codec sch syncBytes blocks =
   toLazyByteString $
-    containerHeaderWithSync sch syncBytes <>
+    containerHeaderWithSync codec sch syncBytes <>
     foldMap putBlock blocks
   where
     putBlock (nrObj, bytes) =
-      putAvro nrObj <>
-      putAvro (BL.length bytes) <>
-      lazyByteString bytes <>
-      lazyByteString syncBytes
+      let compressed = codecCompress codec bytes in
+        putAvro nrObj <>
+        putAvro (BL.length compressed) <>
+        lazyByteString compressed <>
+        lazyByteString syncBytes
 
 -- | Packs a container from a given list of already encoded Avro values
 -- Each bytestring should represent exactly one one value serialised to Avro.
-packContainerValues :: Schema -> [[BL.ByteString]] -> IO BL.ByteString
-packContainerValues sch values = do
+packContainerValues :: Codec -> Schema -> [[BL.ByteString]] -> IO BL.ByteString
+packContainerValues codec sch values = do
   sync <- newSyncBytes
-  pure $ packContainerValuesWithSync sch sync values
+  pure $ packContainerValuesWithSync codec sch sync values
 
 -- | Packs a container from a given list of already encoded Avro values
 -- Each bytestring should represent exactly one one value serialised to Avro.
-packContainerValuesWithSync :: Schema -> BL.ByteString -> [[BL.ByteString]] -> BL.ByteString
-packContainerValuesWithSync sch syncBytes values =
+packContainerValuesWithSync :: Codec -> Schema -> BL.ByteString -> [[BL.ByteString]] -> BL.ByteString
+packContainerValuesWithSync codec sch syncBytes values =
   toLazyByteString $
-    containerHeaderWithSync sch syncBytes <>
+    containerHeaderWithSync codec sch syncBytes <>
     foldMap putBlock values
   where
     putBlock ys =
       let nrObj = P.length ys
-          nrBytes = DL.foldl' (\a b -> BL.length b + a) 0 ys
-          theBytes = mconcat $ lazyByteString <$> ys
+          nrBytes = BL.length theBytes
+          theBytes = codecCompress codec $ toLazyByteString $ mconcat $ lazyByteString <$> ys
       in putAvro nrObj <>
          putAvro nrBytes <>
-         theBytes <>
+         lazyByteString theBytes <>
          lazyByteString syncBytes
 
 putAvro :: EncodeAvro a => a -> Builder
