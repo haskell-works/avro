@@ -6,7 +6,7 @@ module Avro.Decode.Lazy.RawBlocksSpec
 where
 
 import Data.Avro                     as A
-import Data.Avro.Codec (nullCodec)
+import Data.Avro.Codec               (nullCodec)
 import Data.Avro.Decode.Lazy         as DL
 import Data.Avro.Decode.Lazy.Convert as TC
 import Data.Avro.Deriving
