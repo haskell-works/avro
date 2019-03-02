@@ -82,7 +82,7 @@ instance (GetAvro a, Ord a) => GetAvro (Set.Set a) where
 
 data ContainerHeader = ContainerHeader
   { syncBytes       :: !BL.ByteString
-  , decompress      :: forall a. BL.ByteString -> Get a -> Get a
+  , decompress      :: forall a. Decompress a
   , containedSchema :: !Schema
   }
 

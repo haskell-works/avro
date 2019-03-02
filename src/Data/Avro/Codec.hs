@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Data.Avro.Codec (
     Codec(..)
+  , Decompress
   , nullCodec
   , deflateCodec
   ) where
@@ -13,6 +14,9 @@ import qualified Data.Binary.Get                 as G
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Lazy            as LBS
+
+-- | Block decompression function for blocks of Avro.
+type Decompress a = LBS.ByteString -> G.Get a -> Either String a
 
 -- | A `Codec` allows for compression/decompression of a block in an
 -- Avro container according to the Avro spec.
@@ -24,9 +28,9 @@ data Codec = Codec
     -- the chunk incrementally.
     --
     -- The API is somewhat more complex than say `codecCompress` to allow
-    -- interleaving of decompression and binary decoding while still allowing 
+    -- interleaving of decompression and binary decoding while still allowing
     -- proper error handling without resorting to async exceptions.
-  , codecDecompress :: forall a. LBS.ByteString -> G.Get a -> G.Get a
+  , codecDecompress :: forall a. Decompress a
 
     -- | Compresses a lazy stream of bytes.
   , codecCompress   :: LBS.ByteString -> LBS.ByteString
@@ -41,8 +45,8 @@ nullCodec =
       codecName = "null"
     , codecDecompress = \input parser ->
         case G.runGetOrFail parser input of
-          Right (_, _, x)  -> pure x
-          Left (_, _, err) -> fail err
+          Right (_, _, x)  -> Right x
+          Left (_, _, err) -> Left err
     , codecCompress   = id
     }
 
@@ -70,7 +74,7 @@ data Chunk
   | ChunkError Zlib.DecompressError
 
 
-deflateDecompress :: forall a. LBS.ByteString -> G.Get a -> G.Get a
+deflateDecompress :: forall a. LBS.ByteString -> G.Get a -> Either String a
 deflateDecompress bytes parser = do
   let
     -- N.B. this list is lazily created which allows us to
@@ -84,7 +88,7 @@ deflateDecompress bytes parser = do
         (Zlib.decompressST Zlib.rawFormat Zlib.defaultDecompressParams)
         bytes
 
-    decode :: G.Decoder a -> [Chunk] -> G.Get (G.Decoder a)
+    decode :: G.Decoder a -> [Chunk] -> Either String (G.Decoder a)
     decode !dec@G.Fail{} _ =
       -- short circuit if decoding failed
       pure dec
@@ -95,7 +99,7 @@ deflateDecompress bytes parser = do
         ChunkBytes x ->
           decode (G.pushChunk dec x) inchunks
         ChunkError err ->
-          fail (show err)
+          Left (show err)
         ChunkRest rest -> do
           let
             dec' = G.pushEndOfInput dec
@@ -105,8 +109,8 @@ deflateDecompress bytes parser = do
 
   case dec of
     G.Fail _ _ err ->
-      fail err
+      Left err
     G.Partial{} ->
-      fail "Not enough input"
+      Left "deflate: Not enough input"
     G.Done _ _ x ->
-      pure x
+      Right x

@@ -72,7 +72,7 @@ getContainerWith schemaToGet =
    do ContainerHeader {..} <- getAvro
       (containedSchema,) <$> getBlocks (schemaToGet containedSchema) syncBytes decompress
   where
-  getBlocks :: Get a -> BL.ByteString -> (forall x. BL.ByteString -> Get x -> Get x) -> Get [[a]]
+  getBlocks :: Get a -> BL.ByteString -> (forall x. Decompress x) -> Get [[a]]
   getBlocks getValue sync decompress = do
     isEmpty <- G.isEmpty
     if isEmpty
@@ -81,7 +81,9 @@ getContainerWith schemaToGet =
         nrObj    <- sFromIntegral =<< getLong
         nrBytes  <- getLong
         bytes    <- G.getLazyByteString nrBytes
-        r        <- decompress bytes (replicateM nrObj getValue)
+        r        <- case decompress bytes (replicateM nrObj getValue) of
+          Left err -> fail err
+          Right x -> pure x
         marker   <- G.getLazyByteString nrSyncBytes
         when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
         (r :) <$> getBlocks getValue sync decompress
