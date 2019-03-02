@@ -159,15 +159,12 @@ getContainerValues = getContainerValuesWith getAvroOf
 --
 -- The "outer" error represents the error in opening the container itself
 -- (including problems like reading schemas embedded into the container.)
-decodeRawBlocks :: (Schema -> Get a) -> BL.ByteString -> Either String (Schema, [Either String (Int, a)])
-decodeRawBlocks decodeBlock bs =
+decodeRawBlocks :: BL.ByteString -> Either String (Schema, [Either String (Int, BL.ByteString)])
+decodeRawBlocks bs =
   case runGetOrFail getAvro bs of
     Left (bs', _, err) -> Left err
     Right (bs', _, ContainerHeader {..}) ->
-      let
-        decode = decodeBlock containedSchema
-        decompress' = \bs -> decompress bs decode
-        blocks = allBlocks syncBytes decompress' bs'
+      let blocks = allBlocks syncBytes decompress bs'
       in Right (containedSchema, blocks)
   where
     allBlocks sync decompress bytes =
@@ -181,11 +178,10 @@ decodeRawBlocks decodeBlock bs =
         Right Nothing                      -> Nothing
         Left err                           -> Just (Left err, Nothing)
 
-getNextBlock :: forall a
-             .  BL.ByteString
-             -> (BL.ByteString -> Get a)
+getNextBlock :: BL.ByteString
+             -> (BL.ByteString -> Get BL.ByteString -> Get BL.ByteString)
              -> BL.ByteString
-             -> Either String (Maybe (Int, a, BL.ByteString))
+             -> Either String (Maybe (Int, BL.ByteString, BL.ByteString))
 getNextBlock sync decompress bs =
   if BL.null bs
     then Right Nothing
@@ -196,12 +192,12 @@ getNextBlock sync decompress bs =
           Left err   -> Left err
           Right rest -> Right $ Just (nrObj, bytes, rest)
   where
-    getRawBlock :: (BL.ByteString -> Get a) -> Get (Int, a)
+    getRawBlock :: (BL.ByteString -> Get BL.ByteString -> Get BL.ByteString) -> Get (Int, BL.ByteString)
     getRawBlock decompress = do
       nrObj    <- getLong >>= sFromIntegral
       nrBytes  <- getLong
       compressed <- G.getLazyByteString nrBytes
-      bytes <- decompress compressed
+      bytes <- decompress compressed G.getRemainingLazyByteString
       pure (nrObj, bytes)
 
     checkMarker :: BL.ByteString -> BL.ByteString -> Either String BL.ByteString
@@ -214,7 +210,7 @@ getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValu
                  -> BL.ByteString
                  -> Either String (Schema, [[T.LazyValue Type]])
 getContainerValuesWith schemaToGet bs =
-  case decodeRawBlocks (const G.getRemainingLazyByteString) bs of
+  case decodeRawBlocks bs of
     Left err            -> Left err
     Right (sch, blocks) -> Right (sch, decodeBlocks (schemaToGet sch) blocks)
   where
@@ -263,9 +259,17 @@ getContainerValuesBytes' =
 
 extractContainerValues :: (Schema -> Get a) -> BL.ByteString -> Either String (Schema, [Either String a])
 extractContainerValues f bs =
-  case decodeRawBlocks f bs of
+  case decodeRawBlocks bs of
     Left err            -> Left err
-    Right (sch, blocks) -> Right (sch, fmap (fmap snd) blocks)
+    Right (sch, blocks) -> Right (sch, blocks >>= decodeBlock sch)
+  where
+    decodeBlock _ (Left err)               = undefined
+    decodeBlock sch (Right (nrObj, bytes)) = snd $ consumeN (fromIntegral nrObj) (decodeValue sch) bytes
+
+    decodeValue sch bytes =
+      case G.runGetOrFail (f sch) bytes of
+        Left (bs', _, err)  -> (bs', Left err)
+        Right (bs', _, res) -> (bs', Right res)
 
 consumeN :: Int64 -> (a -> (a, b)) -> a -> (a, [b])
 consumeN n f a =
