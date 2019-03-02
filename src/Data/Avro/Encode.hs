@@ -72,7 +72,8 @@ newSyncBytes :: IO BL.ByteString
 newSyncBytes = BL.pack . DL.take 16 . randoms <$> initTFGen
 
 -- |Encode chunks of objects into a container, using 16 random bytes for
--- the synchronization markers.
+-- the synchronization markers. Blocks are compressed (or not) according
+-- to the given `Codec` (`nullCodec` or `deflateCodec`).
 encodeContainer :: EncodeAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
 encodeContainer codec sch xss =
   do sync <- newSyncBytes
