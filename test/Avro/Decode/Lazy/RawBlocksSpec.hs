@@ -11,7 +11,6 @@ import Data.Avro.Decode.Lazy         as DL
 import Data.Avro.Decode.Lazy.Convert as TC
 import Data.Avro.Deriving
 import Data.Avro.Encode              (packContainerBlocks, packContainerValues)
-import Data.Binary.Get               (getRemainingLazyByteString)
 import Data.Either                   (isLeft, isRight, rights)
 import Data.List                     (unfoldr)
 import Data.Semigroup                ((<>))
@@ -25,23 +24,21 @@ deriveAvro "test/data/small.avsc"
 
 spec :: Spec
 spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
-  let
-    decodeRawBlocks = DL.decodeRawBlocks (const getRemainingLazyByteString)
 
   it "should decode empty container" $ do
     empty <- A.encodeContainer ([] :: [[Endpoint]])
-    decodeRawBlocks empty `shouldBe` Right (schema'Endpoint, [])
+    DL.decodeRawBlocks empty `shouldBe` Right (schema'Endpoint, [])
 
   it "should decode container with one block" $ do
     container <- A.encodeContainer [mkEndpoint <$> [1, 2]]
-    let Right (s, bs) = decodeRawBlocks container
+    let Right (s, bs) = DL.decodeRawBlocks container
     s `shouldBe` schema'Endpoint
     fmap fst <$> bs `shouldBe` [Right 2]
     sequence bs `shouldSatisfy` isRight
 
   it "should decode container with multiple blocks" $ do
     container <- A.encodeContainer (chunksOf 4 $ mkEndpoint <$> [1..10])
-    let Right (s, bs) = decodeRawBlocks container
+    let Right (s, bs) = DL.decodeRawBlocks container
     s `shouldBe` schema'Endpoint
     fmap fst <$> bs `shouldBe` [Right 4, Right 4, Right 2]
     sequence bs `shouldSatisfy` isRight
@@ -49,7 +46,7 @@ spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
   it "should repack container" $ do
     let srcValues = mkEndpoint <$> [1..19]
     srcContainer <- A.encodeContainer (chunksOf 4 srcValues)
-    let Right (s, bs) = decodeRawBlocks srcContainer
+    let Right (s, bs) = DL.decodeRawBlocks srcContainer
     tgtContainer <- packContainerBlocks nullCodec s (rights bs)
     let tgtValues = DL.decodeContainer tgtContainer
     let allTgtValues = rights tgtValues
@@ -60,7 +57,7 @@ spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
     let values = A.encode <$> srcValues
     container <- packContainerValues nullCodec schema'Endpoint (chunksOf 4 values)
 
-    let Right (s, bs) = decodeRawBlocks container
+    let Right (s, bs) = DL.decodeRawBlocks container
     s `shouldBe` schema'Endpoint
     fst <$> rights bs `shouldBe` [4,4,4,4,3]
 
