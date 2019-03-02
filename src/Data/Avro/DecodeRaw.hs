@@ -12,7 +12,7 @@ import Data.Word
 getNonNegative :: (Bits i, Integral i) => Get i
 getNonNegative = do
   orig <- getWord8s
-  return (foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig))
+  return $! (foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig))
 
 getWord8s :: Get [Word8]
 getWord8s = do

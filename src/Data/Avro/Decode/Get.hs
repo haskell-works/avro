@@ -127,7 +127,7 @@ getCodec code | Just "null"    <- code =
 getBoolean :: Get Bool
 getBoolean =
  do w <- G.getWord8
-    return (w == 0x01)
+    return $! (w == 0x01)
 
 -- |Get a 32-bit int (zigzag encoded, max of 5 bytes)
 getInt :: Get Int32
