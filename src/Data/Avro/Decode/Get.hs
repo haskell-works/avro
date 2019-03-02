@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -147,7 +148,7 @@ getString = do
   bytes <- getBytes
   case Text.decodeUtf8' bytes of
     Left unicodeExc -> fail (show unicodeExc)
-    Right text -> return text
+    Right text      -> return text
 
 -- a la Java:
 --  Bit 31 (the bit that is selected by the mask 0x80000000) represents the
@@ -208,14 +209,17 @@ decodeBlocks element = do
      -- array block
      | count < 0  -> do
          _bytes <- getLong
-         items  <- replicateM (fromIntegral $ abs count) element
+         items  <- replicateM (fromIntegral $ abs count) element'
          rest   <- decodeBlocks element
          pure $ items <> rest
 
      | otherwise  -> do
-         items <- replicateM (fromIntegral count) element
+         items <- replicateM (fromIntegral count) element'
          rest  <- decodeBlocks element
          pure $ items <> rest
+  where element' = do
+          !x <- element
+          pure x
 
 -- Safe-ish from integral
 sFromIntegral :: forall a b m. (Monad m, Bounded a, Bounded b, Integral a, Integral b) => a -> m b
