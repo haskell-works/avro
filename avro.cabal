@@ -52,6 +52,7 @@ flag templatehaskell
 library
   exposed-modules:
       Data.Avro
+      Data.Avro.Codec
       Data.Avro.Decode
       Data.Avro.Decode.Get
       Data.Avro.Decode.Lazy
@@ -95,7 +96,6 @@ library
     , fail
     , hashable
     , mtl
-    , pure-zlib
     , scientific
     , semigroups
     , tagged
@@ -103,6 +103,7 @@ library
     , tf-random
     , unordered-containers
     , vector
+    , zlib
   if flag(templatehaskell)
     other-extensions: TemplateHaskell
     build-depends:
@@ -114,6 +115,7 @@ library
 test-suite test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
+  build-tool-depends: hspec-discover:hspec-discover
   other-modules:
       Avro.Codec.ArraySpec
       Avro.Codec.BoolSpec

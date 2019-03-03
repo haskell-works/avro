@@ -114,6 +114,7 @@ import qualified Data.Vector           as V
 import           Data.Word
 import           Prelude               as P
 
+import Data.Avro.Codec (nullCodec)
 import Data.Avro.FromAvro
 import Data.Avro.HasAvroSchema
 import Data.Avro.ToAvro
@@ -170,16 +171,16 @@ encode = E.encodeAvro . toAvro
 encodeContainer :: forall a. ToAvro a => [[a]] -> IO BL.ByteString
 encodeContainer =
   let sch = untag (schema :: Tagged a Schema)
-  in E.encodeContainer sch . map (map toAvro)
+  in E.encodeContainer nullCodec sch . map (map toAvro)
 
 -- | Encode chunks of objects into a container, using the provided
--- ByteString as the synchronization markers
+-- ByteString as the synchronization markers.
 encodeContainerWithSync :: forall a. ToAvro a => (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
 encodeContainerWithSync (a,b,c,d) =
   let
     sch = untag (schema :: Tagged a Schema)
     syncBytes = P.runPut $ mapM_ P.putWord64le [a,b,c,d]
-  in E.encodeContainerWithSync sch syncBytes . map (map toAvro)
+  in E.encodeContainerWithSync nullCodec sch syncBytes . map (map toAvro)
 
 -- |Like 'decodeContainer' but returns the avro-encoded bytes for each
 -- object in the container instead of the Haskell type.

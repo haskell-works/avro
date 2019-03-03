@@ -29,7 +29,6 @@ module Data.Avro.Decode.Lazy
   , badValue
   ) where
 
-import qualified Codec.Compression.Zlib     as Z
 import           Control.Monad              (foldM, replicateM, when)
 import qualified Data.Aeson                 as A
 import qualified Data.Array                 as Array
@@ -56,6 +55,7 @@ import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 import           Prelude                    as P
 
+import           Data.Avro.Codec (Decompress)
 import qualified Data.Avro.Decode.Lazy.LazyValue as T
 import           Data.Avro.DecodeRaw
 import           Data.Avro.HasAvroSchema         (schema)
@@ -179,7 +179,7 @@ decodeRawBlocks bs =
         Left err                           -> Just (Left err, Nothing)
 
 getNextBlock :: BL.ByteString
-             -> (BL.ByteString -> Get BL.ByteString)
+             -> Decompress BL.ByteString
              -> BL.ByteString
              -> Either String (Maybe (Int, BL.ByteString, BL.ByteString))
 getNextBlock sync decompress bs =
@@ -192,11 +192,14 @@ getNextBlock sync decompress bs =
           Left err   -> Left err
           Right rest -> Right $ Just (nrObj, bytes, rest)
   where
-    getRawBlock :: (BL.ByteString -> Get BL.ByteString) -> Get (Int, BL.ByteString)
+    getRawBlock :: Decompress BL.ByteString -> Get (Int, BL.ByteString)
     getRawBlock decompress = do
       nrObj    <- getLong >>= sFromIntegral
       nrBytes  <- getLong
-      bytes    <- G.getLazyByteString nrBytes >>= decompress
+      compressed <- G.getLazyByteString nrBytes
+      bytes <- case decompress compressed G.getRemainingLazyByteString of
+        Right x -> pure x
+        Left err -> fail err
       pure (nrObj, bytes)
 
     checkMarker :: BL.ByteString -> BL.ByteString -> Either String BL.ByteString

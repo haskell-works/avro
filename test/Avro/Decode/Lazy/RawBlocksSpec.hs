@@ -6,6 +6,7 @@ module Avro.Decode.Lazy.RawBlocksSpec
 where
 
 import Data.Avro                     as A
+import Data.Avro.Codec               (nullCodec)
 import Data.Avro.Decode.Lazy         as DL
 import Data.Avro.Decode.Lazy.Convert as TC
 import Data.Avro.Deriving
@@ -46,7 +47,7 @@ spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
     let srcValues = mkEndpoint <$> [1..19]
     srcContainer <- A.encodeContainer (chunksOf 4 srcValues)
     let Right (s, bs) = DL.decodeRawBlocks srcContainer
-    tgtContainer <- packContainerBlocks s (rights bs)
+    tgtContainer <- packContainerBlocks nullCodec s (rights bs)
     let tgtValues = DL.decodeContainer tgtContainer
     let allTgtValues = rights tgtValues
     allTgtValues `shouldBe` srcValues
@@ -54,7 +55,7 @@ spec = describe "Avro.Decode.Lazy.RawBlocksSpec" $ do
   it "should pack container with individual values" $ do
     let srcValues = mkEndpoint <$> [1..19]
     let values = A.encode <$> srcValues
-    container <- packContainerValues schema'Endpoint (chunksOf 4 values)
+    container <- packContainerValues nullCodec schema'Endpoint (chunksOf 4 values)
 
     let Right (s, bs) = DL.decodeRawBlocks container
     s `shouldBe` schema'Endpoint

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
@@ -39,6 +40,7 @@ import qualified Data.Text.Encoding               as Text
 import qualified Data.Vector                      as V
 import           Prelude                          as P
 
+import           Data.Avro.Codec
 import           Data.Avro.Decode.Get
 import           Data.Avro.DecodeRaw
 import           Data.Avro.Schema                 as S
@@ -70,7 +72,7 @@ getContainerWith schemaToGet =
    do ContainerHeader {..} <- getAvro
       (containedSchema,) <$> getBlocks (schemaToGet containedSchema) syncBytes decompress
   where
-  getBlocks :: Get a -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[a]]
+  getBlocks :: Get a -> BL.ByteString -> (forall x. Decompress x) -> Get [[a]]
   getBlocks getValue sync decompress = do
     isEmpty <- G.isEmpty
     if isEmpty
@@ -78,19 +80,10 @@ getContainerWith schemaToGet =
       else do
         nrObj    <- sFromIntegral =<< getLong
         nrBytes  <- getLong
-        bytes    <- decompress =<< G.getLazyByteString nrBytes
-        r        <- case runGetOrFail (replicateM nrObj getValue) bytes of
-                      Right (_,_,x) -> return x
-                      Left (_,_,s)  -> fail s
+        bytes    <- G.getLazyByteString nrBytes
+        r        <- case decompress bytes (replicateM nrObj getValue) of
+          Left err -> fail err
+          Right x -> pure x
         marker   <- G.getLazyByteString nrSyncBytes
         when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
         (r :) <$> getBlocks getValue sync decompress
-
-getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
-getCodec code | Just "null"    <- code =
-                     return return
-              | Just "deflate" <- code =
-                     return (either (fail . show) return . Z.decompress)
-              | Just x <- code =
-                     fail ("Unrecognized codec: " <> BC.unpack x)
-              | otherwise = return return

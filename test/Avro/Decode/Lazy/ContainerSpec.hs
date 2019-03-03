@@ -6,13 +6,16 @@ module Avro.Decode.Lazy.ContainerSpec
 where
 
 import           Data.Avro                     as A
+import           Data.Avro.Codec               as A
 import           Data.Avro.Decode.Lazy         as DL
 import           Data.Avro.Decode.Lazy.Convert as TC
 import           Data.Avro.Deriving
+import           Data.Avro.Encode              as E
 import           Data.Either                   (isLeft)
 import           Data.List                     (unfoldr)
 import           Data.Semigroup                ((<>))
 import           Data.Text                     (pack)
+import Data.ByteString.Char8 (unpack)
 
 import           Test.Hspec
 
@@ -21,35 +24,45 @@ import           Test.Hspec
 deriveAvro "test/data/small.avsc"
 
 spec :: Spec
-spec = describe "Avro.Decode.Lazy.ContainerSpec" $ do
+spec = do
+  containerSpec A.nullCodec
+  containerSpec A.deflateCodec
+
+containerSpec :: A.Codec -> Spec
+containerSpec codec = describe title $ do
 
   it "should decode empty container" $
-    encodeThenDecode ([] :: [[Endpoint]]) >>= (`shouldBe` [])
+    encodeThenDecode codec ([] :: [[Endpoint]]) >>= (`shouldBe` [])
 
   it "should decode container with one block" $ do
     let msg = mkEndpoint 1
-    res <- encodeThenDecode [[msg]]
+    res <- encodeThenDecode codec [[msg]]
     sequence res `shouldBe` Right [msg]
 
   it "should decode container with empty blocks" $ do
     let msg = mkEndpoint 1
-    res <- encodeThenDecode [[msg], [], []]
+    res <- encodeThenDecode codec [[msg], [], []]
     sequence res `shouldBe` Right [msg]
 
   it "should decode container with empty blocks in between" $ do
     let (msg1, msg2) = (mkEndpoint 1, mkEndpoint 2)
-    res <- encodeThenDecode [[msg1], [], [], [msg2]]
+    res <- encodeThenDecode codec [[msg1], [], [], [msg2]]
     sequence res `shouldBe` Right [msg1, msg2]
 
   it "should decode container with multiple blocks" $ do
     let msgs = mkEndpoint <$> [1..10]
     let chunks = chunksOf 4 msgs
-    res <- encodeThenDecode chunks
+    res <- encodeThenDecode codec chunks
     sequence res `shouldBe` Right msgs
+  where
+    title =
+      "Avro.Decode.Lazy.ContainerSpec (" ++ unpack (A.codecName codec) ++ ")"
 
-encodeThenDecode :: (FromLazyAvro a, ToAvro a) => [[a]] -> IO [Either String a]
-encodeThenDecode as =
-  DL.decodeContainer <$> A.encodeContainer as
+
+encodeThenDecode :: forall a. (FromLazyAvro a, ToAvro a) => A.Codec -> [[a]] -> IO [Either String a]
+encodeThenDecode codec as =
+  DL.decodeContainer <$>
+    E.encodeContainer codec (schemaOf (undefined :: a)) (fmap (fmap toAvro) as)
 
 mkEndpoint :: Int -> Endpoint
 mkEndpoint i =
