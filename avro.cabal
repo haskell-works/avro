@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: >=1.12
 
 name:           avro
 version:        0.4.2.0
@@ -78,11 +78,9 @@ library
       Data.Avro.Types.Value
       Data.Avro.Zag
       Data.Avro.Zig
-  other-modules:
-      Paths_avro
-  hs-source-dirs:
-      src
+  hs-source-dirs: src
   other-extensions: OverloadedStrings
+  default-language: Haskell2010
   build-depends:
       aeson
     , array
@@ -111,10 +109,11 @@ library
         template-haskell >=2.4
   if flag(dev)
     ghc-options: -Wall -Werror
-  default-language: Haskell2010
 
 test-suite test
   type: exitcode-stdio-1.0
+  ghc-options: -threaded
+  default-language: Haskell2010
   main-is: Spec.hs
   build-tool-depends: hspec-discover:hspec-discover
   other-modules:
@@ -151,9 +150,7 @@ test-suite test
       DecodeContainer
       Example1
       Paths_avro
-  hs-source-dirs:
-      test
-  ghc-options: -threaded
+  hs-source-dirs: test
   build-depends:
       QuickCheck
     , aeson
@@ -188,9 +185,10 @@ test-suite test
         template-haskell
   if flag(dev)
     ghc-options: -Wall -Werror
-  default-language: Haskell2010
+
 
 benchmark bench-time
+  default-language: Haskell2010
   type: exitcode-stdio-1.0
   main-is: Time.hs
   hs-source-dirs: bench

@@ -4,22 +4,22 @@
 {-# LANGUAGE TemplateHaskell     #-}
 module Avro.JSONSpec where
 
-import           Control.Monad        (forM_)
+import Control.Monad (forM_)
 
 import qualified Data.Aeson           as Aeson
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map             as Map
 
-import           Data.Avro.Deriving
-import           Data.Avro.EitherN
-import           Data.Avro.JSON
+import Data.Avro.Deriving
+import Data.Avro.EitherN
+import Data.Avro.JSON
 
-import           Test.Hspec
+import Test.Hspec
 
-import           Paths_avro
+import Paths_avro
 
-import           System.Directory     (doesFileExist, getCurrentDirectory)
-import           System.Environment   (setEnv)
+import System.Directory   (doesFileExist, getCurrentDirectory)
+import System.Environment (setEnv)
 
 deriveAvro "test/data/enums.avsc"
 deriveAvro "test/data/reused.avsc"
