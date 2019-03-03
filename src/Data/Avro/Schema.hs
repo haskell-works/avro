@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -46,37 +48,41 @@ module Data.Avro.Schema
   ) where
 
 import           Control.Applicative
+import           Control.DeepSeq            (NFData)
 import           Control.Monad.Except
 import qualified Control.Monad.Fail         as MF
 import           Control.Monad.State.Strict
 
-import           Data.Aeson             (FromJSON (..), ToJSON (..), object, (.!=), (.:), (.:!), (.:?), (.=))
-import qualified Data.Aeson             as A
-import           Data.Aeson.Types       (Parser, typeMismatch)
-import qualified Data.Avro.Types        as Ty
-import qualified Data.ByteString        as B
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.Char              as Char
-import           Data.Function          (on)
+import           Data.Aeson                 (FromJSON (..), ToJSON (..), object,
+                                             (.!=), (.:), (.:!), (.:?), (.=))
+import qualified Data.Aeson                 as A
+import           Data.Aeson.Types           (Parser, typeMismatch)
+import qualified Data.Avro.Types            as Ty
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Base16     as Base16
+import qualified Data.Char                  as Char
+import           Data.Function              (on)
 import           Data.Hashable
-import qualified Data.HashMap.Strict    as HashMap
+import qualified Data.HashMap.Strict        as HashMap
 import           Data.Int
-import qualified Data.IntMap            as IM
-import qualified Data.List              as L
-import           Data.List.NonEmpty     (NonEmpty (..))
-import qualified Data.List.NonEmpty     as NE
-import           Data.Maybe             (catMaybes, fromMaybe, isJust)
-import           Data.Monoid            (First (..))
+import qualified Data.IntMap                as IM
+import qualified Data.List                  as L
+import           Data.List.NonEmpty         (NonEmpty (..))
+import qualified Data.List.NonEmpty         as NE
+import           Data.Maybe                 (catMaybes, fromMaybe, isJust)
+import           Data.Monoid                (First (..))
 import           Data.Semigroup
-import qualified Data.Set               as S
+import qualified Data.Set                   as S
 import           Data.String
-import           Data.Text              (Text)
-import qualified Data.Text              as T
-import           Data.Text.Encoding     as T
-import qualified Data.Vector            as V
-import           Prelude                as P
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Data.Text.Encoding         as T
+import qualified Data.Vector                as V
+import           Prelude                    as P
 
-import Text.Show.Functions ()
+import           GHC.Generics               (Generic)
+
+import           Text.Show.Functions        ()
 
 -- |An Avro schema is either
 -- * A "JSON object in the form `{"type":"typeName" ...`
@@ -121,7 +127,7 @@ data Type
               , aliases :: [TypeName]
               , size    :: Int
               }
-    deriving (Show)
+    deriving (Show, Generic, NFData)
 
 instance Eq Type where
   Null == Null = True
@@ -195,7 +201,7 @@ mkUnion os = Union os (\i -> IM.lookup (fromIntegral i) mp)
 data TypeName = TN { baseName  :: T.Text
                    , namespace :: [T.Text]
                    }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, NFData)
 
 -- | Show the 'TypeName' as a string literal compatible with its
 -- 'IsString' instance.
@@ -302,10 +308,10 @@ data Field = Field { fldName    :: Text
                    , fldType    :: Type
                    , fldDefault :: Maybe (Ty.Value Type)
                    }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 data Order = Ascending | Descending | Ignore
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 instance FromJSON Type where
   parseJSON = parseSchemaJSON Nothing

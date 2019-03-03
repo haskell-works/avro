@@ -1,4 +1,8 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
 module Data.Avro.Types.Value where
+
+import           Control.DeepSeq     (NFData)
 
 import           Data.ByteString
 import           Data.HashMap.Strict (HashMap)
@@ -6,6 +10,8 @@ import           Data.Int
 import           Data.List.NonEmpty  (NonEmpty)
 import           Data.Text
 import           Data.Vector
+
+import           GHC.Generics        (Generic)
 
 data Value f
       = Null
@@ -22,4 +28,4 @@ data Value f
       | Union (NonEmpty f) f (Value f) -- ^ Set of union options, schema for selected option, and the actual value.
       | Fixed f {-# UNPACK #-} !ByteString
       | Enum f {-# UNPACK #-} !Int Text  -- ^ An enum is a set of the possible symbols (the schema) and the selected symbol
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
