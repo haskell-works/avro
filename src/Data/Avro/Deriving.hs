@@ -288,6 +288,12 @@ deriveAvro = deriveAvroWithOptions defaultDeriveOptions
 deriveAvro' :: Schema -> Q [Dec]
 deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
 
+-- | Same as 'deriveAvro' but takes a ByteString rather than FilePath
+deriveAvroFromByteString :: LBS.ByteString -> Q [Dec]
+deriveAvroFromByteString bs = case eitherDecode bs of
+    Right schema -> deriveAvroWithOptions' defaultDeriveOptions schema
+    Left err     -> fail $ "Unable to generate AVRO for bytestring: " <> err
+
 -- | Same as 'deriveFromAvroWithOptions' but uses
 -- 'defaultDeriveOptions'.
 --
