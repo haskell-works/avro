@@ -26,6 +26,7 @@ module Data.Avro.Deriving
   , deriveAvroWithOptions
   , deriveAvroWithOptions'
   , deriveFromAvroWithOptions
+  , deriveAvroFromByteString
   , deriveAvro
   , deriveAvro'
   , deriveFromAvro
