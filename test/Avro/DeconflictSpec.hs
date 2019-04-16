@@ -1,21 +1,22 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Avro.DeconflictSpec
-where
 
-import           Data.Avro              as A
-import qualified Data.Avro.Decode       as A (decodeAvro)
-import           Data.Avro.Deconflict
-import           Data.Avro.Deriving
-import           Data.Avro.Schema
-import qualified Data.Avro.Types        as Ty
-import           Data.Either
-import           Data.List.NonEmpty     (NonEmpty (..))
+module Avro.DeconflictSpec where
+
+import Data.Avro            as A
+import Data.Avro.Deconflict
+import Data.Avro.Deriving
+import Data.Avro.Schema
+import Data.Either
+import Data.List.NonEmpty   (NonEmpty (..))
 
 import qualified Avro.Deconflict.Reader as R
 import qualified Avro.Deconflict.Writer as W
+import qualified Data.Avro.Decode       as A (decodeAvro)
+import qualified Data.Avro.Decode.Lazy  as AL
+import qualified Data.Avro.Types        as Ty
 
-import           Test.Hspec
+import Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
@@ -37,4 +38,16 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     fromAvro deconflicted `shouldBe` Success (R.Outer "Peone" (R.Inner 3 Nothing))
 
+  it "should deconflict via strict containers" $ do
+    w <- A.encodeContainer [[W.Outer "Peone" (W.Inner 3)]]
 
+    let r = A.decodeContainer w :: [[R.Outer]]
+
+    r `shouldBe` [[R.Outer "Peone" (R.Inner 3 Nothing)]]
+
+  it "should deconflict via lazy containers" $ do
+    w <- A.encodeContainer [[W.Outer "Peone" (W.Inner 3)]]
+
+    let r = AL.decodeContainer w :: [Either String R.Outer]
+
+    r `shouldBe` [Right (R.Outer "Peone" (R.Inner 3 Nothing))]
