@@ -38,3 +38,17 @@ deriveAvroFromByteString [r|
 }
 ]
 |]
+
+sampleValue :: Foo
+sampleValue = Foo
+  { fooFieldA = Just Goo
+    { gooFieldB1 = Moo
+      { mooName     = "X"
+      , mooFullName = Nothing
+      }
+    , gooFieldB2 = Moo
+      { mooName     = "X"
+      , mooFullName = Nothing
+      }
+    }
+  }
