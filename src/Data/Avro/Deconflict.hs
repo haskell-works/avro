@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 module Data.Avro.Deconflict
   ( deconflict
+  , deconflictNoResolve
   ) where
 
 import           Control.Applicative ((<|>))
@@ -20,14 +21,39 @@ import qualified Data.Text.Encoding  as Text
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
 -- reader's schema.
+--
+-- 'deconflict' will attempt resolving 'TypedName' constructors to make sure that
+-- they are handled correctly. This has a performance impact.
+-- To avoid it use 'deconflictNoResolve' when possible.
 deconflict :: Schema        -- ^ Writer schema
            -> Schema        -- ^ Reader schema
            -> T.Value Type
            -> Either String (T.Value Type)
-deconflict = resolveSchema
+deconflict writerSchema readerSchema =
+  deconflictNoResolve (S.overlay writerSchema writerSchema) (S.overlay readerSchema readerSchema)
 
-resolveSchema :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveSchema writerSchema readerSchema v
+-- | @deconflict writer reader val@ will convert a value that was
+-- encoded/decoded with the writer's schema into the form specified by the
+-- reader's schema.
+--
+-- A faster version of 'deconflict' which does not attempt to resolve 'TypedName' references.
+-- It still checks if the referenced type has the same name, but does not traverses these references.
+--
+-- 'deconflictNoResolve' should typically be used when a number of values are decoded with
+-- the same reader and writer schemas. In this case schemas can only be resolved once
+-- to be used in 'deconflictNoResolve'.
+deconflictNoResolve :: Schema         -- ^ Writer schema
+                    -> Schema         -- ^ Reader schema
+                    -> T.Value Type
+                    -> Either String (T.Value Type)
+deconflictNoResolve writerSchema readerSchema =
+  deconflictValue writerSchema readerSchema
+
+deconflictValue :: Schema
+              -> Schema
+              -> T.Value Type
+              -> Either String (T.Value Type)
+deconflictValue writerSchema readerSchema v
   | writerSchema == readerSchema    = Right v
   | otherwise = go writerSchema readerSchema v
   where
@@ -37,17 +63,17 @@ resolveSchema writerSchema readerSchema v
   go (S.Map aTy) (S.Map bTy) (T.Map mp)    =
        T.Map <$> mapM (go aTy bTy) mp
   go a@S.Enum {} b@S.Enum {} val
-       | name a == name b = resolveEnum a b val
+       | name a == name b = deconflictEnum a b val
   go a@S.Fixed {} b@S.Fixed {} val
        | name a == name b && size a == size b = Right val
   go a@S.Record {} b@S.Record {} val
-       | name a == name b = resolveRecord a b val
+       | name a == name b = deconflictRecord a b val
   go (S.Union _ _) (S.Union ys _) val =
-       resolveTwoUnions ys val
+       deconflictTwoUnions ys val
   go nonUnion (S.Union ys _) val =
-       resolveReaderUnion nonUnion ys val
+       deconflictReaderUnion nonUnion ys val
   go (S.Union _xs _) nonUnion val =
-       resolveWriterUnion nonUnion val
+       deconflictWriterUnion nonUnion val
   go eTy dTy val =
     case val of
       T.Int i32 | dTy == S.Long    -> Right $ T.Long   (fromIntegral i32)
@@ -61,47 +87,47 @@ resolveSchema writerSchema readerSchema v
       _                            -> Left $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
 -- The writer's symbol must be present in the reader's enum
-resolveEnum :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveEnum e d val@(T.Enum _ _ _txt) = Right val
+deconflictEnum :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
+deconflictEnum e d val@(T.Enum _ _ _txt) = Right val
   -- --  | txt `elem` symbols d = Right val
   -- --  | otherwise = Left "Decoded enum does not appear in reader's symbol list."
 
-resolveTwoUnions :: NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
-resolveTwoUnions  ds (T.Union _ eTy val) =
-    resolveReaderUnion eTy ds val
+deconflictTwoUnions :: NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
+deconflictTwoUnions  ds (T.Union _ eTy val) =
+    deconflictReaderUnion eTy ds val
 
-resolveReaderUnion :: Type -> NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
-resolveReaderUnion e ds val =
+deconflictReaderUnion :: Type -> NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
+deconflictReaderUnion e ds val =
     let hdl [] = Left "Impossible: empty non-empty list."
         hdl (d:rest) =
-              case resolveSchema e d val of
+              case deconflictValue e d val of
                 Right v -> Right (T.Union ds d v)
                 Left _  -> hdl rest
     in hdl (NE.toList ds)
 
-resolveWriterUnion :: Type -> T.Value Type -> Either String (T.Value Type)
-resolveWriterUnion reader (T.Union _ ty val) = resolveSchema ty reader val
+deconflictWriterUnion :: Type -> T.Value Type -> Either String (T.Value Type)
+deconflictWriterUnion reader (T.Union _ ty val) = deconflictValue ty reader val
 
-resolveRecord :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
-resolveRecord writerSchema readerSchema (T.Record ty fldVals)  =
-  T.Record ty . HashMap.fromList <$> mapM (resolveFields fldVals (fields writerSchema)) (fields readerSchema)
+deconflictRecord :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
+deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
+  T.Record ty . HashMap.fromList <$> mapM (deconflictFields fldVals (fields writerSchema)) (fields readerSchema)
 
 -- For each field of the decoders, lookup the field in the hash map
---  1) If the field exists, call 'resolveSchema'
+--  1) If the field exists, call 'deconflictValue'
 --  2) If the field is missing use the reader's default
 --  3) If there is no default, fail.
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
-resolveFields :: HashMap Text (T.Value Type) -> [Field] -> Field -> Either String (Text,T.Value Type)
-resolveFields hm writerFields readerField =
+deconflictFields :: HashMap Text (T.Value Type) -> [Field] -> Field -> Either String (Text,T.Value Type)
+deconflictFields hm writerFields readerField =
   let
     mbWriterField = findField readerField writerFields
     mbValue = HashMap.lookup (fldName readerField) hm
   in case (mbWriterField, mbValue, fldDefault readerField) of
-    (Just w, Just x,_)   -> (fldName readerField,) <$> resolveSchema (fldType w) (fldType readerField) x
-    (_, Just x,_)  -> Right (fldName readerField, x)
-    (_, _,Just def)      -> Right (fldName readerField, def)
-    (_,Nothing,Nothing)  -> Left $ "No field and no default for " ++ show (fldName readerField)
+    (Just w, Just x,_)  -> (fldName readerField,) <$> deconflictValue (fldType w) (fldType readerField) x
+    (_, Just x,_)       -> Right (fldName readerField, x)
+    (_, _,Just def)     -> Right (fldName readerField, def)
+    (_,Nothing,Nothing) -> Left $ "No field and no default for " ++ show (fldName readerField)
 
 findField :: Field -> [Field] -> Maybe Field
 findField f fs =

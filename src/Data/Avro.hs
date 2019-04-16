@@ -114,7 +114,7 @@ import qualified Data.Vector           as V
 import           Data.Word
 import           Prelude               as P
 
-import Data.Avro.Codec (nullCodec)
+import Data.Avro.Codec         (nullCodec)
 import Data.Avro.FromAvro
 import Data.Avro.HasAvroSchema
 import Data.Avro.ToAvro
@@ -152,13 +152,16 @@ decodeContainerWithSchema :: FromAvro a => Schema -> ByteString -> [[a]]
 decodeContainerWithSchema readerSchema bs =
   case D.decodeContainer bs of
     Right (writerSchema,val) ->
-      let err e = error $ "Could not deconflict reader and writer schema." <> e
-          dec x =
-            case C.deconflict writerSchema readerSchema x of
-              Left e   -> err e
-              Right v  -> case fromAvro v of
-                            Success x -> x
-                            Error e   -> error e
+      let
+        writerSchema' = S.overlay writerSchema writerSchema
+        readerSchema' = S.overlay readerSchema readerSchema
+        err e = error $ "Could not deconflict reader and writer schema." <> e
+        dec x =
+          case C.deconflictNoResolve writerSchema' readerSchema' x of
+            Left e   -> err e
+            Right v  -> case fromAvro v of
+                          Success x -> x
+                          Error e   -> error e
       in P.map (P.map dec) val
     Left err -> error err
 
