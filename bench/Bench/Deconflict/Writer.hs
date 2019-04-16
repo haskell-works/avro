@@ -1,3 +1,14 @@
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TemplateHaskell   #-}
+module Bench.Deconflict.Writer
+where
+
+import Data.Avro.Deriving
+import Text.RawString.QQ
+
+deriveAvroFromByteString [r|
 {
   "type": "record",
   "name": "Outer",
@@ -14,3 +25,4 @@
     { "name": "other", "type": "Inner" }
   ]
 }
+|]
