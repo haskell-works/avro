@@ -14,6 +14,7 @@ import           Data.List           (find)
 import           Data.List.NonEmpty  (NonEmpty (..))
 import qualified Data.List.NonEmpty  as NE
 import qualified Data.Map            as M
+import           Data.Semigroup      ((<>))
 import qualified Data.Set            as Set
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
