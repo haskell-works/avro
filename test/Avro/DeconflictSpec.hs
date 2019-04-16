@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
 module Avro.DeconflictSpec where
 
 import Control.Monad.IO.Class
