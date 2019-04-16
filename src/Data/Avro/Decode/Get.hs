@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -8,20 +9,17 @@ module Data.Avro.Decode.Get
 where
 
 import qualified Codec.Compression.Zlib     as Z
-import           Control.Monad              (foldM, replicateM, when)
+import           Control.Monad              (replicateM, when)
 import qualified Data.Aeson                 as A
 import qualified Data.Array                 as Array
-import           Data.Binary.Get            (Get, runGetOrFail)
+import           Data.Binary.Get            (Get)
 import qualified Data.Binary.Get            as G
 import           Data.Binary.IEEE754        as IEEE
 import           Data.Bits
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.ByteString.Lazy.Char8 as BC
-import qualified Data.HashMap.Strict        as HashMap
 import           Data.Int
-import           Data.List                  (foldl')
-import qualified Data.List.NonEmpty         as NE
 import qualified Data.Map                   as Map
 import           Data.Maybe
 import           Data.Monoid                ((<>))
@@ -35,7 +33,6 @@ import           Prelude                    as P
 import           Data.Avro.Codec
 import           Data.Avro.DecodeRaw
 import           Data.Avro.Schema           as S
-import           Data.Avro.Zag
 
 class GetAvro a where
   getAvro :: Get a
@@ -153,7 +150,7 @@ getString = do
   bytes <- getBytes
   case Text.decodeUtf8' bytes of
     Left unicodeExc -> fail (show unicodeExc)
-    Right text -> return text
+    Right text      -> return text
 
 -- a la Java:
 --  Bit 31 (the bit that is selected by the mask 0x80000000) represents the
@@ -196,28 +193,35 @@ getDouble = IEEE.wordToDouble <$> G.getWord64le
 -- getRecord = getAvro
 
 getArray :: GetAvro ty => Get [ty]
-getArray =
-  do nr <- getLong
-     if
-      | nr == 0 -> return []
-      | nr < 0  ->
-          do _len <- getLong
-             rs <- replicateM (fromIntegral (abs nr)) getAvro
-             (rs <>) <$> getArray
-      | otherwise ->
-          do rs <- replicateM (fromIntegral nr) getAvro
-             (rs <>) <$> getArray
+getArray = decodeBlocks getAvro
 
 getMap :: GetAvro ty => Get (Map.Map Text ty)
-getMap = go Map.empty
- where
- go acc =
-  do nr <- getLong
-     if nr == 0
-       then return acc
-       else do m <- Map.fromList <$> replicateM (fromIntegral nr) getKVs
-               go (Map.union m acc)
- getKVs = (,) <$> getString <*> getAvro
+getMap = Map.fromList <$> decodeBlocks keyValue
+  where keyValue = (,) <$> getString <*> getAvro
+
+-- | Avro encodes arrays and maps as a series of blocks. Each block
+-- starts with a count of the elements in the block. A series of
+-- blocks is always terminated with an empty block (encoded as a 0).
+decodeBlocks :: Get a -> Get [a]
+decodeBlocks element = do
+  count <- getLong
+  if | count == 0 -> return []
+
+     -- negative counts are followed by the number of *bytes* in the
+     -- array block
+     | count < 0  -> do
+         _bytes <- getLong
+         items  <- replicateM (fromIntegral $ abs count) element'
+         rest   <- decodeBlocks element
+         pure $ items <> rest
+
+     | otherwise  -> do
+         items <- replicateM (fromIntegral count) element'
+         rest  <- decodeBlocks element
+         pure $ items <> rest
+  where element' = do
+          !x <- element
+          pure x
 
 -- Safe-ish from integral
 sFromIntegral :: forall a b m. (Monad m, Bounded a, Bounded b, Integral a, Integral b) => a -> m b
