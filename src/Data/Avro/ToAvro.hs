@@ -1,27 +1,27 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Data.Avro.ToAvro
 
 where
 
-import           Control.Arrow        (first)
+import           Control.Arrow           (first)
 import           Data.Avro.HasAvroSchema
-import           Data.Avro.Schema     as S
-import           Data.Avro.Types      as T
-import qualified Data.ByteString      as B
-import           Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.HashMap.Strict  as HashMap
+import           Data.Avro.Schema        as S
+import           Data.Avro.Types         as T
+import qualified Data.ByteString         as B
+import           Data.ByteString.Lazy    (ByteString)
+import qualified Data.ByteString.Lazy    as BL
+import qualified Data.HashMap.Strict     as HashMap
 import           Data.Int
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.Map             as Map
-import           Data.Text            (Text)
-import qualified Data.Text            as Text
-import qualified Data.Text.Lazy       as TL
+import           Data.List.NonEmpty      (NonEmpty (..))
+import qualified Data.Map                as Map
 import           Data.Tagged
-import qualified Data.Vector          as V
-import qualified Data.Vector.Unboxed  as U
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import qualified Data.Text.Lazy          as TL
+import qualified Data.Vector             as V
+import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 
 class HasAvroSchema a => ToAvro a where
@@ -65,10 +65,10 @@ instance ToAvro BL.ByteString where
 
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   toAvro e =
-    let sch@(l:|[r]) = options (schemaOf e)
+    let sch = options (schemaOf e)
     in case e of
-         Left a  -> T.Union sch l (toAvro a)
-         Right b -> T.Union sch r (toAvro b)
+         Left a  -> T.Union sch (schemaOf a) (toAvro a)
+         Right b -> T.Union sch (schemaOf b) (toAvro b)
 
 instance (ToAvro a) => ToAvro (Map.Map Text a) where
   toAvro = toAvro . HashMap.fromList . Map.toList
@@ -90,10 +90,10 @@ instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
 
 instance (ToAvro a) => ToAvro (Maybe a) where
   toAvro a =
-    let sch@(l:|[r]) = options (schemaOf a)
+    let sch = options (schemaOf a)
     in case a of
       Nothing -> T.Union sch S.Null (toAvro ())
-      Just v  -> T.Union sch r (toAvro v)
+      Just v  -> T.Union sch (schemaOf v) (toAvro v)
 
 instance (ToAvro a) => ToAvro [a] where
   toAvro = T.Array . V.fromList . (toAvro <$>)

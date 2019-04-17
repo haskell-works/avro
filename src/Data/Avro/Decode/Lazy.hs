@@ -322,12 +322,12 @@ getAvroOf ty0 bs = go ty0 bs
               Nothing  -> (bs', T.Error ("Unknown value {" <> show i <> "} for enum " <> Text.unpack (typeName ty) ))
               Just sym -> (bs', T.Enum ty (fromIntegral i) sym)
 
-      Union ts unionLookup ->
+      Union ts ->
         case runGetOrFail getLong bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, i)  ->
-            case unionLookup i of
-              Nothing -> (bs', T.Error $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName $ NE.toList ts))
+            case ts V.!? (fromIntegral i) of
+              Nothing -> (bs', T.Error $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (V.map typeName ts))
               Just t  -> T.Union ts t <$> go t bs'
 
       Fixed {..} ->

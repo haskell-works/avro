@@ -19,6 +19,8 @@ import qualified Data.Set            as Set
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
 import qualified Data.Text.Encoding  as Text
+import           Data.Vector         (Vector)
+import qualified Data.Vector         as V
 
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
@@ -70,11 +72,11 @@ deconflictValue writerSchema readerSchema v
        | name a == name b && size a == size b = Right val
   go a@S.Record {} b@S.Record {} val
        | name a == name b = deconflictRecord a b val
-  go (S.Union xs _) (S.Union ys _) (T.Union _ tyVal val) =
+  go (S.Union xs) (S.Union ys) (T.Union _ tyVal val) =
        withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion sch ys val
-  go nonUnion (S.Union ys _) val =
+  go nonUnion (S.Union ys) val =
        deconflictReaderUnion nonUnion ys val
-  go (S.Union xs _) nonUnion (T.Union _ tyVal val) =
+  go (S.Union xs) nonUnion (T.Union _ tyVal val) =
        withSchemaIn tyVal xs $ \sch -> deconflictValue sch nonUnion val
   go eTy dTy val =
     case val of
@@ -104,14 +106,14 @@ withSchemaIn schema schemas f =
     Nothing    -> Left $ "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> schemas) <> " does not contain schema " <> Text.unpack (typeName schema)
     Just found -> f found
 
-deconflictReaderUnion :: Type -> NonEmpty Type -> T.Value Type -> Either String (T.Value Type)
+deconflictReaderUnion :: Type -> Vector Type -> T.Value Type -> Either String (T.Value Type)
 deconflictReaderUnion valueSchema unionTypes val =
     let hdl [] = Left "Impossible: empty non-empty list."
         hdl (d:rest) =
               case deconflictValue valueSchema d val of
                 Right v -> Right (T.Union unionTypes d v)
                 Left _  -> hdl rest
-    in hdl (NE.toList unionTypes)
+    in hdl (V.toList unionTypes)
 
 deconflictRecord :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
 deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =

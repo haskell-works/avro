@@ -489,7 +489,7 @@ schemaDef' = mkSchema
                                        $(mkMaybeText doc)
                                        $(ListE <$> mapM mkText symbols)
                               |]
-          Union {..}     -> [e| mkUnion $(mkNE options) |]
+          Union {..}     -> [e| Union $(mkV options) |]
           Fixed {..}     -> [e| Fixed { name      = $(mkName name)
                                       , aliases   = $(ListE <$> mapM mkName aliases)
                                       , size      = $(litE $ IntegerL $ fromIntegral size)
@@ -533,7 +533,7 @@ schemaDef' = mkSchema
           AT.Array vec    -> [e| AT.Array $ V.fromList $(ListE <$> mapM mkDefaultValue (V.toList vec)) |]
           AT.Map m        -> [e| AT.Map $ $(mkMap m) |]
           AT.Record s m   -> [e| AT.Record $(mkSchema s) $(mkMap m) |]
-          AT.Union ts t v -> [e| AT.Union $(mkNE ts) $(mkSchema t) $(mkDefaultValue v) |]
+          AT.Union ts t v -> [e| AT.Union $(mkV ts) $(mkSchema t) $(mkDefaultValue v) |]
           AT.Fixed s bs   -> [e| AT.Fixed $(mkSchema s) $(mkByteString bs) |]
           AT.Enum s n sym -> [e| AT.Enum $(mkSchema s) $(litE $ IntegerL $ fromIntegral n) $(mkText sym) |]
 
@@ -543,7 +543,7 @@ schemaDef' = mkSchema
         mkMap (HM.toList -> xs) = [e| HM.fromList $(ListE <$> mapM mkKVPair xs) |]
         mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) |]
 
-        mkNE (NE.toList -> xs) = [e| NE.fromList $(ListE <$> mapM mkSchema xs) |]
+        mkV (V.toList -> xs) = [e| V.fromList $(ListE <$> mapM mkSchema xs) |]
 
 -- | A hack around TemplateHaskell limitation:
 -- It is currently not possible to splice variable name in QQ.
@@ -577,7 +577,7 @@ mkFieldTypeName namespaceBehavior = \case
   S.Double           -> [t| Double |]
   S.Bytes            -> [t| ByteString |]
   S.String           -> [t| Text |]
-  S.Union branches _ -> union branches
+  S.Union branches   -> union (V.toList branches)
   S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
   S.Map x            -> [t| Map Text $(go x) |]
   S.Array x          -> [t| [$(go x)] |]
@@ -587,13 +587,13 @@ mkFieldTypeName namespaceBehavior = \case
   t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior
         union = \case
-          Null :| [x]       -> [t| Maybe $(go x) |]
-          x :| [Null]       -> [t| Maybe $(go x) |]
-          x :| [y]          -> [t| Either $(go x) $(go y) |]
-          a :| [b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
-          a :| [b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
-          a :| [b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
-          _                 ->
+          [Null, x]       -> [t| Maybe $(go x) |]
+          [x, Null]       -> [t| Maybe $(go x) |]
+          [x, y]          -> [t| Either $(go x) $(go y) |]
+          [a, b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
+          [a, b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
+          [a, b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
+          _               ->
             error "Unions with more than 5 elements are not yet supported"
 
 updateFirst :: (Text -> Text) -> Text -> Text
