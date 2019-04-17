@@ -67,9 +67,9 @@ getAvroOf ty0 = go ty0
       do let getField Field {..} = (fldName,) <$> go fldType
          T.Record ty . HashMap.fromList <$> mapM getField fields
     Enum {..} ->
-      do val <- getLong
-         let sym = fromMaybe "" (symbolLookup val) -- empty string for 'missing' symbols (alternative is an error or exception)
-         pure (T.Enum ty (fromIntegral val) sym)
+      do i <- getLong
+         let sym = fromMaybe "" (symbols V.!? (fromIntegral i)) -- empty string for 'missing' symbols (alternative is an error or exception)
+         pure (T.Enum ty (fromIntegral i) sym)
     Union ts ->
       do i <- getLong
          case ts V.!? (fromIntegral i) of

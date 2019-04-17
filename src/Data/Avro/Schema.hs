@@ -118,11 +118,10 @@ data Type
                , order   :: Maybe Order
                , fields  :: [Field]
                }
-      | Enum { name         :: TypeName
-             , aliases      :: [TypeName]
-             , doc          :: Maybe Text
-             , symbols      :: [Text]
-             , symbolLookup :: Int64 -> Maybe Text
+      | Enum { name    :: TypeName
+             , aliases :: [TypeName]
+             , doc     :: Maybe Text
+             , symbols :: V.Vector Text
              }
       | Union { options     :: V.Vector Type
               }
@@ -148,7 +147,7 @@ instance Eq Type where
 
   Record name1 _ _ _ fs1 == Record name2 _ _ _ fs2 =
     and [name1 == name2, fs1 == fs2]
-  Enum name1 _ _ s _ == Enum name2 _ _ s2 _ =
+  Enum name1 _ _ s == Enum name2 _ _ s2 =
     and [name1 == name2, s == s2]
   Union a == Union b = a == b
   Fixed name1 _ s == Fixed name2 _ s2 =
@@ -166,9 +165,7 @@ mkEnum :: TypeName
        -> [Text]
           -- ^ The symbols of the enum.
        -> Type
-mkEnum name aliases doc symbols = Enum name aliases doc symbols lookup
- where lookup i = IM.lookup (fromIntegral i) table
-       table    = IM.fromList $ [0..] `zip` symbols
+mkEnum name aliases doc symbols = Enum name aliases doc (V.fromList symbols)
 
 -- | @mkUnion subTypes@ Defines a union of the provided subTypes.  N.B. it is
 -- invalid Avro to include another union or to have more than one of the same
@@ -599,9 +596,9 @@ parseAvroJSON union env ty av                  =
         case ty of
           String      -> return $ Ty.String s
           Enum {..}   ->
-              if s `elem` symbols
-                then return $ Ty.Enum ty (maybe (error "IMPOSSIBLE BUG") id $ lookup s (zip symbols [0..])) s
-                else fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
+              case s `V.elemIndex` symbols of
+                Just i  -> pure $ Ty.Enum ty i s
+                Nothing -> fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
           Bytes       -> Ty.Bytes <$> parseBytes s
           Fixed {..}  -> do
             bytes <- parseBytes s

@@ -318,7 +318,7 @@ getAvroOf ty0 bs = go ty0 bs
         case runGetOrFail getLong bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, i)  ->
-            case symbolLookup i of
+            case symbols V.!? (fromIntegral i) of
               Nothing  -> (bs', T.Error ("Unknown value {" <> show i <> "} for enum " <> Text.unpack (typeName ty) ))
               Just sym -> (bs', T.Enum ty (fromIntegral i) sym)
 

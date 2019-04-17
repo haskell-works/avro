@@ -333,7 +333,7 @@ readSchema p = do
 ---------------------------- FromAvro -----------------------------------------
 
 genFromAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromAvro namespaceBehavior (S.Enum n _ _ _ _) =
+genFromAvro namespaceBehavior (S.Enum n _ _ _ ) =
   [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AT.Enum _ i _) = $([| pure . toEnum|]) i
         fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
@@ -364,7 +364,7 @@ genFromAvroFieldsExp n (x:xs) =
 
 -------------------------------- FromLazyAvro ---------------------------------
 genFromLazyAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromLazyAvro namespaceBehavior (S.Enum n _ _ _ _) =
+genFromLazyAvro namespaceBehavior (S.Enum n _ _ _) =
   [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromLazyAvro (LV.Enum _ i _) = $([| pure . toEnum|]) i
         fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
@@ -417,7 +417,7 @@ newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 ------------------------- ToAvro ----------------------------------------------
 
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
-genToAvro opts s@(S.Enum n _ _ vs _) =
+genToAvro opts s@(S.Enum n _ _ vs) =
   toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     conP' = flip conP [] . mkAdtCtorName (namespaceBehavior opts) n
@@ -426,7 +426,7 @@ genToAvro opts s@(S.Enum n _ _ vs _) =
             toAvro = $([| \x ->
               let convert = AT.Enum $(varE sname) (fromEnum $([|x|]))
               in $(caseE [|x|] ((\v -> match (conP' v)
-                               (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> vs))
+                               (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> V.toList vs))
               |])
       |]
 genToAvro opts s@(S.Record n _ _ _ fs) =
@@ -487,7 +487,7 @@ schemaDef' = mkSchema
           Enum {..}      -> [e| mkEnum $(mkName name)
                                        $(ListE <$> mapM mkName aliases)
                                        $(mkMaybeText doc)
-                                       $(ListE <$> mapM mkText symbols)
+                                       $(ListE <$> mapM mkText (V.toList symbols))
                               |]
           Union {..}     -> [e| Union $(mkV options) |]
           Fixed {..}     -> [e| Fixed { name      = $(mkName name)
@@ -560,9 +560,9 @@ genType opts (S.Record n _ _ _ fs) = do
   flds <- traverse (mkField opts n) fs
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genDataType dname flds]
-genType opts (S.Enum n _ _ vs _) = do
+genType opts (S.Enum n _ _ vs) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
-  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> vs)]
+  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> (V.toList vs))]
 genType opts (S.Fixed n _ s) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genNewtype dname]
@@ -583,7 +583,7 @@ mkFieldTypeName namespaceBehavior = \case
   S.Array x          -> [t| [$(go x)] |]
   S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   S.Fixed n _ _      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Enum n _ _ _ _   -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
+  S.Enum n _ _ _     -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior
         union = \case
