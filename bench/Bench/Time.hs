@@ -2,22 +2,22 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Main where
+module Bench.Time where
 
-import           Control.Monad         (replicateM)
+import Control.Monad (replicateM)
 
-import qualified Data.ByteString.Lazy  as LBS
-import           Data.HashMap.Strict   (HashMap)
-import qualified Data.HashMap.Strict   as HashMap
-import           Data.Text             (Text)
-import           Data.Vector           (Vector)
-import qualified Data.Vector           as Vector
+import qualified Data.ByteString.Lazy as LBS
+import           Data.HashMap.Strict  (HashMap)
+import qualified Data.HashMap.Strict  as HashMap
+import           Data.Text            (Text)
+import           Data.Vector          (Vector)
+import qualified Data.Vector          as Vector
 
-import           Gauge
+import Gauge
 
-import           GHC.Int               (Int32, Int64)
+import GHC.Int (Int32, Int64)
 
-import qualified System.Random         as Random
+import qualified System.Random as Random
 
 import qualified Data.Avro             as Avro
 import qualified Data.Avro.Decode      as Decode
@@ -26,10 +26,6 @@ import           Data.Avro.Schema      (Schema)
 import qualified Data.Avro.Schema      as Schema
 import           Data.Avro.Types.Value (Value)
 import qualified Data.Avro.Types.Value as Value
-
-main :: IO ()
-main = defaultMain [encode, decode]
-
 -- * Encoding to binary
 
 encode :: Benchmark

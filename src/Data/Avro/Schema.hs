@@ -45,6 +45,7 @@ module Data.Avro.Schema
 
   , overlay
   , subdefinition
+  , expandNamedTypes
   ) where
 
 import           Control.Applicative
@@ -53,36 +54,36 @@ import           Control.Monad.Except
 import qualified Control.Monad.Fail         as MF
 import           Control.Monad.State.Strict
 
-import           Data.Aeson                 (FromJSON (..), ToJSON (..), object,
-                                             (.!=), (.:), (.:!), (.:?), (.=))
-import qualified Data.Aeson                 as A
-import           Data.Aeson.Types           (Parser, typeMismatch)
-import qualified Data.Avro.Types            as Ty
-import qualified Data.ByteString            as B
-import qualified Data.ByteString.Base16     as Base16
-import qualified Data.Char                  as Char
-import           Data.Function              (on)
+import           Data.Aeson             (FromJSON (..), ToJSON (..), object, (.!=), (.:), (.:!), (.:?), (.=))
+import qualified Data.Aeson             as A
+import           Data.Aeson.Types       (Parser, typeMismatch)
+import qualified Data.Avro.Types        as Ty
+import qualified Data.ByteString        as B
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.Char              as Char
+import           Data.Function          (on)
 import           Data.Hashable
-import qualified Data.HashMap.Strict        as HashMap
+import           Data.HashMap.Strict    (HashMap)
+import qualified Data.HashMap.Strict    as HashMap
 import           Data.Int
-import qualified Data.IntMap                as IM
-import qualified Data.List                  as L
-import           Data.List.NonEmpty         (NonEmpty (..))
-import qualified Data.List.NonEmpty         as NE
-import           Data.Maybe                 (catMaybes, fromMaybe, isJust)
-import           Data.Monoid                (First (..))
+import qualified Data.IntMap            as IM
+import qualified Data.List              as L
+import           Data.List.NonEmpty     (NonEmpty (..))
+import qualified Data.List.NonEmpty     as NE
+import           Data.Maybe             (catMaybes, fromMaybe, isJust)
+import           Data.Monoid            (First (..))
 import           Data.Semigroup
-import qualified Data.Set                   as S
+import qualified Data.Set               as S
 import           Data.String
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import           Data.Text.Encoding         as T
-import qualified Data.Vector                as V
-import           Prelude                    as P
+import           Data.Text              (Text)
+import qualified Data.Text              as T
+import           Data.Text.Encoding     as T
+import qualified Data.Vector            as V
+import           Prelude                as P
 
-import           GHC.Generics               (Generic)
+import GHC.Generics (Generic)
 
-import           Text.Show.Functions        ()
+import Text.Show.Functions ()
 
 -- |An Avro schema is either
 -- * A "JSON object in the form `{"type":"typeName" ...`
@@ -742,9 +743,28 @@ extractBindings = \case
   Map{..}      -> extractBindings values
   _            -> HashMap.empty
 
+
+expandNamedTypes :: Schema -> Schema
+expandNamedTypes =
+  flip evalState HashMap.empty . go
+  where
+    expandField f@Field{fldType} = (\x -> f { fldType = x }) <$> go fldType
+    go = \case
+      t@(NamedType n)   -> fromMaybe t <$> gets (HashMap.lookup n)
+      a@Array{item}     -> (\x -> a { item = x })   <$> go item
+      m@Map{values}     -> (\x -> m { values = x }) <$> go values
+      u@Union{options}  -> mkUnion <$> traverse go options
+
+      r@Record{name, fields}  -> do
+        fields' <- traverse expandField fields
+        let r' = r { fields = fields' }
+        modify' (HashMap.insert name r')
+        pure r'
+
+      other -> pure other
+
 -- | Merge two schemas to produce a third.
 -- Specifically, @overlay schema reference@ fills in 'NamedTypes' in 'schema' using any matching definitions from 'reference'.
-
 overlay :: Type -> Type -> Type
 overlay input supplement = overlayType input
   where
@@ -752,12 +772,7 @@ overlay input supplement = overlayType input
     overlayType  a@Array{..}      = a { item    = overlayType item }
     overlayType  m@Map{..}        = m { values  = overlayType values }
     overlayType  r@Record{..}     = r { fields  = map overlayField fields }
-    overlayType  u@Union{..}      = u {
-                                      options     = NE.map overlayType options,
-                                      unionLookup = \i -> case unionLookup i of
-                                                            Just named@(NamedType _) -> Just $ rebind named
-                                                            other                    -> other
-                                   }
+    overlayType  u@Union{..}      = mkUnion (NE.map overlayType options)
     overlayType  nt@(NamedType _) = rebind nt
     overlayType  other            = other
 

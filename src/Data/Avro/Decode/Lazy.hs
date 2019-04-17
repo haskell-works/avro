@@ -55,7 +55,7 @@ import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 import           Prelude                    as P
 
-import           Data.Avro.Codec (Decompress)
+import           Data.Avro.Codec                 (Decompress)
 import qualified Data.Avro.Decode.Lazy.LazyValue as T
 import           Data.Avro.DecodeRaw
 import           Data.Avro.HasAvroSchema         (schema)
@@ -125,9 +125,11 @@ decodeContainerWithSchema s bs =
 decodeContainerWithSchema' :: FromLazyAvro a => Schema -> BL.ByteString -> Either String [[Either String a]]
 decodeContainerWithSchema' readerSchema bs = do
   (writerSchema, vals) <- getContainerValues bs
-  pure $ (fmap . fmap) (convertValue writerSchema) vals
+  let writerSchema' = S.expandNamedTypes writerSchema
+  let readerSchema' = S.expandNamedTypes readerSchema
+  pure $ (fmap . fmap) (convertValue writerSchema' readerSchema') vals
   where
-    convertValue w v = resultToEither $ fromLazyAvro (C.deconflict w readerSchema v) -- >>= (resultToEither . fromLazyAvro)
+    convertValue w r v = resultToEither $ fromLazyAvro (C.deconflictNoResolve w r v)
 
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Type
@@ -198,7 +200,7 @@ getNextBlock sync decompress bs =
       nrBytes  <- getLong
       compressed <- G.getLazyByteString nrBytes
       bytes <- case decompress compressed G.getRemainingLazyByteString of
-        Right x -> pure x
+        Right x  -> pure x
         Left err -> fail err
       pure (nrObj, bytes)
 
