@@ -29,8 +29,6 @@ extra-source-files:
     test/data/namespace-inference.json
     test/data/unions-object-a.json
     test/data/unions-object-b.json
-    test/data/deconflict/reader.avsc
-    test/data/deconflict/writer.avsc
     test/data/overlay/composite.avsc
     test/data/overlay/expectation.avsc
     test/data/overlay/primitives.avsc
@@ -135,6 +133,8 @@ test-suite test
       Avro.Deconflict.A.Writer
       Avro.Deconflict.B.Reader
       Avro.Deconflict.B.Writer
+      Avro.Deconflict.C.Reader
+      Avro.Deconflict.C.Writer
       Avro.DeconflictSpec
       Avro.DefaultsSpec
       Avro.EncodeRawSpec
