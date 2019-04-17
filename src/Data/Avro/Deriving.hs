@@ -1,10 +1,10 @@
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE CPP                #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 -- | This module lets us derive Haskell types from an Avro schema that
 -- can be serialized/deserialzed to Avro.
@@ -50,7 +50,6 @@ import           Data.Maybe         (fromMaybe)
 import           Data.Semigroup     ((<>))
 import qualified Data.Text          as Text
 
-
 import GHC.Generics (Generic)
 
 import Language.Haskell.TH        as TH hiding (notStrict)
@@ -71,6 +70,9 @@ import qualified Data.Vector                as V
 
 import           Data.Avro.Decode.Lazy.FromLazyAvro
 import qualified Data.Avro.Decode.Lazy.LazyValue    as LV
+
+import Data.Avro.Deriving.Lift    ()
+import Language.Haskell.TH.Syntax (lift)
 
 -- | How to treat Avro namespaces in the generated Haskell types.
 data NamespaceBehavior =
@@ -312,7 +314,7 @@ deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
 -- mySchema = $(makeSchema "schemas/my-schema.avsc")
 -- @
 makeSchema :: FilePath -> Q Exp
-makeSchema p = readSchema p >>= schemaDef'
+makeSchema p = readSchema p >>= lift
 
 makeSchemaFrom :: FilePath -> Text -> Q Exp
 makeSchemaFrom p name = do
@@ -320,7 +322,7 @@ makeSchemaFrom p name = do
 
   case subdefinition s name of
     Nothing -> fail $ "No such entity '" <> T.unpack name <> "' defined in " <> p
-    Just ss -> schemaDef' ss
+    Just ss -> lift ss
 
 readSchema :: FilePath -> Q Schema
 readSchema p = do
@@ -460,90 +462,8 @@ schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
   [d|
       x :: Schema
-      x = $(schemaDef' sch)
+      x = sch -- $(schemaDef' sch)
   |]
-
-schemaDef' :: S.Type -> ExpQ
-schemaDef' = mkSchema
-  where mkSchema = \case
-          Null           -> [e| Null |]
-          Boolean        -> [e| Boolean |]
-          Int            -> [e| Int |]
-          Long           -> [e| Long |]
-          Float          -> [e| Float |]
-          Double         -> [e| Double |]
-          Bytes          -> [e| Bytes |]
-          String         -> [e| String |]
-          Array item     -> [e| Array $(mkSchema item) |]
-          Map values     -> [e| Map $(mkSchema values) |]
-          NamedType name -> [e| NamedType $(mkName name) |]
-          Record {..}    -> [e| Record { name      = $(mkName name)
-                                       , aliases   = $(ListE <$> mapM mkName aliases)
-                                       , doc       = $(mkMaybeText doc)
-                                       , order     = $(mkOrder order)
-                                       , fields    = $(ListE <$> mapM mkField fields)
-                                       }
-                              |]
-          Enum {..}      -> [e| mkEnum $(mkName name)
-                                       $(ListE <$> mapM mkName aliases)
-                                       $(mkMaybeText doc)
-                                       $(ListE <$> mapM mkText (V.toList symbols))
-                              |]
-          Union {..}     -> [e| Union $(mkV options) |]
-          Fixed {..}     -> [e| Fixed { name      = $(mkName name)
-                                      , aliases   = $(ListE <$> mapM mkName aliases)
-                                      , size      = $(litE $ IntegerL $ fromIntegral size)
-                                      }
-                              |]
-
-        mkText text = [e| T.pack $(mkTextLit text) |]
-
-        mkName (TN name namespace) = [e| TN $(mkText name) $(mkNamespace namespace) |]
-        mkNamespace ls = listE $ stringE . T.unpack <$> ls
-
-        mkMaybeText (Just text) = [e| Just $(mkText text) |]
-        mkMaybeText Nothing     = [e| Nothing |]
-
-        mkOrder (Just Ascending)  = [e| Just Ascending |]
-        mkOrder (Just Descending) = [e| Just Descending |]
-        mkOrder (Just Ignore)     = [e| Just Ignore |]
-        mkOrder Nothing           = [e| Nothing |]
-
-        mkField Field {..} =
-          [e| Field { fldName    = $(mkText fldName)
-                    , fldAliases = $(ListE <$> mapM mkText fldAliases)
-                    , fldDoc     = $(mkMaybeText fldDoc)
-                    , fldOrder   = $(mkOrder fldOrder)
-                    , fldType    = $(mkSchema fldType)
-                    , fldDefault = $(fromMaybe [e|Nothing|] $ mkJust . mkDefaultValue <$> fldDefault)
-                    }
-            |]
-
-        mkJust exp = [e|Just $(exp)|]
-
-        mkDefaultValue = \case
-          AT.Null         -> [e| AT.Null |]
-          AT.Boolean b    -> [e| AT.Boolean $(if b then [e|True|] else [e|False|]) |]
-          AT.Int n        -> [e| AT.Int $(litE $ IntegerL $ fromIntegral n) |]
-          AT.Long n       -> [e| AT.Long $(litE $ IntegerL $ fromIntegral n) |]
-          AT.Float f      -> [e| AT.Long $(litE $ FloatPrimL $ realToFrac f) |]
-          AT.Double f     -> [e| AT.Long $(litE $ FloatPrimL $ realToFrac f) |]
-          AT.Bytes bs     -> [e| AT.Bytes $(mkByteString bs) |]
-          AT.String s     -> [e| AT.String $(mkText s) |]
-          AT.Array vec    -> [e| AT.Array $ V.fromList $(ListE <$> mapM mkDefaultValue (V.toList vec)) |]
-          AT.Map m        -> [e| AT.Map $ $(mkMap m) |]
-          AT.Record s m   -> [e| AT.Record $(mkSchema s) $(mkMap m) |]
-          AT.Union ts t v -> [e| AT.Union $(mkV ts) $(mkSchema t) $(mkDefaultValue v) |]
-          AT.Fixed s bs   -> [e| AT.Fixed $(mkSchema s) $(mkByteString bs) |]
-          AT.Enum s n sym -> [e| AT.Enum $(mkSchema s) $(litE $ IntegerL $ fromIntegral n) $(mkText sym) |]
-
-        mkByteString bs = [e| B.pack $(ListE <$> mapM numericLit (B.unpack bs)) |]
-          where numericLit = litE . IntegerL . fromIntegral
-
-        mkMap (HM.toList -> xs) = [e| HM.fromList $(ListE <$> mapM mkKVPair xs) |]
-        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) |]
-
-        mkV (V.toList -> xs) = [e| V.fromList $(ListE <$> mapM mkSchema xs) |]
 
 -- | A hack around TemplateHaskell limitation:
 -- It is currently not possible to splice variable name in QQ.

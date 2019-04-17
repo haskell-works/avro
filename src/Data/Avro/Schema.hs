@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveLift            #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -82,8 +83,6 @@ import qualified Data.Vector            as V
 import           Prelude                as P
 
 import GHC.Generics (Generic)
-
-import Text.Show.Functions ()
 
 -- | An Avro schema is either
 --
