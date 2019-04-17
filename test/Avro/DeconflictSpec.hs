@@ -14,6 +14,8 @@ import qualified Avro.Deconflict.A.Reader         as AR
 import qualified Avro.Deconflict.A.Writer         as AW
 import qualified Avro.Deconflict.B.Reader         as BR
 import qualified Avro.Deconflict.B.Writer         as BW
+import qualified Avro.Deconflict.C.Reader         as CR
+import qualified Avro.Deconflict.C.Writer         as CW
 import qualified Data.Avro.Decode                 as A (decodeAvro)
 import qualified Data.Avro.Decode.Lazy            as AL
 import qualified Data.Avro.Decode.Lazy.Deconflict as AL
@@ -76,11 +78,11 @@ spec = describe "Avro.DeconflictSpec" $ do
       AL.decodeContainer w `shouldBe` [ Right BR.sampleValue ]
 
     it "should deconflict lazy value" $ do
-      let payload = A.encode AW.sampleValue
-      let decodedAvro = AL.decodeAvro AW.schema'Outer payload
-      let deconflicted = AL.deconflict AW.schema'Outer AR.schema'Outer decodedAvro
+      let payload = A.encode BW.sampleValue
+      let decodedAvro = AL.decodeAvro BW.schema'Foo payload
+      let deconflicted = AL.deconflict BW.schema'Foo BR.schema'Foo decodedAvro
 
-      AL.fromLazyAvro deconflicted `shouldBe` Success AR.sampleValue
+      AL.fromLazyAvro deconflicted `shouldBe` Success BR.sampleValue
 
     it "should deconflict strict container" $ do
       w <- A.encodeContainer [[BW.sampleValue]]
@@ -92,3 +94,34 @@ spec = describe "Avro.DeconflictSpec" $ do
       let Right deconflicted = A.deconflict BW.schema'Foo BR.schema'Foo decodedAvro
 
       A.fromAvro deconflicted `shouldBe` Success BR.sampleValue
+
+  describe "Type C" $ do
+    it "should deconflict complex type" $ do
+      let payload = A.encode CW.sampleValue
+      let decodedAvro = AL.decodeAvro CW.schema'Foo payload
+      let res = AL.deconflict CW.schema'Foo CR.schema'Foo decodedAvro
+
+      AL.fromLazyAvro res `shouldBe` Success CR.sampleValue
+
+    it "should deconflict lazy container" $ do
+      w <- liftIO $ A.encodeContainer [[ CW.sampleValue ]]
+      AL.decodeContainer w `shouldBe` [ Right CR.sampleValue ]
+
+    it "should deconflict lazy value" $ do
+      let payload = A.encode CW.sampleValue
+      let decodedAvro = AL.decodeAvro CW.schema'Foo payload
+      let deconflicted = AL.deconflict CW.schema'Foo CR.schema'Foo decodedAvro
+
+      AL.fromLazyAvro deconflicted `shouldBe` Success CR.sampleValue
+
+    it "should deconflict strict container" $ do
+      w <- A.encodeContainer [[CW.sampleValue]]
+      A.decodeContainer w `shouldBe` [[CR.sampleValue]]
+
+    it "should deconflict strict value" $ do
+      let payload = A.encode CW.sampleValue
+      let Right decodedAvro = A.decodeAvro CW.schema'Foo payload
+      let Right deconflicted = A.deconflict CW.schema'Foo CR.schema'Foo decodedAvro
+
+      A.fromAvro deconflicted `shouldBe` Success CR.sampleValue
+
