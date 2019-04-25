@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  haskell: haskell-works/haskell-build@1.6.6
+  haskell: haskell-works/haskell-build-2@1.6.7
   github: haskell-works/github-release@1.2.1
   hackage: haskell-works/hackage@1.1.0
 
@@ -11,14 +11,17 @@ workflows:
       - haskell/build:
           name: GHC 8.4.4
           executor: haskell/ghc-8_4_4
+          context: haskell-ci
 
       - haskell/build:
           name: GHC 8.6.4
           executor: haskell/ghc-8_6_4
+          context: haskell-ci
 
       - haskell/build:
           name: GHC 7.10.3
           executor: haskell/ghc-7_10_3
+          context: haskell-ci
 
       - github/release-cabal:
           context: haskell-ci
