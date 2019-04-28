@@ -1,5 +1,3 @@
-.*
-
 ### Haskell ###
 result
 dist
@@ -21,3 +19,5 @@ cabal.project.local
 
 # Emacs files
 *~
+/.ghc.environment.*
+
