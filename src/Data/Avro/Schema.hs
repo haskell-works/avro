@@ -222,7 +222,7 @@ instance Show TypeName where
 -- @
 renderFullname :: TypeName -> T.Text
 renderFullname TN { baseName, namespace } =
-  T.intercalate "." namespace <> "." <> baseName
+  T.intercalate "." $ namespace ++ [baseName]
 
 -- | Parses a fullname into a 'TypeName', assuming the string
 -- representation is valid.
@@ -268,7 +268,7 @@ mkTypeName :: Maybe TypeName
 mkTypeName context name ns
   | isFullName name = parseFullname name
   | otherwise       = case ns of
-      Just ns -> TN name $ T.splitOn "." ns
+      Just ns -> TN name $ filter (/= "") (T.splitOn "." ns)
       Nothing -> TN name $ fromMaybe [] $ namespace <$> context
   where isFullName = isJust . T.find (== '.')
 

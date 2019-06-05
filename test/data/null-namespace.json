@@ -1,0 +1,17 @@
+{
+  "type" : "record",
+  "name" : "Foo",
+  "namespace" : "",
+  "aliases" : [],
+  "doc": "An example schema to test null namespace handling.",
+  "fields" : [
+    {
+      "name" : "bar",
+      "type" : "Bar"
+    },
+    {
+      "name" : "baz",
+      "type" : "com.example.Baz"
+    }
+  ]
+}
