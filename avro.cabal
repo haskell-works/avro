@@ -27,6 +27,7 @@ extra-source-files:
     test/data/unions.avsc
     test/data/enums-object.json
     test/data/namespace-inference.json
+    test/data/null-namespace.json
     test/data/unions-object-a.json
     test/data/unions-object-b.json
     test/data/deconflict/reader.avsc

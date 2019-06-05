@@ -28,6 +28,11 @@ spec = describe "NamespaceSpec.hs: namespace inference in Avro schemas" $ do
     let expectedJSONSchema :: Aeson.Value
         Just expectedJSONSchema = head <$> Aeson.decode schemas
     Aeson.toJSON expected `shouldBe` expectedJSONSchema
+  it "should render names in the null namespace with no leading '.'" $
+    renderFullname (TN "FooType" []) `shouldBe` "FooType"
+  nullNamespaceSchema <- runIO $ getFileName "test/data/null-namespace.json" >>= LBS.readFile
+  it "should generate JSON with null namespaces rendered correctly" $
+    Aeson.decode nullNamespaceSchema `shouldBe` Just expectedNullNamespace
 
 expected :: Schema
 expected = Record
@@ -58,6 +63,18 @@ expected = Record
                       , field "bazzy" $ NamedType "com.example.Bazzy"
                       ]
           }
+
+
+expectedNullNamespace :: Schema
+expectedNullNamespace = Record
+  { name    = "Foo"
+  , aliases = []
+  , doc     = Just "An example schema to test null namespace handling."
+  , order   = Just Ascending
+  , fields  = [field "bar" $ NamedType "Bar", field "baz" $ NamedType "com.example.Baz"]
+  }
+  where field name schema = Field name [] Nothing (Just Ascending) schema Nothing
+
 
 getFileName :: FilePath -> IO FilePath
 getFileName p = do
