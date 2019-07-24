@@ -5,6 +5,9 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | An internal module that contains common decoding functionality
+-- that is shared between Lazy and Strict decoders, as well as
+-- generic 'Get' monad helpers.
 module Data.Avro.Decode.Get
 where
 
@@ -114,10 +117,10 @@ instance GetAvro ContainerHeader where
 
 
 getCodec :: Monad m => Maybe BL.ByteString -> m Codec
-getCodec (Just "null") = pure nullCodec
+getCodec (Just "null")    = pure nullCodec
 getCodec (Just "deflate") = pure deflateCodec
-getCodec (Just x) = fail $ "Unrecognized codec: " <> BC.unpack x
-getCodec Nothing = pure nullCodec
+getCodec (Just x)         = fail $ "Unrecognized codec: " <> BC.unpack x
+getCodec Nothing          = pure nullCodec
 
 
 --------------------------------------------------------------------------------

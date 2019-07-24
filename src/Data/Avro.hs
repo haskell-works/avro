@@ -5,87 +5,65 @@
 -- | Avro encoding and decoding routines.
 --
 -- This library provides a high level interface for encoding (and decoding)
--- Haskell values in Apache's Avro serialization format.  The goal is to
--- match Aeson's API whenever reasonable, meaning user experience with one
--- effectively translate to the other.
+-- Haskell values in Apache's Avro serialization format.
+--
+-- The goal is to match Aeson's API whenever reasonable,
+-- meaning user experience with one effectively translate to the other.
 --
 -- Avro RPC is not currently supported.
 --
--- **Library Structure**
+-- == Library Structure
 --
 -- The library structure includes:
---   * This module, 'Data.Avro', providing a high-level interface via
+--
+--   * This module, "Data.Avro", providing a high-level interface via
 --     classes of 'FromAvro' and 'ToAvro' for decoding and encoding values.
---   * 'Data.Avro.Type' define the types of Avro data, providing a common
---      (intermediate) representation for any data that is encoded or decoded
---      by Data.Avro.
---   * 'Data.Avro.Encode' and 'Data.Avro.Decode': More
+--
+--   * "Data.Avro.Schema": Defines the type for Avro schema's and its JSON
+--      encoding/decoding.
+--
+--   * "Data.Avro.Encode" and "Data.Avro.Decode": More
 --     efficient conversion capable of avoiding the intermediate representation.
 --     Also, the implementation of the en/decoding of the intermediate
 --     representation.
---   * 'Data.Avro.Deconflict': translate decoded data from an
+--
+--   * "Data.Avro.Decode.Lazy": Lazy/Streaming decoding for Avro containers.
+--
+--   * "Data.Avro.Deconflict": translate decoded data from an
 --     encoder schema to the (potentially different) decoder's schema.
---   * 'Data.Avro.Schema': Defines the type for Avro schema's and its JSON
---      encoding/decoding.
---
--- Example decoding:
---
--- Let's say you have an ADT and related schema:
---
--- @
--- {-# LANGUAGE OverloadedStrings #-}
--- import qualified Data.Avro.Types as Ty
--- import Data.Avro.Schema
--- import Data.Avro
--- import           Data.List.NonEmpty (NonEmpty(..))
---
--- data MyEnum = A | B | C | D deriving (Eq,Ord,Show,Enum,Generic)
--- data MyStruct = MyStruct (Either MyEnum String) Int
---
--- meSchema :: Schema
--- meSchema = Schema $ mkEnum "MyEnum" [] Nothing Nothing ["A","B","C","D"]
---
--- msSchema  :: Schema
--- msSchema =
---   Struct "MyStruct" Nothing [] Nothing Nothing
---       [ fld "enumOrString" eOrS (Just $ String "The Default")
---       , fld "int" Int (Just (Ty.Int 1))
---       ]
---      where
---      fld nm ty def = Field nm [] Nothing Nothing ty def
---      eOrS = mkUnion (meSchema :| [String])
---
--- instance ToAvro MyEnum where
---     toAvro = toAvroEnum
--- instance ToAvro MyStruct where
---     toAvro (MyStruct ab i) =
---      record [ "enumOrString" .= ab
---             , "int"          .= i
---             ]
---
--- main = do
---   let val = MyStruct (Right "Hello") 1
---   print (fromAvro (toAvro val) == Success val)
---
--- @
 module Data.Avro
-  ( FromAvro(..)
-  , ToAvro(..)
-  , HasAvroSchema(..)
-  , Schema
-  , Avro
+  ( -- * Schema
+    Schema
+
+    -- * Encoding and decoding
+  , Result(..), badValue
+  , encode
+  , decode
+
   , (.:)
   , (.=), record, fixed
-  , Result(..), badValue
-  , decode
+
+    -- * Working with containers
+    -- ** Decoding containers
   , decodeWithSchema
   , decodeContainer
   , decodeContainerWithSchema
   , decodeContainerBytes
-  , encode
+
+    -- ** Encoding containers
   , encodeContainer
+  , encodeContainer'
   , encodeContainerWithSync
+  , encodeContainerWithSync'
+
+  -- * Classes and instances
+  , FromAvro(..)
+  , ToAvro(..)
+  , HasAvroSchema(..)
   , schemaOf
+
+  -- * Misc
+  , Avro
   ) where
 
 import           Control.Arrow         (first)
@@ -114,21 +92,21 @@ import qualified Data.Vector           as V
 import           Data.Word
 import           Prelude               as P
 
-import Data.Avro.Codec         (nullCodec)
+import Data.Avro.Codec         (Codec, deflateCodec, nullCodec)
 import Data.Avro.FromAvro
 import Data.Avro.HasAvroSchema
 import Data.Avro.ToAvro
 
 type Avro a = (FromAvro a, ToAvro a)
 
--- | Decode a lazy bytestring using a Schema for the return type.
+-- | Decode a lazy bytestring using a 'Schema' of the return type.
 decode :: forall a. FromAvro a => ByteString -> Result a
 decode bytes =
   case D.decodeAvro (untag (schema :: Tagged a Type)) bytes of
       Right val -> fromAvro val
       Left err  -> Error err
 
--- | Decode a lazy bytestring with a provided schema
+-- | Decode a lazy bytestring using a provided schema
 decodeWithSchema :: FromAvro a => Schema -> ByteString -> Result a
 decodeWithSchema sch bytes =
   case D.decodeAvro sch bytes of
@@ -172,18 +150,26 @@ encode = E.encodeAvro . toAvro
 -- | Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers.
 encodeContainer :: forall a. ToAvro a => [[a]] -> IO BL.ByteString
-encodeContainer =
+encodeContainer = encodeContainer' nullCodec
+
+encodeContainer' :: forall a. ToAvro a => Codec -> [[a]] -> IO BL.ByteString
+encodeContainer' codec =
   let sch = untag (schema :: Tagged a Schema)
-  in E.encodeContainer nullCodec sch . map (map toAvro)
+  in E.encodeContainer codec sch . map (map toAvro)
 
 -- | Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
 encodeContainerWithSync :: forall a. ToAvro a => (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
-encodeContainerWithSync (a,b,c,d) =
+encodeContainerWithSync = encodeContainerWithSync' nullCodec
+
+-- | Encode chunks of objects into a container, using the provided
+-- ByteString as the synchronization markers.
+encodeContainerWithSync' :: forall a. ToAvro a => Codec -> (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
+encodeContainerWithSync' codec (a,b,c,d) =
   let
     sch = untag (schema :: Tagged a Schema)
     syncBytes = P.runPut $ mapM_ P.putWord64le [a,b,c,d]
-  in E.encodeContainerWithSync nullCodec sch syncBytes . map (map toAvro)
+  in E.encodeContainerWithSync codec sch syncBytes . map (map toAvro)
 
 -- |Like 'decodeContainer' but returns the avro-encoded bytes for each
 -- object in the container instead of the Haskell type.

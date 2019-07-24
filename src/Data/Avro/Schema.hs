@@ -85,12 +85,15 @@ import GHC.Generics (Generic)
 
 import Text.Show.Functions ()
 
--- |An Avro schema is either
--- * A "JSON object in the form `{"type":"typeName" ...`
--- * A "JSON string, naming a defined type" (basic type w/o free variables/names)
+-- | An Avro schema is either
+--
+-- * A "JSON object in the form @{"type":"typeName" ...}@
+--
+-- * A "JSON string, naming a defined type" (basic type without free variables)
+--
 -- * A "JSON array, representing a union"
 --
--- N.B. It is possible to create a Haskell value (of Schema type) that is
+-- N.B. It is possible to create a Haskell value (of 'Schema' type) that is
 -- not a valid Avro schema by violating one of the above or one of the
 -- conditions called out in 'validateSchema'.
 type Schema = Type

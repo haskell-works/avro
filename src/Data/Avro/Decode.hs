@@ -9,6 +9,7 @@
 module Data.Avro.Decode
   ( decodeAvro
   , decodeContainer
+
   -- * Lower level interface
   , decodeContainerWith
   , getAvroOf
@@ -49,15 +50,24 @@ import           Data.Avro.Zag
 
 import           Data.Avro.Decode.Strict.Internal
 
--- |Decode bytes into a 'Value' as described by Schema.
+-- | Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
 decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
 {-# INLINABLE decodeAvro #-}
 
+-- | Decode the container eagerly.
+-- In order know whether to return an error or a successfully decoded value
+-- the whole container is decoded into a memory.
+--
+-- "Data.Avro.Decode.Lazy" provides functions to decode Avro containers
+-- in a lazy, streaming fashion.
 decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Type]])
 decodeContainer = decodeContainerWith getAvroOf
 {-# INLINABLE decodeContainer #-}
 
+-- | Decode container using a custom decoding function.
+--
+-- Honestly, I don't know why we still expose this function.
 decodeContainerWith :: (Schema -> Get a)
                     -> BL.ByteString
                     -> Either String (Schema, [[a]])
@@ -83,7 +93,7 @@ getContainerWith schemaToGet =
         bytes    <- G.getLazyByteString nrBytes
         r        <- case decompress bytes (replicateM nrObj getValue) of
           Left err -> fail err
-          Right x -> pure x
+          Right x  -> pure x
         marker   <- G.getLazyByteString nrSyncBytes
         when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
         (r :) <$> getBlocks getValue sync decompress
