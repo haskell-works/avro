@@ -84,9 +84,11 @@ instance FromAvro Float where
   fromAvro v           = badValue v "Float"
 
 instance FromAvro a => FromAvro (Maybe a) where
-  fromAvro (T.Union (S.Null :| [_])  _ T.Null) = pure Nothing
-  fromAvro (T.Union (S.Null :| [_]) _ v)       = Just <$> fromAvro v
-  fromAvro v                                   = badValue v "Maybe a"
+  fromAvro (T.Union ts _ v) = case (V.toList ts, v) of
+    ([S.Null, _], T.Null) -> pure Nothing
+    ([S.Null, _], v')     -> Just <$> fromAvro v'
+    _                     -> badValue v "Maybe a"
+  fromAvro v                = badValue v "Maybe a"
 
 instance FromAvro a => FromAvro [a] where
   fromAvro (T.Array vec) = mapM fromAvro $ toList vec

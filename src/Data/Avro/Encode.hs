@@ -52,9 +52,9 @@ import qualified Data.Text.Lazy.Encoding    as TL
 import qualified Data.Vector                as V
 import qualified Data.Vector.Unboxed        as U
 import           Data.Word
+import           Prelude                    as P
 import           System.Random.TF.Init      (initTFGen)
 import           System.Random.TF.Instances (randoms)
-import           Prelude                    as P
 
 import Data.Avro.Codec
 import Data.Avro.EncodeRaw
@@ -295,8 +295,8 @@ instance EncodeAvro (T.Value Type) where
             fs = P.map fldName (fields ty)
         in AvroM (bs, ty)
       T.Union opts sel val | F.length opts > 0 ->
-        case DL.elemIndex sel (NE.toList opts) of
-          Just idx -> AvroM (putI idx <> putAvro val, S.mkUnion opts)
+        case V.elemIndex sel opts of
+          Just idx -> AvroM (putI idx <> putAvro val, S.Union opts)
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Enum sch@S.Enum{..} ix t -> AvroM (putI ix, sch)
       T.Fixed ty bs  ->

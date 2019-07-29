@@ -59,7 +59,7 @@
 -- @
 module Data.Avro.JSON where
 
-import           Data.Semigroup       ((<>))
+import Data.Semigroup ((<>))
 
 import qualified Data.Aeson           as Aeson
 import           Data.ByteString.Lazy (ByteString)
@@ -70,11 +70,12 @@ import qualified Data.List.NonEmpty   as NE
 import           Data.Tagged
 import qualified Data.Text            as Text
 
-import           Data.Avro            (FromAvro (..), Result (..), ToAvro (..))
-import qualified Data.Avro            as Avro
-import           Data.Avro.Schema     (Schema, parseAvroJSON)
-import qualified Data.Avro.Schema     as Schema
-import qualified Data.Avro.Types      as Avro
+import           Data.Avro        (FromAvro (..), Result (..), ToAvro (..))
+import qualified Data.Avro        as Avro
+import           Data.Avro.Schema (Schema, parseAvroJSON)
+import qualified Data.Avro.Schema as Schema
+import qualified Data.Avro.Types  as Avro
+import qualified Data.Vector      as V
 
 decodeAvroJSON :: Schema -> Aeson.Value -> Result (Avro.Value Schema)
 decodeAvroJSON schema json =
@@ -85,12 +86,12 @@ decodeAvroJSON schema json =
     missing name =
       fail ("Type " <> show name <> " not in schema")
 
-    union (Schema.Union schemas _) Aeson.Null
+    union (Schema.Union schemas) Aeson.Null
       | Schema.Null `elem` schemas =
           pure $ Avro.Union schemas Schema.Null Avro.Null
       | otherwise                  =
           fail "Null not in union."
-    union (Schema.Union schemas _) (Aeson.Object obj)
+    union (Schema.Union schemas) (Aeson.Object obj)
       | null obj =
           fail "Invalid encoding of union: empty object ({})."
       | length obj > 1 =
@@ -103,7 +104,7 @@ decodeAvroJSON schema json =
             branch =
               head $ HashMap.keys obj
             names =
-              HashMap.fromList [(Schema.typeName t, t) | t <- NE.toList schemas]
+              HashMap.fromList [(Schema.typeName t, t) | t <- V.toList schemas]
           in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
               nested <- parseAvroJSON union env t (obj ! branch)

@@ -84,7 +84,7 @@ instance HasAvroSchema BL.ByteString where
   schema = Tagged S.Bytes
 
 instance (HasAvroSchema a, HasAvroSchema b) => HasAvroSchema (Either a b) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [untag (schema :: Tagged b Type)])
+  schema = Tagged $ S.Union $ V.fromListN 2 [untag (schema :: Tagged a Type), untag (schema :: Tagged b Type)]
 
 instance (HasAvroSchema a) => HasAvroSchema (Map.Map Text a) where
   schema = wrapTag S.Map (schema :: Tagged a Type)

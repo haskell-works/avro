@@ -5,7 +5,7 @@
 module Avro.THUnionSpec
 where
 
-import qualified Data.List.NonEmpty   as NE
+import qualified Data.List.NonEmpty as NE
 
 import qualified Data.Aeson           as Aeson
 import           Data.Avro
@@ -15,12 +15,13 @@ import qualified Data.Avro.Schema     as Schema
 import qualified Data.Avro.Types      as Avro
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map             as Map
+import qualified Data.Vector          as V
 
-import           System.Directory     (doesFileExist)
+import System.Directory (doesFileExist)
 
-import           Test.Hspec
+import Test.Hspec
 
-import           Paths_avro
+import Paths_avro
 
 deriveAvro "test/data/unions.avsc"
 
@@ -67,8 +68,8 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long, foo]))         Nothing
         , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long, foo, notFoo])) Nothing
         ]
-      scalarsDefault  = Just $ Avro.Union (NE.fromList [Schema.String, Schema.Long]) Schema.String (Avro.String "foo")
-      nullableDefault = Just $ Avro.Union (NE.fromList [Schema.Null, Schema.Int])    Schema.Null   Avro.Null
+      scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String, Schema.Long]) Schema.String (Avro.String "foo")
+      nullableDefault = Just $ Avro.Union (V.fromList [Schema.Null, Schema.Int])    Schema.Null   Avro.Null
 
       fooSchema = record "haskell.avro.example.Foo" [field "stuff" Schema.String Nothing]
       barSchema = record "haskell.avro.example.Bar"

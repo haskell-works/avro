@@ -1,10 +1,10 @@
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE CPP                #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 -- | This module lets us derive Haskell types from an Avro schema that
 -- can be serialized/deserialzed to Avro.
@@ -50,7 +50,6 @@ import           Data.Maybe         (fromMaybe)
 import           Data.Semigroup     ((<>))
 import qualified Data.Text          as Text
 
-
 import GHC.Generics (Generic)
 
 import Language.Haskell.TH        as TH hiding (notStrict)
@@ -71,6 +70,9 @@ import qualified Data.Vector                as V
 
 import           Data.Avro.Decode.Lazy.FromLazyAvro
 import qualified Data.Avro.Decode.Lazy.LazyValue    as LV
+
+import Data.Avro.Deriving.Lift    ()
+import Language.Haskell.TH.Syntax (lift)
 
 -- | How to treat Avro namespaces in the generated Haskell types.
 data NamespaceBehavior =
@@ -312,7 +314,7 @@ deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
 -- mySchema = $(makeSchema "schemas/my-schema.avsc")
 -- @
 makeSchema :: FilePath -> Q Exp
-makeSchema p = readSchema p >>= schemaDef'
+makeSchema p = readSchema p >>= lift
 
 makeSchemaFrom :: FilePath -> Text -> Q Exp
 makeSchemaFrom p name = do
@@ -320,7 +322,7 @@ makeSchemaFrom p name = do
 
   case subdefinition s name of
     Nothing -> fail $ "No such entity '" <> T.unpack name <> "' defined in " <> p
-    Just ss -> schemaDef' ss
+    Just ss -> lift ss
 
 readSchema :: FilePath -> Q Schema
 readSchema p = do
@@ -333,7 +335,7 @@ readSchema p = do
 ---------------------------- FromAvro -----------------------------------------
 
 genFromAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromAvro namespaceBehavior (S.Enum n _ _ _ _) =
+genFromAvro namespaceBehavior (S.Enum n _ _ _ ) =
   [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AT.Enum _ i _) = $([| pure . toEnum|]) i
         fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
@@ -364,7 +366,7 @@ genFromAvroFieldsExp n (x:xs) =
 
 -------------------------------- FromLazyAvro ---------------------------------
 genFromLazyAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromLazyAvro namespaceBehavior (S.Enum n _ _ _ _) =
+genFromLazyAvro namespaceBehavior (S.Enum n _ _ _) =
   [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromLazyAvro (LV.Enum _ i _) = $([| pure . toEnum|]) i
         fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
@@ -417,7 +419,7 @@ newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 ------------------------- ToAvro ----------------------------------------------
 
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
-genToAvro opts s@(S.Enum n _ _ vs _) =
+genToAvro opts s@(S.Enum n _ _ vs) =
   toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     conP' = flip conP [] . mkAdtCtorName (namespaceBehavior opts) n
@@ -426,7 +428,7 @@ genToAvro opts s@(S.Enum n _ _ vs _) =
             toAvro = $([| \x ->
               let convert = AT.Enum $(varE sname) (fromEnum $([|x|]))
               in $(caseE [|x|] ((\v -> match (conP' v)
-                               (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> vs))
+                               (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> V.toList vs))
               |])
       |]
 genToAvro opts s@(S.Record n _ _ _ fs) =
@@ -460,90 +462,8 @@ schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
   [d|
       x :: Schema
-      x = $(schemaDef' sch)
+      x = sch -- $(schemaDef' sch)
   |]
-
-schemaDef' :: S.Type -> ExpQ
-schemaDef' = mkSchema
-  where mkSchema = \case
-          Null           -> [e| Null |]
-          Boolean        -> [e| Boolean |]
-          Int            -> [e| Int |]
-          Long           -> [e| Long |]
-          Float          -> [e| Float |]
-          Double         -> [e| Double |]
-          Bytes          -> [e| Bytes |]
-          String         -> [e| String |]
-          Array item     -> [e| Array $(mkSchema item) |]
-          Map values     -> [e| Map $(mkSchema values) |]
-          NamedType name -> [e| NamedType $(mkName name) |]
-          Record {..}    -> [e| Record { name      = $(mkName name)
-                                       , aliases   = $(ListE <$> mapM mkName aliases)
-                                       , doc       = $(mkMaybeText doc)
-                                       , order     = $(mkOrder order)
-                                       , fields    = $(ListE <$> mapM mkField fields)
-                                       }
-                              |]
-          Enum {..}      -> [e| mkEnum $(mkName name)
-                                       $(ListE <$> mapM mkName aliases)
-                                       $(mkMaybeText doc)
-                                       $(ListE <$> mapM mkText symbols)
-                              |]
-          Union {..}     -> [e| mkUnion $(mkNE options) |]
-          Fixed {..}     -> [e| Fixed { name      = $(mkName name)
-                                      , aliases   = $(ListE <$> mapM mkName aliases)
-                                      , size      = $(litE $ IntegerL $ fromIntegral size)
-                                      }
-                              |]
-
-        mkText text = [e| T.pack $(mkTextLit text) |]
-
-        mkName (TN name namespace) = [e| TN $(mkText name) $(mkNamespace namespace) |]
-        mkNamespace ls = listE $ stringE . T.unpack <$> ls
-
-        mkMaybeText (Just text) = [e| Just $(mkText text) |]
-        mkMaybeText Nothing     = [e| Nothing |]
-
-        mkOrder (Just Ascending)  = [e| Just Ascending |]
-        mkOrder (Just Descending) = [e| Just Descending |]
-        mkOrder (Just Ignore)     = [e| Just Ignore |]
-        mkOrder Nothing           = [e| Nothing |]
-
-        mkField Field {..} =
-          [e| Field { fldName    = $(mkText fldName)
-                    , fldAliases = $(ListE <$> mapM mkText fldAliases)
-                    , fldDoc     = $(mkMaybeText fldDoc)
-                    , fldOrder   = $(mkOrder fldOrder)
-                    , fldType    = $(mkSchema fldType)
-                    , fldDefault = $(fromMaybe [e|Nothing|] $ mkJust . mkDefaultValue <$> fldDefault)
-                    }
-            |]
-
-        mkJust exp = [e|Just $(exp)|]
-
-        mkDefaultValue = \case
-          AT.Null         -> [e| AT.Null |]
-          AT.Boolean b    -> [e| AT.Boolean $(if b then [e|True|] else [e|False|]) |]
-          AT.Int n        -> [e| AT.Int $(litE $ IntegerL $ fromIntegral n) |]
-          AT.Long n       -> [e| AT.Long $(litE $ IntegerL $ fromIntegral n) |]
-          AT.Float f      -> [e| AT.Long $(litE $ FloatPrimL $ realToFrac f) |]
-          AT.Double f     -> [e| AT.Long $(litE $ FloatPrimL $ realToFrac f) |]
-          AT.Bytes bs     -> [e| AT.Bytes $(mkByteString bs) |]
-          AT.String s     -> [e| AT.String $(mkText s) |]
-          AT.Array vec    -> [e| AT.Array $ V.fromList $(ListE <$> mapM mkDefaultValue (V.toList vec)) |]
-          AT.Map m        -> [e| AT.Map $ $(mkMap m) |]
-          AT.Record s m   -> [e| AT.Record $(mkSchema s) $(mkMap m) |]
-          AT.Union ts t v -> [e| AT.Union $(mkNE ts) $(mkSchema t) $(mkDefaultValue v) |]
-          AT.Fixed s bs   -> [e| AT.Fixed $(mkSchema s) $(mkByteString bs) |]
-          AT.Enum s n sym -> [e| AT.Enum $(mkSchema s) $(litE $ IntegerL $ fromIntegral n) $(mkText sym) |]
-
-        mkByteString bs = [e| B.pack $(ListE <$> mapM numericLit (B.unpack bs)) |]
-          where numericLit = litE . IntegerL . fromIntegral
-
-        mkMap (HM.toList -> xs) = [e| HM.fromList $(ListE <$> mapM mkKVPair xs) |]
-        mkKVPair (k, v)         = [e| ($(mkText k), $(mkDefaultValue v)) |]
-
-        mkNE (NE.toList -> xs) = [e| NE.fromList $(ListE <$> mapM mkSchema xs) |]
 
 -- | A hack around TemplateHaskell limitation:
 -- It is currently not possible to splice variable name in QQ.
@@ -560,9 +480,9 @@ genType opts (S.Record n _ _ _ fs) = do
   flds <- traverse (mkField opts n) fs
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genDataType dname flds]
-genType opts (S.Enum n _ _ vs _) = do
+genType opts (S.Enum n _ _ vs) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
-  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> vs)]
+  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> (V.toList vs))]
 genType opts (S.Fixed n _ s) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genNewtype dname]
@@ -577,23 +497,23 @@ mkFieldTypeName namespaceBehavior = \case
   S.Double           -> [t| Double |]
   S.Bytes            -> [t| ByteString |]
   S.String           -> [t| Text |]
-  S.Union branches _ -> union branches
+  S.Union branches   -> union (V.toList branches)
   S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
   S.Map x            -> [t| Map Text $(go x) |]
   S.Array x          -> [t| [$(go x)] |]
   S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   S.Fixed n _ _      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Enum n _ _ _ _   -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
+  S.Enum n _ _ _     -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior
         union = \case
-          Null :| [x]       -> [t| Maybe $(go x) |]
-          x :| [Null]       -> [t| Maybe $(go x) |]
-          x :| [y]          -> [t| Either $(go x) $(go y) |]
-          a :| [b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
-          a :| [b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
-          a :| [b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
-          _                 ->
+          [Null, x]       -> [t| Maybe $(go x) |]
+          [x, Null]       -> [t| Maybe $(go x) |]
+          [x, y]          -> [t| Either $(go x) $(go y) |]
+          [a, b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
+          [a, b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
+          [a, b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
+          _               ->
             error "Unions with more than 5 elements are not yet supported"
 
 updateFirst :: (Text -> Text) -> Text -> Text

@@ -14,6 +14,7 @@ import           Data.Semigroup             ((<>))
 import qualified Data.Set                   as S
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
+import qualified Data.Vector                as V
 
 -- | Extracts all the records from the schema (flattens the schema)
 -- Named types get resolved when needed to include at least one "inlined"
@@ -31,7 +32,7 @@ getTypes :: Type -> [(TypeName, Type)]
 getTypes rec = case rec of
   r@Record{name, fields} -> (name,r) : (fields >>= (getTypes . fldType))
   Array t                -> getTypes t
-  Union (t1 :| ts) _     -> getTypes t1 <> concatMap getTypes ts
+  Union ts               -> concatMap getTypes (V.toList ts)
   Map t                  -> getTypes t
   e@Enum{name}           -> [(name, e)]
   f@Fixed{name}          -> [(name, f)]
@@ -54,9 +55,9 @@ normSchema r = case r of
       Nothing ->
         error $ "Unable to resolve schema: " <> show (typeName t)
 
-  Array s   -> Array <$> normSchema s
-  Map s     -> Map <$> normSchema s
-  Union l f -> flip Union f <$> traverse normSchema l
+  Array s -> Array <$> normSchema s
+  Map s   -> Map <$> normSchema s
+  Union l -> Union <$> traverse normSchema l
   r@Record{name = tn}  -> do
     modify' (M.insert tn (NamedType tn))
     flds <- mapM (\fld -> setType fld <$> normSchema (fldType fld)) (fields r)

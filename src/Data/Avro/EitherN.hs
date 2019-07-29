@@ -214,27 +214,27 @@ instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLa
 
 instance (ToAvro a, ToAvro b, ToAvro c) => ToAvro (Either3 a b c) where
   toAvro e =
-    let sch@(one :| [two, three]) = options (schemaOf e)
+    let sch = options (schemaOf e)
     in case e of
-      E3_1 a -> T.Union sch one   (toAvro a)
-      E3_2 b -> T.Union sch two   (toAvro b)
-      E3_3 c -> T.Union sch three (toAvro c)
+      E3_1 a -> T.Union sch (schemaOf a) (toAvro a)
+      E3_2 b -> T.Union sch (schemaOf b) (toAvro b)
+      E3_3 c -> T.Union sch (schemaOf c) (toAvro c)
 
 instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d) => ToAvro (Either4 a b c d) where
   toAvro e =
-    let sch@(one :| [two, three, four]) = options (schemaOf e)
+    let sch = options (schemaOf e)
     in case e of
-      E4_1 a -> T.Union sch one   (toAvro a)
-      E4_2 b -> T.Union sch two   (toAvro b)
-      E4_3 c -> T.Union sch three (toAvro c)
-      E4_4 d -> T.Union sch four  (toAvro d)
+      E4_1 a -> T.Union sch (schemaOf a) (toAvro a)
+      E4_2 b -> T.Union sch (schemaOf b) (toAvro b)
+      E4_3 c -> T.Union sch (schemaOf c) (toAvro c)
+      E4_4 d -> T.Union sch (schemaOf d) (toAvro d)
 
 instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e) => ToAvro (Either5 a b c d e) where
   toAvro e =
-    let sch@(one :| [two, three, four, five]) = options (schemaOf e)
+    let sch = options (schemaOf e)
     in case e of
-      E5_1 a -> T.Union sch one   (toAvro a)
-      E5_2 b -> T.Union sch two   (toAvro b)
-      E5_3 c -> T.Union sch three (toAvro c)
-      E5_4 d -> T.Union sch four  (toAvro d)
-      E5_5 e -> T.Union sch five  (toAvro e)
+      E5_1 a -> T.Union sch (schemaOf a) (toAvro a)
+      E5_2 b -> T.Union sch (schemaOf b) (toAvro b)
+      E5_3 c -> T.Union sch (schemaOf c) (toAvro c)
+      E5_4 d -> T.Union sch (schemaOf d) (toAvro d)
+      E5_5 e -> T.Union sch (schemaOf e) (toAvro e)

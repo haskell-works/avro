@@ -64,6 +64,7 @@ library
       Data.Avro.DecodeRaw
       Data.Avro.Deconflict
       Data.Avro.Deriving
+      Data.Avro.Deriving.Lift
       Data.Avro.Deriving.NormSchema
       Data.Avro.EitherN
       Data.Avro.Encode
