@@ -62,6 +62,9 @@ normSchema r = case r of
     modify' (M.insert tn (NamedType tn))
     flds <- mapM (\fld -> setType fld <$> normSchema (fldType fld)) (fields r)
     pure $ r { fields = flds }
+  r@Fixed{name = tn} -> do
+    modify' (M.insert tn (NamedType tn))
+    pure r
   s         -> pure s
   where
     setType fld t = fld { fldType = t}

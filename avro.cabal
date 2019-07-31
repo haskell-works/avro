@@ -33,6 +33,7 @@ extra-source-files:
     test/data/overlay/composite.avsc
     test/data/overlay/expectation.avsc
     test/data/overlay/primitives.avsc
+    test/data/fixed-types.avsc
 
 source-repository head
   type: git
@@ -143,6 +144,7 @@ test-suite test
       Avro.JSONSpec
       Avro.NamespaceSpec
       Avro.NormSchemaSpec
+      Avro.ReuseFixedSpec
       Avro.SchemaSpec
       Avro.THEncodeContainerSpec
       Avro.THEnumSpec

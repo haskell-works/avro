@@ -1,0 +1,18 @@
+{
+  "name": "ReuseFixed",
+  "type": "record",
+  "fields": [
+    {
+      "name": "primary",
+      "type": {
+        "type": "fixed",
+        "name": "FixedData",
+        "size": 16
+      }
+    },
+    {
+      "name": "secondary",
+      "type": "FixedData"
+    }
+  ]
+}
