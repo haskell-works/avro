@@ -462,7 +462,7 @@ schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
   [d|
       x :: Schema
-      x = sch -- $(schemaDef' sch)
+      x = sch
   |]
 
 -- | A hack around TemplateHaskell limitation:
