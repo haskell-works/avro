@@ -1,9 +1,11 @@
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveLift         #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Data.Avro.Deriving.Lift
-where
+
+module Data.Avro.Deriving.Lift where
 
 import qualified Data.Avro.Schema           as Schema
 import qualified Data.Avro.Types.Value      as Avro
@@ -16,8 +18,11 @@ import           Language.Haskell.TH.Syntax (Lift (..))
 instance Lift ByteString.ByteString where
   lift b = [| ByteString.pack $(lift $ ByteString.unpack b) |]
 
+#if MIN_VERSION_text(1,2,4)
+#else
 instance Lift Text.Text where
   lift t = [| Text.pack $(lift $ Text.unpack t) |]
+#endif
 
 instance Lift a => Lift (Vector.Vector a) where
   lift v = [| Vector.fromList $(lift $ Vector.toList v) |]
