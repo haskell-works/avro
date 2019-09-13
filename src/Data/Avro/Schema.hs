@@ -734,6 +734,8 @@ parseAvroJSON union env ty av                  =
             when (len /= size) $
               fail $ "Fixed string wrong size. Expected " <> show size <> " but got " <> show len
             return $ Ty.Fixed ty bytes
+          _ -> fail $ "Expected type String, Enum, Bytes, or Fixed, but found (Type,Value)="
+             <> show (ty, av)
       A.Bool b       -> case ty of
                           Boolean -> return $ Ty.Boolean b
                           _       -> avroTypeMismatch ty "boolean"

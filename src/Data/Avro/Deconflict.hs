@@ -22,6 +22,12 @@ import qualified Data.Text.Encoding  as Text
 import           Data.Vector         (Vector)
 import qualified Data.Vector         as V
 
+type Deconflicter =
+     Schema        -- ^ Writer schema
+  -> Schema        -- ^ Reader schema
+  -> T.Value Schema
+  -> Either String (T.Value Schema)
+
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
 -- reader's schema.
@@ -33,8 +39,7 @@ deconflict :: Schema        -- ^ Writer schema
            -> Schema        -- ^ Reader schema
            -> T.Value Schema
            -> Either String (T.Value Schema)
-deconflict writerSchema readerSchema =
-  deconflictNoResolve (S.expandNamedTypes writerSchema) (S.expandNamedTypes readerSchema)
+deconflict = startDeconflict True
 
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
@@ -50,18 +55,17 @@ deconflictNoResolve :: Schema         -- ^ Writer schema
                     -> Schema         -- ^ Reader schema
                     -> T.Value Schema
                     -> Either String (T.Value Schema)
-deconflictNoResolve writerSchema readerSchema =
-  deconflictValue writerSchema readerSchema
+deconflictNoResolve = startDeconflict False
 
-deconflictValue :: Schema
-              -> Schema
-              -> T.Value Schema
-              -> Either String (T.Value Schema)
-deconflictValue writerSchema readerSchema v
-  | writerSchema == readerSchema    = Right v
-  | otherwise = go writerSchema readerSchema v
+
+startDeconflict :: Bool -> Deconflicter
+startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema readerSchema
   where
-  go :: Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)
+  aEnv = S.buildTypeEnvironment (const $ Left "Bad Schema") writerSchema
+  bEnv = S.buildTypeEnvironment (const $ Left "Bad Schema") readerSchema
+  go :: Deconflicter
+  go aTy bTy val
+    | not shouldExpandNames && aTy == bTy = Right val
   go (S.Array aTy) (S.Array bTy) (T.Array vec) =
        T.Array <$> mapM (go aTy bTy) vec
   go (S.Map aTy) (S.Map bTy) (T.Map mp)    =
@@ -71,13 +75,20 @@ deconflictValue writerSchema readerSchema v
   go a@S.Fixed {} b@S.Fixed {} val
        | name a == name b && size a == size b = Right val
   go a@S.Record {} b@S.Record {} val
-       | name a == name b = deconflictRecord a b val
+       | name a == name b = deconflictRecord go a b val
   go (S.Union xs) (S.Union ys) (T.Union _ tyVal val) =
-       withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion sch ys val
+       withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion go sch ys val
   go nonUnion (S.Union ys) val =
-       deconflictReaderUnion nonUnion ys val
+       deconflictReaderUnion go nonUnion ys val
   go (S.Union xs) nonUnion (T.Union _ tyVal val) =
-       withSchemaIn tyVal xs $ \sch -> deconflictValue sch nonUnion val
+       withSchemaIn tyVal xs $ \sch -> go sch nonUnion val
+  go (S.NamedType t) bTy val = do
+       aTy <- aEnv t
+       go aTy bTy val
+  go aTy (S.NamedType t) val = do
+       bTy <- bEnv t
+       go aTy bTy val
+  go aTy bTy val | aTy == bTy = Right val
   go eTy dTy val =
     case val of
       T.Int i32  | S.Long _ <- dTy   -> Right $ T.Long   (fromIntegral i32)
@@ -106,32 +117,32 @@ withSchemaIn schema schemas f =
     Nothing    -> Left $ "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> schemas) <> " does not contain schema " <> Text.unpack (typeName schema)
     Just found -> f found
 
-deconflictReaderUnion :: Schema -> Vector Schema -> T.Value Schema -> Either String (T.Value Schema)
-deconflictReaderUnion valueSchema unionTypes val =
+deconflictReaderUnion :: Deconflicter -> Schema -> Vector Schema -> T.Value Schema -> Either String (T.Value Schema)
+deconflictReaderUnion go valueSchema unionTypes val =
     let hdl [] = Left "Impossible: empty non-empty list."
         hdl (d:rest) =
-              case deconflictValue valueSchema d val of
+              case go valueSchema d val of
                 Right v -> Right (T.Union unionTypes d v)
                 Left _  -> hdl rest
     in hdl (V.toList unionTypes)
 
-deconflictRecord :: Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)
-deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
-  T.Record readerSchema . HashMap.fromList <$> mapM (deconflictFields fldVals (fields writerSchema)) (fields readerSchema)
+deconflictRecord :: Deconflicter -> Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)
+deconflictRecord go writerSchema readerSchema (T.Record ty fldVals)  =
+  T.Record readerSchema . HashMap.fromList <$> mapM (deconflictFields go fldVals (fields writerSchema)) (fields readerSchema)
 
 -- For each field of the decoders, lookup the field in the hash map
---  1) If the field exists, call 'deconflictValue'
+--  1) If the field exists, call the given deconflicting function
 --  2) If the field is missing use the reader's default
 --  3) If there is no default, fail.
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
-deconflictFields :: HashMap Text (T.Value Schema) -> [Field] -> Field -> Either String (Text,T.Value Schema)
-deconflictFields hm writerFields readerField =
+deconflictFields :: Deconflicter -> HashMap Text (T.Value Schema) -> [Field] -> Field -> Either String (Text,T.Value Schema)
+deconflictFields go hm writerFields readerField =
   let
     mbWriterField = findField readerField writerFields
     mbValue = HashMap.lookup (fldName readerField) hm
   in case (mbWriterField, mbValue, fldDefault readerField) of
-    (Just w, Just x,_)  -> (fldName readerField,) <$> deconflictValue (fldType w) (fldType readerField) x
+    (Just w, Just x,_)  -> (fldName readerField,) <$> go (fldType w) (fldType readerField) x
     (_, Just x,_)       -> Right (fldName readerField, x)
     (_, _,Just def)     -> Right (fldName readerField, def)
     (_,Nothing,Nothing) -> Left $ "No field and no default for " ++ show (fldName readerField)
