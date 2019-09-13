@@ -125,11 +125,9 @@ decodeContainerWithSchema s bs =
 decodeContainerWithSchema' :: FromLazyAvro a => Schema -> BL.ByteString -> Either String [[Either String a]]
 decodeContainerWithSchema' readerSchema bs = do
   (writerSchema, vals) <- getContainerValues bs
-  let writerSchema' = S.expandNamedTypes writerSchema
-  let readerSchema' = S.expandNamedTypes readerSchema
-  pure $ (fmap . fmap) (convertValue writerSchema' readerSchema') vals
+  pure $ (fmap . fmap) (convertValue writerSchema readerSchema) vals
   where
-    convertValue w r v = resultToEither $ fromLazyAvro (C.deconflictNoResolve w r v)
+    convertValue w r v = resultToEither $ fromLazyAvro (C.deconflict w r v)
 
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Type

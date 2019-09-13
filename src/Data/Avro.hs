@@ -131,11 +131,9 @@ decodeContainerWithSchema readerSchema bs =
   case D.decodeContainer bs of
     Right (writerSchema,val) ->
       let
-        writerSchema' = S.expandNamedTypes writerSchema
-        readerSchema' = S.expandNamedTypes readerSchema
         err e = error $ "Could not deconflict reader and writer schema." <> e
         dec x =
-          case C.deconflictNoResolve writerSchema' readerSchema' x of
+          case C.deconflict writerSchema readerSchema x of
             Left e   -> err e
             Right v  -> case fromAvro v of
                           Success x -> x

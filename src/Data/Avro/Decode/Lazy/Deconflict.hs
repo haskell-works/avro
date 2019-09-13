@@ -22,6 +22,12 @@ import qualified Data.Text.Encoding              as Text
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
 
+type Deconflicter =
+     Schema        -- ^ Writer schema
+  -> Schema        -- ^ Reader schema
+  -> T.LazyValue Type
+  -> T.LazyValue Type
+
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
 -- reader's schema.
@@ -33,8 +39,7 @@ deconflict :: Schema        -- ^ Writer schema
            -> Schema        -- ^ Reader schema
            -> T.LazyValue Type
            -> T.LazyValue Type
-deconflict writerSchema readerSchema =
-  deconflictNoResolve (S.expandNamedTypes writerSchema) (S.expandNamedTypes readerSchema)
+deconflict = startDeconflict True
 
 -- | @deconflict writer reader val@ will convert a value that was
 -- encoded/decoded with the writer's schema into the form specified by the
@@ -50,15 +55,16 @@ deconflictNoResolve :: Schema         -- ^ Writer schema
                     -> Schema         -- ^ Reader schema
                     -> T.LazyValue Type
                     -> T.LazyValue Type
-deconflictNoResolve writerSchema readerSchema =
-  deconflictValue writerSchema readerSchema
+deconflictNoResolve = startDeconflict False
 
-deconflictValue :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
-deconflictValue writerSchema readerSchema v
-  | writerSchema == readerSchema    = v
-  | otherwise = go writerSchema readerSchema v
+startDeconflict :: Bool -> Deconflicter
+startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema readerSchema
   where
-    go :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
+    aEnv = S.buildTypeEnvironment (const $ Left "Bad Schema") writerSchema
+    bEnv = S.buildTypeEnvironment (const $ Left "Bad Schema") readerSchema
+    go :: Deconflicter
+    go aTy bTy val
+        | not shouldExpandNames && aTy == bTy = val
     go _ _ val@(T.Error _) = val
     go (S.Array aTy) (S.Array bTy) (T.Array vec) =
         T.Array $ fmap (go aTy bTy) vec
@@ -69,22 +75,27 @@ deconflictValue writerSchema readerSchema v
     go a@S.Fixed {} b@S.Fixed {} val
         | name a == name b && size a == size b = val
     go a@S.Record {} b@S.Record {} val
-        | name a == name b = deconflictRecord a b val
+        | name a == name b = deconflictRecord go a b val
     go (S.Union xs) (S.Union ys) (T.Union _ tyVal val) =
-        withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion sch ys val
+        withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion go sch ys val
     go nonUnion (S.Union ys) val =
-        deconflictReaderUnion nonUnion ys val
+        deconflictReaderUnion go nonUnion ys val
     go (S.Union xs) nonUnion (T.Union _ tyVal val) =
-        withSchemaIn tyVal xs $ \sch -> deconflictValue sch nonUnion val
+        withSchemaIn tyVal xs $ \sch -> go sch nonUnion val
+    go (S.NamedType t) bTy val =
+      either T.Error (\aTy -> go aTy bTy val) $ aEnv t
+    go aTy (S.NamedType t) val =
+      either T.Error (\bTy -> go aTy bTy val) $ bEnv t
+    go aTy bTy val | aTy == bTy = val
     go eTy dTy val =
       case val of
         T.Int i32  | dTy == S.Long   -> T.Long   (fromIntegral i32)
                    | dTy == S.Float  -> T.Float  (fromIntegral i32)
                    | dTy == S.Double -> T.Double (fromIntegral i32)
-        T.Long i64 | dTy == S.Float  -> T.Float (fromIntegral i64)
+        T.Long i64 | dTy == S.Float  -> T.Float  (fromIntegral i64)
                    | dTy == S.Double -> T.Double (fromIntegral i64)
         T.Float f  | dTy == S.Double -> T.Double (realToFrac f)
-        T.String s | dTy == S.Bytes  -> T.Bytes (Text.encodeUtf8 s)
+        T.String s | dTy == S.Bytes  -> T.Bytes  (Text.encodeUtf8 s)
         T.Bytes bs | dTy == S.String -> T.String (Text.decodeUtf8 bs)
         _                            -> T.Error $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
@@ -104,32 +115,32 @@ withSchemaIn schema schemas f =
     Nothing    -> T.Error $ "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> schemas) <> " does not contain schema " <> Text.unpack (typeName schema)
     Just found -> f found
 
-deconflictReaderUnion :: Type -> Vector Type -> T.LazyValue Type -> T.LazyValue Type
-deconflictReaderUnion valueType unionTypes val =
+deconflictReaderUnion :: Deconflicter -> Type -> Vector Type -> T.LazyValue Type -> T.LazyValue Type
+deconflictReaderUnion go valueType unionTypes val =
   let hdl [] = T.Error $ "No corresponding union value for " <> Text.unpack (typeName valueType)
       hdl (d:rest) =
-            case deconflictValue valueType d val of
+            case go valueType d val of
               T.Error _ -> hdl rest
               v         -> T.Union unionTypes d v
   in hdl (V.toList unionTypes)
 
-deconflictRecord :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
-deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
-  T.Record readerSchema . HashMap.fromList $ fmap (deconflictFields fldVals (fields writerSchema)) (fields readerSchema)
+deconflictRecord :: Deconflicter -> Type -> Type -> T.LazyValue Type -> T.LazyValue Type
+deconflictRecord go writerSchema readerSchema (T.Record ty fldVals)  =
+  T.Record readerSchema . HashMap.fromList $ fmap (deconflictFields go fldVals (fields writerSchema)) (fields readerSchema)
 
 -- For each field of the decoders, lookup the field in the hash map
---  1) If the field exists, call 'deconflictValue'
+--  1) If the field exists, call the given deconflicting function
 --  2) If the field is missing use the reader's default
 --  3) If there is no default, fail.
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
-deconflictFields :: HashMap Text (T.LazyValue Type) -> [Field] -> Field -> (Text,T.LazyValue Type)
-deconflictFields hm writerFields readerField =
+deconflictFields :: Deconflicter -> HashMap Text (T.LazyValue Type) -> [Field] -> Field -> (Text,T.LazyValue Type)
+deconflictFields go hm writerFields readerField =
   let
     mbWriterField = findField readerField writerFields
     mbValue = HashMap.lookup (fldName readerField) hm
   in case (mbWriterField, mbValue, fldDefault readerField) of
-    (Just w, Just x,_)  -> (fldName readerField, deconflictValue (fldType w) (fldType readerField) x)
+    (Just w, Just x,_)  -> (fldName readerField, go (fldType w) (fldType readerField) x)
     (_, Just x,_)       -> (fldName readerField, x)
     (_, _,Just def)     -> (fldName readerField, fromStrictValue def)
     (_,Nothing,Nothing) -> (fldName readerField, T.Error ("No field and no default for " ++ show (fldName readerField)))

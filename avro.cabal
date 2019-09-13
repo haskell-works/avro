@@ -203,6 +203,8 @@ test-suite test
       Avro.Deconflict.B.Writer
       Avro.Deconflict.C.Reader
       Avro.Deconflict.C.Writer
+      Avro.Deconflict.D.Reader
+      Avro.Deconflict.D.Writer
       Avro.DeconflictSpec
       Avro.DefaultsSpec
       Avro.EncodeRawSpec
