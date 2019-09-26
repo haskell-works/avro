@@ -7,7 +7,7 @@
       "type": { "name": "Opaque", "type": "fixed", "size": 16 }
     },
     { "name": "correlation", "type": "Opaque" },
-    { "name": "tag", "type": ["int", "string"] },
+    { "name": "tag", "type": ["int", {"type": "string"}] },
     {
       "name": "ips",
       "type": { "type": "array", "items": "string" }

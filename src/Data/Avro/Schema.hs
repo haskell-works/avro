@@ -373,6 +373,14 @@ parseSchemaJSON context = \case
           aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
           size    <- o .: "size"
           pure $ Fixed typeName aliases size
+        "null"    -> pure Null
+        "boolean" -> pure Boolean
+        "int"     -> pure Int
+        "long"    -> pure Long
+        "float"   -> pure Float
+        "double"  -> pure Double
+        "bytes"   -> pure Bytes
+        "string"  -> pure String
         s        -> fail $ "Unrecognized object type: " <> T.unpack s
 
   invalid    -> typeMismatch "Invalid JSON for Avro Schema" invalid
