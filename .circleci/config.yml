@@ -20,6 +20,12 @@ workflows:
           context: haskell-ci
           binary-cache-uri: ${BINARY_CACHE_URI-"http://hw-binary-cache-us-west-2-a.s3-website-us-west-2.amazonaws.com/archive"}
 
+      - haskell/build-with-binary-cache:
+          name: GHC 8.8.1
+          executor: haskell/ghc-8_8_1
+          context: haskell-ci
+          binary-cache-uri: ${BINARY_CACHE_URI-"http://hw-binary-cache-us-west-2-a.s3-website-us-west-2.amazonaws.com/archive"}
+
       - github/release-cabal:
           context: haskell-ci
           name: GitHub Release
@@ -27,6 +33,7 @@ workflows:
           requires:
             - GHC 8.4.4
             - GHC 8.6.5
+            - GHC 8.8.1
           filters:
             branches:
               only: master
