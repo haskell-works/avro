@@ -767,6 +767,10 @@ expandNamedTypes =
         modify' (HashMap.insert name r')
         pure r'
 
+      r@Enum{name} -> do
+        modify' (HashMap.insert name r)
+        pure r
+
       other -> pure other
 
 -- | Merge two schemas to produce a third.
