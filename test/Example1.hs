@@ -26,7 +26,7 @@ msSchema =
       , fld "intvalue" Long Nothing
       ]
      where
-     fld nm ty def = Field nm [] Nothing Nothing ty def
+     fld nm ty def = Field nm [] Nothing Nothing AsIs ty def
      eOrS = mkUnion (meSchema :| [String])
 
 -- Encoding data, via the ToAvro class, requires both the routine that encodes

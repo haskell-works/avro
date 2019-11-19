@@ -21,12 +21,13 @@ module Data.Avro.Schema
   (
    -- * Schema description types
     Schema(..), Type
-  , Field(..), Order(..)
+  , Field(..), Order(..), FieldStatus(..)
   , TypeName(..)
   , renderFullname
   , parseFullname
   , mkEnum, mkUnion
   , validateSchema
+  , isSchemaStrict
   -- * Lower level utilities
   , typeName
   , buildTypeEnvironment
@@ -118,6 +119,14 @@ data Schema
               , aliases :: [TypeName]
               , size    :: Int
               }
+      | IntLongCoercion
+      | IntFloatCoercion
+      | IntDoubleCoercion
+      | LongFloatCoercion
+      | LongDoubleCoercion
+      | FloatDoubleCoercion
+      | FreeUnion { ty :: Type }
+      | Panic { ty :: Type, err :: String }
     deriving (Show, Generic, NFData)
 
 instance Eq Schema where
@@ -141,6 +150,15 @@ instance Eq Schema where
   Union a == Union b = a == b
   Fixed name1 _ s == Fixed name2 _ s2 =
     and [name1 == name2, s == s2]
+
+  IntLongCoercion     == IntLongCoercion     = True
+  IntFloatCoercion    == IntFloatCoercion    = True
+  IntDoubleCoercion   == IntDoubleCoercion   = True
+  LongFloatCoercion   == LongFloatCoercion   = True
+  LongDoubleCoercion  == LongDoubleCoercion  = True
+  FloatDoubleCoercion == FloatDoubleCoercion = True
+  FreeUnion ty1 == FreeUnion ty2 = ty1 == ty2
+  Panic ty1 _ == Panic ty2 _ = ty1 == ty2
 
   _ == _ = False
 
@@ -289,10 +307,17 @@ typeName bt =
     Union ts       -> typeName (V.head ts)
     _              -> renderFullname $ name bt
 
+data FieldStatus =
+    AsIs
+  | Ignored
+  | Defaulted (Ty.Value Type)
+  deriving (Eq, Show, Generic, NFData)
+
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
                    , fldDoc     :: Maybe Text
                    , fldOrder   :: Maybe Order
+                   , fldStatus  :: FieldStatus
                    , fldType    :: Schema
                    , fldDefault :: Maybe (Ty.Value Schema)
                    }
@@ -377,7 +402,7 @@ parseSchemaJSON context = \case
 
   invalid    -> typeMismatch "Invalid JSON for Avro Schema" invalid
 
--- | Parse aliases, inferring the namespace based on the type being aliases.
+-- | Parse aliases, inferring the namespace based on the type being aliased.
 mkAliases :: TypeName
              -- ^ The name of the type being aliased.
           -> [Text]
@@ -399,7 +424,7 @@ parseField record = \case
     name  <- o .: "name"
     doc   <- o .:? "doc"
     ty    <- parseSchemaJSON (Just record) =<< o .: "type"
-    let err = error "Haskell Avro bindings does not support default for aliased or recursive types at this time."
+    let err = fail "Haskell Avro bindings do not support default for aliased or recursive types at this time."
     defM  <- o .:! "default"
     def   <- case parseFieldDefault err ty <$> defM of
       Just (Success x) -> return (Just x)
@@ -409,7 +434,7 @@ parseField record = \case
 
     let mkAlias name = mkTypeName (Just record) name Nothing
     aliases  <- o .:? "aliases"  .!= []
-    return $ Field name aliases doc order ty def
+    return $ Field name aliases doc order AsIs ty def
   invalid    -> typeMismatch "Field" invalid
 
 instance ToJSON Schema where
@@ -686,6 +711,16 @@ instance FromJSON Order where
 --  * Named types are resolvable
 validateSchema :: Schema -> Parser ()
 validateSchema _sch = return () -- XXX TODO
+
+-- | True iff there are no errors in the schema.
+isSchemaStrict :: Schema -> Bool
+isSchemaStrict Array{item}    = isSchemaStrict item
+isSchemaStrict Map{values}    = isSchemaStrict values
+isSchemaStrict Record{fields} = all (isSchemaStrict . fldType) fields
+isSchemaStrict Union{options} = V.all isSchemaStrict options
+isSchemaStrict FreeUnion{ty}  = isSchemaStrict ty
+isSchemaStrict Panic{}        = False
+isSchemaStrict _              = True
 
 -- | @buildTypeEnvironment schema@ builds a function mapping type names to
 -- the types declared in the traversed schema.

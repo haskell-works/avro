@@ -60,9 +60,9 @@ encodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
           , ("l", Value.Long long)
           ]
         recordSchema = Schema.Record "Rec" [] Nothing Nothing
-          [ Schema.Field "b" [] Nothing Nothing Schema.Boolean Nothing
-          , Schema.Field "i" [] Nothing Nothing Schema.Int Nothing
-          , Schema.Field "l" [] Nothing Nothing Schema.Long Nothing
+          [ Schema.Field "b" [] Nothing Nothing Schema.AsIs Schema.Boolean Nothing
+          , Schema.Field "i" [] Nothing Nothing Schema.AsIs Schema.Int Nothing
+          , Schema.Field "l" [] Nothing Nothing Schema.AsIs Schema.Long Nothing
           ]
 
 encodeAvro :: Value Schema -> LBS.ByteString
@@ -106,9 +106,9 @@ decodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
           , ("l", Value.Long long)
           ]
         recordSchema = Schema.Record "Rec" [] Nothing Nothing
-          [ Schema.Field "b" [] Nothing Nothing Schema.Boolean Nothing
-          , Schema.Field "i" [] Nothing Nothing Schema.Int Nothing
-          , Schema.Field "l" [] Nothing Nothing Schema.Long Nothing
+          [ Schema.Field "b" [] Nothing Nothing Schema.AsIs Schema.Boolean Nothing
+          , Schema.Field "i" [] Nothing Nothing Schema.AsIs Schema.Int Nothing
+          , Schema.Field "l" [] Nothing Nothing Schema.AsIs Schema.Long Nothing
           ]
 
 decodeAvro :: Schema -> LBS.ByteString -> Value Schema

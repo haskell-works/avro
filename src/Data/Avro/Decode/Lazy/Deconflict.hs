@@ -22,6 +22,8 @@ import qualified Data.Text.Encoding              as Text
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
 
+{-# DEPRECATED deconflict, deconflictNoResolve "Use Data.Avro.Schema.Deconflict.deconflict or Data.Avro.Decode.Lazy.decodeContainerWithSchema instead." #-}
+
 type Deconflicter =
      Schema        -- ^ Writer schema
   -> Schema        -- ^ Reader schema
@@ -134,7 +136,7 @@ deconflictRecord go writerSchema readerSchema (T.Record ty fldVals)  =
 --  3) If there is no default, fail.
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
-deconflictFields :: Deconflicter -> HashMap Text (T.LazyValue Schema) -> [Field] -> Field -> (Text,T.LazyValue Schema)
+deconflictFields :: Deconflicter -> HashMap Text (T.LazyValue Schema) -> [Field] -> Field -> (Text, T.LazyValue Schema)
 deconflictFields go hm writerFields readerField =
   let
     mbWriterField = findField readerField writerFields

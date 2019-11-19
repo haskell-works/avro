@@ -69,7 +69,7 @@ module Data.Avro
 import           Control.Arrow         (first)
 import qualified Data.Avro.Decode      as D
 import qualified Data.Avro.Decode.Lazy as DL
-import           Data.Avro.Deconflict  as C
+import           Data.Avro.Schema.Deconflict
 import qualified Data.Avro.Encode      as E
 import           Data.Avro.Schema      as S
 import           Data.Avro.Types       as T
@@ -83,6 +83,7 @@ import qualified Data.HashMap.Strict   as HashMap
 import           Data.Int
 import           Data.List.NonEmpty    (NonEmpty (..))
 import qualified Data.Map              as Map
+import           Data.Maybe            (fromMaybe)
 import           Data.Monoid           ((<>))
 import           Data.Tagged
 import           Data.Text             (Text)
@@ -128,17 +129,13 @@ decodeContainer bs =
 -- allow this function to be read lazy (to be done in some later version).
 decodeContainerWithSchema :: FromAvro a => Schema -> ByteString -> [[a]]
 decodeContainerWithSchema readerSchema bs =
-  case D.decodeContainer bs of
-    Right (writerSchema,val) ->
+  case D.decodeContainerWith (D.getAvroOf . flip deconflict readerSchema) bs of
+    Right (_, val) ->
       let
-        err e = error $ "Could not deconflict reader and writer schema." <> e
-        dec x =
-          case C.deconflict writerSchema readerSchema x of
-            Left e   -> err e
-            Right v  -> case fromAvro v of
-                          Success x -> x
-                          Error e   -> error e
-      in P.map (P.map dec) val
+        from v = case fromAvro v of
+          Success x -> x
+          Error e   -> error e
+      in P.map (P.map from) val
     Left err -> error err
 
 -- | Encodes a value to a lazy ByteString
