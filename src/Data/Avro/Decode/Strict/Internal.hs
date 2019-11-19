@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
 module Data.Avro.Decode.Strict.Internal
 where
 
@@ -64,8 +65,7 @@ getAvroOf ty0 = go ty0
          return $ T.Map (HashMap.fromList $ mconcat kvs)
     NamedType tn -> env tn >>= go
     Record {..} ->
-      do let getField Field {..} = (fldName,) <$> go fldType
-         T.Record ty . HashMap.fromList <$> mapM getField fields
+      T.Record ty . HashMap.fromList . catMaybes <$> mapM getField fields
     Enum {..} ->
       do i <- getLong
          let sym = fromMaybe "" (symbols V.!? (fromIntegral i)) -- empty string for 'missing' symbols (alternative is an error or exception)
@@ -76,6 +76,20 @@ getAvroOf ty0 = go ty0
           Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (V.map typeName ts)
           Just t  -> T.Union ts t <$> go t
     Fixed {..} -> T.Fixed ty <$> G.getByteString (fromIntegral size)
+    IntLongCoercion     -> T.Long   . fromIntegral <$> getAvro @Int32
+    IntFloatCoercion    -> T.Float  . fromIntegral <$> getAvro @Int32
+    IntDoubleCoercion   -> T.Double . fromIntegral <$> getAvro @Int32
+    LongFloatCoercion   -> T.Float  . fromIntegral <$> getAvro @Int64
+    LongDoubleCoercion  -> T.Double . fromIntegral <$> getAvro @Int64
+    FloatDoubleCoercion -> T.Double . realToFrac   <$> getAvro @Float
+    FreeUnion ty -> T.Union (V.singleton ty) ty <$> go ty
+
+ getField :: Field -> Get (Maybe (Text, T.Value Schema))
+ getField Field{..} =
+  case (fldReadIgnore, fldDefault) of
+    (False, _)       -> Just . (fldName,) <$> go fldType
+    (True,  Just v)  -> pure $ Just (fldName, v)
+    (True,  Nothing) -> go fldType >> pure Nothing
 
  getKVBlocks :: Schema -> Get [[(Text,T.Value Schema)]]
  getKVBlocks t =

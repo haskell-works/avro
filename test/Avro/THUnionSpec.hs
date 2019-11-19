@@ -67,7 +67,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
                                           }
         }
 
-      field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) schema def
+      field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) False schema def
       record name fields =
         Schema.Record name [] Nothing (Just Schema.Ascending) fields
       named = Schema.NamedType

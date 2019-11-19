@@ -22,7 +22,7 @@ module Data.Avro.Schema
   (
    -- * Schema description types
     Schema(.., Int', Long', Bytes', String'), Type
-  , Field(..), Order(..)
+  , Field(..), Order(..), FieldStatus(..)
   , TypeName(..)
   , Decimal(..)
   , LogicalTypeBytes(..), LogicalTypeFixed(..)
@@ -126,6 +126,13 @@ data Schema
               , size         :: Int
               , logicalTypeF :: Maybe LogicalTypeFixed
               }
+      | IntLongCoercion
+      | IntFloatCoercion
+      | IntDoubleCoercion
+      | LongFloatCoercion
+      | LongDoubleCoercion
+      | FloatDoubleCoercion
+      | FreeUnion { ty :: Type }
     deriving (Ord, Show, Generic, NFData)
 
 pattern Int'    = Int    Nothing
@@ -178,6 +185,14 @@ instance Eq Schema where
   Union a == Union b = a == b
   Fixed name1 _ s lt1 == Fixed name2 _ s2 lt2 =
     (name1 == name2) && (s == s2) && (lt1 == lt2)
+
+  IntLongCoercion     == IntLongCoercion     = True
+  IntFloatCoercion    == IntFloatCoercion    = True
+  IntDoubleCoercion   == IntDoubleCoercion   = True
+  LongFloatCoercion   == LongFloatCoercion   = True
+  LongDoubleCoercion  == LongDoubleCoercion  = True
+  FloatDoubleCoercion == FloatDoubleCoercion = True
+  FreeUnion ty1 == FreeUnion ty2 = ty1 == ty2
 
   _ == _ = False
 
@@ -349,10 +364,17 @@ typeName bt =
   where
     decimalName (Decimal prec sc) = "decimal(" <> T.pack (show prec) <> "," <> T.pack (show sc) <> ")"
 
+data FieldStatus =
+    AsIs
+  | Ignored
+  | Defaulted (Ty.Value Schema)
+  deriving (Eq, Ord, Show, Generic, NFData)
+
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
                    , fldDoc     :: Maybe Text
                    , fldOrder   :: Maybe Order
+                   , fldStatus  :: FieldStatus
                    , fldType    :: Schema
                    , fldDefault :: Maybe (Ty.Value Schema)
                    }
@@ -376,21 +398,21 @@ parseSchemaJSON :: Maybe TypeName
                 -> Parser Schema
 parseSchemaJSON context = \case
   A.String s -> case s of
-    "null"    -> return Null
-    "boolean" -> return Boolean
-    "int"     -> return $ Int Nothing
-    "long"    -> return $ Long Nothing
-    "float"   -> return Float
-    "double"  -> return Double
-    "bytes"   -> return $ Bytes Nothing
-    "string"  -> return $ String Nothing
-    "uuid"    -> return $ String (Just UUID)
-    "date"    -> return $ Int (Just Date)
-    "time-millis" -> return $ Int (Just TimeMillis)
-    "time-micros" -> return $ Long (Just TimeMicros)
+    "null"             -> return Null
+    "boolean"          -> return Boolean
+    "int"              -> return $ Int Nothing
+    "long"             -> return $ Long Nothing
+    "float"            -> return Float
+    "double"           -> return Double
+    "bytes"            -> return $ Bytes Nothing
+    "string"           -> return $ String Nothing
+    "uuid"             -> return $ String (Just UUID)
+    "date"             -> return $ Int (Just Date)
+    "time-millis"      -> return $ Int (Just TimeMillis)
+    "time-micros"      -> return $ Long (Just TimeMicros)
     "timestamp-millis" -> return $ Long (Just TimestampMillis)
     "timestamp-micros" -> return $ Long (Just TimestampMicros)
-    somename  -> return $ NamedType $ mkTypeName context somename Nothing
+    somename           -> return $ NamedType $ mkTypeName context somename Nothing
   A.Array arr
     | V.length arr > 0 ->
       Union <$> V.mapM (parseSchemaJSON context) arr
@@ -430,7 +452,7 @@ parseSchemaJSON context = \case
           s      -> fail $ "Unsupported underlying type: " <> T.unpack s
       Just "duration" -> case ty of
           "fixed" -> (\fx -> fx { logicalTypeF = Just Duration }) <$> parseFixed o
-          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
+          s       -> fail $ "Unsupported underlying type: " <> T.unpack s
       Just _  -> parseJSON (A.String ty)
       Nothing -> case ty of
         "map"    -> Map <$> (parseSchemaJSON context =<< o .: "values")
@@ -509,7 +531,7 @@ parseField record = \case
 
     let mkAlias name = mkTypeName (Just record) name Nothing
     aliases  <- o .:? "aliases"  .!= []
-    return $ Field name aliases doc order ty def
+    return $ Field name aliases doc order AsIs ty def
   invalid    -> typeMismatch "Field" invalid
 
 instance ToJSON Schema where
@@ -555,7 +577,7 @@ schemaToJSON context = \case
     object [ "type" .= ("bytes" :: Text), "logicalType" .= ("decimal" :: Text)
            , "precision" .= prec, "scale" .= sc ]
   String Nothing  -> A.String "string"
-  String (Just UUID) -> 
+  String (Just UUID) ->
     object [ "type" .= ("string" :: Text), "logicalType" .= ("uuid" :: Text) ]
   Array tn        ->
     object [ "type" .= ("array" :: Text), "items" .= schemaToJSON context tn ]
@@ -583,7 +605,7 @@ schemaToJSON context = \case
        ]
   Union  {..} -> toJSON $ schemaToJSON context <$> options
   Fixed  {..} ->
-    let basic = 
+    let basic =
            [ "type"    .= ("fixed" :: Text)
            , "name"    .= render context name
            , "aliases" .= (render (Just name) <$> aliases)
@@ -633,7 +655,7 @@ instance ToJSON (Ty.Value Schema) where
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 badValue :: Show t => t -> String -> Result a
 badValue v t = fail $ "Unexpected value for '" <> t <> "': " <> show v

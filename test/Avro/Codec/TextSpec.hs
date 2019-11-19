@@ -20,7 +20,7 @@ newtype OnlyText = OnlyText
 
 onlyTextSchema :: Schema
 onlyTextSchema =
-  let fld nm = Field nm [] Nothing Nothing
+  let fld nm = Field nm [] Nothing Nothing False
   in Record "test.contract.OnlyText" [] Nothing Nothing
         [ fld "onlyTextValue" String' Nothing
         ]

@@ -23,7 +23,7 @@ data ParentType = ParentType
 
 childTypeSchema :: Schema
 childTypeSchema =
-  let fld nm = Field nm [] Nothing Nothing
+  let fld nm = Field nm [] Nothing Nothing False
   in Record "test.contract.ChildType" [] Nothing Nothing
         [ fld "childValue1" Long' Nothing
         , fld "childValue2" Long' Nothing
@@ -31,7 +31,7 @@ childTypeSchema =
 
 parentTypeSchema :: Schema
 parentTypeSchema =
-  let fld nm = Field nm [] Nothing Nothing
+  let fld nm = Field nm [] Nothing Nothing False
   in Record "test.contract.ParentType" [] Nothing Nothing
         [ fld "parentValue1" Long'             Nothing
         , fld "parentValue2" (Array childTypeSchema)  Nothing]

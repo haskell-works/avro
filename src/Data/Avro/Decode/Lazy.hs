@@ -5,6 +5,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module Data.Avro.Decode.Lazy
   ( decodeAvro
@@ -66,10 +67,10 @@ import           Data.Avro.Zag
 import qualified Data.Avro.Decode.Strict.Internal as DecodeStrict
 
 import Data.Avro.Decode.Get
-import Data.Avro.Decode.Lazy.Convert      (toStrictValue)
-import Data.Avro.Decode.Lazy.Deconflict   as C
+import Data.Avro.Decode.Lazy.Convert      (fromStrictValue, toStrictValue)
 import Data.Avro.Decode.Lazy.FromLazyAvro
 import Data.Avro.FromAvro
+import Data.Avro.Schema.Deconflict
 
 -- | Decodes the container as a lazy list of values of the requested type.
 --
@@ -124,10 +125,13 @@ decodeContainerWithSchema s bs =
 -- and with the container's writer schema.
 decodeContainerWithSchema' :: FromLazyAvro a => Schema -> BL.ByteString -> Either String [[Either String a]]
 decodeContainerWithSchema' readerSchema bs = do
-  (writerSchema, vals) <- getContainerValues bs
-  pure $ (fmap . fmap) (convertValue writerSchema readerSchema) vals
+  (_, vals) <- getDeconflictedValues bs
+  pure $ (fmap . fmap) (resultToEither . fromLazyAvro) vals
   where
-    convertValue w r v = resultToEither $ fromLazyAvro (C.deconflict w r v)
+    getDeconflictedValues = getContainerValuesWith (getAvroOf' . flip deconflict readerSchema)
+    getAvroOf' :: Either String Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
+    getAvroOf' (Left err) bs = (bs, T.Error err)
+    getAvroOf' (Right sc) bs = getAvroOf sc bs
 
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Schema
@@ -308,9 +312,8 @@ getAvroOf ty0 bs = go ty0 bs
           Right (bs', _, v)  -> go v bs'
 
       Record {..} -> do
-        let getField bs' Field {..} = (fldName,) <$> go fldType bs'
-        let flds = foldl' (\(bs', as) fld -> (:as) <$> getField bs' fld ) (bs, []) fields
-        T.Record ty . HashMap.fromList <$> flds
+        let flds = foldl' (\(bs', as) fld -> (:as) <$> getField fld bs' ) (bs, []) fields
+        T.Record ty . HashMap.fromList . catMaybes <$> flds
 
       Enum {..} ->
         case runGetOrFail getLong bs of
@@ -332,6 +335,21 @@ getAvroOf ty0 bs = go ty0 bs
         case runGetOrFail (G.getByteString (fromIntegral size)) bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, v)  -> (bs', T.Fixed ty v)
+
+      IntLongCoercion     -> decodeGet @Int32 (T.Long   . fromIntegral) bs
+      IntFloatCoercion    -> decodeGet @Int32 (T.Float  . fromIntegral) bs
+      IntDoubleCoercion   -> decodeGet @Int32 (T.Double . fromIntegral) bs
+      LongFloatCoercion   -> decodeGet @Int64 (T.Float  . fromIntegral) bs
+      LongDoubleCoercion  -> decodeGet @Int64 (T.Double . fromIntegral) bs
+      FloatDoubleCoercion -> decodeGet @Float (T.Double . realToFrac)   bs
+      FreeUnion {..} -> T.Union (V.singleton ty) ty <$> go ty bs
+
+  getField :: Field -> BL.ByteString -> (BL.ByteString, Maybe (Text, T.LazyValue Schema))
+  getField Field{..} bs =
+    case (fldReadIgnore, fldDefault) of
+      (False, _)       -> Just . (fldName,) <$> go fldType bs
+      (True,  Just v)  -> (bs, Just (fldName, fromStrictValue v))
+      (True,  Nothing) -> (fst (go fldType bs), Nothing)
 {-# INLINABLE getAvroOf #-}
 
 getKVPair getElement bs =

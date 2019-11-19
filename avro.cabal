@@ -144,6 +144,7 @@ library
                         Data.Avro.HasAvroSchema
                         Data.Avro.JSON
                         Data.Avro.Schema
+                        Data.Avro.Schema.Deconflict
                         Data.Avro.ToAvro
                         Data.Avro.Types
                         Data.Avro.Types.Decimal
@@ -241,6 +242,7 @@ benchmark bench-time
                       , aeson
                       , bytestring
                       , containers
+                      , deepseq
                       , gauge
                       , hashable
                       , mtl
