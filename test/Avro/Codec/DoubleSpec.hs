@@ -19,7 +19,7 @@ newtype OnlyDouble = OnlyDouble
 
 onlyDoubleSchema :: Schema
 onlyDoubleSchema =
-  let fld nm = Field nm [] Nothing Nothing
+  let fld nm = Field nm [] Nothing Nothing AsIs
   in Record "test.contract.OnlyDouble" [] Nothing Nothing
         [ fld "onlyDoubleValue" Double Nothing
         ]

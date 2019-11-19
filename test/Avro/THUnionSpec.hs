@@ -50,7 +50,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , unionsFive        = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
         }
 
-      field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) schema def
+      field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) Schema.AsIs schema def
       record name fields =
         Schema.Record name [] Nothing (Just Schema.Ascending) fields
       named = Schema.NamedType

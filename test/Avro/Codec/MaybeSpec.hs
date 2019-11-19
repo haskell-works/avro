@@ -22,7 +22,7 @@ newtype OnlyMaybeBool = OnlyMaybeBool
 
 onlyMaybeBoolSchema :: Schema
 onlyMaybeBoolSchema =
-  let fld nm = Field nm [] Nothing Nothing
+  let fld nm = Field nm [] Nothing Nothing AsIs
    in Record "test.contract.onlyMaybeBool" [] Nothing Nothing
         [ fld "onlyMaybeBoolValue" (mkUnion (Null :| [Boolean])) Nothing
         ]

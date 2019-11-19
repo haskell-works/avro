@@ -22,6 +22,8 @@ import qualified Data.Text.Encoding  as Text
 import           Data.Vector         (Vector)
 import qualified Data.Vector         as V
 
+{-# DEPRECATED deconflict, deconflictNoResolve "Use Data.Avro.Schema.Deconflict.deconflict or Data.Avro.decodeContainerWithSchema instead." #-}
+
 type Deconflicter =
      Schema        -- ^ Writer schema
   -> Schema        -- ^ Reader schema

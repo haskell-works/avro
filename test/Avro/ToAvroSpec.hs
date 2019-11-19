@@ -31,7 +31,7 @@ data TypesTestMessage = TypesTestMessage
 
 tmSchema :: Schema
 tmSchema =
-  let fld nm = Field nm [] Nothing Nothing
+  let fld nm = Field nm [] Nothing Nothing AsIs
    in Record "avro.haskell.test.TypesTestMessage" [] Nothing Nothing
         [ fld "id" Long Nothing
         , fld "name" String Nothing

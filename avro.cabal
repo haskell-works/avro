@@ -139,6 +139,7 @@ library
                         Data.Avro.HasAvroSchema
                         Data.Avro.JSON
                         Data.Avro.Schema
+                        Data.Avro.Schema.Deconflict
                         Data.Avro.ToAvro
                         Data.Avro.Types
                         Data.Avro.Types.Value
