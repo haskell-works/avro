@@ -1,39 +1,38 @@
-cabal-version:  2.2
+cabal-version: 2.2
 
-name:           avro
-version:        0.4.5.4
-synopsis:       Avro serialization support for Haskell
-description:    Avro serialization and deserialization support for Haskell
-category:       Data
-homepage:       https://github.com/haskell-works/avro#readme
-bug-reports:    https://github.com/haskell-works/avro/issues
-author:         Thomas M. DuBuisson
-maintainer:     Alexey Raga <alexey.raga@gmail.com>
-license:        BSD-3-Clause
-license-file:   LICENSE
-build-type:     Simple
-extra-source-files:
-    README.md
-    ChangeLog.md
-    test/data/enums.avsc
-    test/data/internal-bindings.avsc
-    test/data/karma.avsc
-    test/data/logical.avsc
-    test/data/maybe.avsc
-    test/data/record.avsc
-    test/data/reused.avsc
-    test/data/small.avsc
-    test/data/unions-no-namespace.avsc
-    test/data/unions.avsc
-    test/data/enums-object.json
-    test/data/namespace-inference.json
-    test/data/null-namespace.json
-    test/data/unions-object-a.json
-    test/data/unions-object-b.json
-    test/data/overlay/composite.avsc
-    test/data/overlay/expectation.avsc
-    test/data/overlay/primitives.avsc
-    test/data/fixed-types.avsc
+name:                   avro
+version:                0.4.5.4
+synopsis:               Avro serialization support for Haskell
+description:            Avro serialization and deserialization support for Haskell
+category:               Data
+homepage:               https://github.com/haskell-works/avro#readme
+bug-reports:            https://github.com/haskell-works/avro/issues
+author:                 Thomas M. DuBuisson
+maintainer:             Alexey Raga <alexey.raga@gmail.com>
+license:                BSD-3-Clause
+license-file:           LICENSE
+build-type:             Simple
+extra-source-files:     README.md
+                        ChangeLog.md
+                        test/data/enums.avsc
+                        test/data/internal-bindings.avsc
+                        test/data/karma.avsc
+                        test/data/logical.avsc
+                        test/data/maybe.avsc
+                        test/data/record.avsc
+                        test/data/reused.avsc
+                        test/data/small.avsc
+                        test/data/unions-no-namespace.avsc
+                        test/data/unions.avsc
+                        test/data/enums-object.json
+                        test/data/namespace-inference.json
+                        test/data/null-namespace.json
+                        test/data/unions-object-a.json
+                        test/data/unions-object-b.json
+                        test/data/overlay/composite.avsc
+                        test/data/overlay/expectation.avsc
+                        test/data/overlay/primitives.avsc
+                        test/data/fixed-types.avsc
 
 source-repository head
   type: git
@@ -62,6 +61,8 @@ common containers               { build-depends: containers                     
 common data-binary-ieee754      { build-depends: data-binary-ieee754                                }
 common deepseq                  { build-depends: deepseq                                            }
 common directory                { build-depends: directory                                          }
+common doctest                  { build-depends: doctest                  >= 0.16.2     && < 0.17   }
+common doctest-discover         { build-depends: doctest-discover         >= 0.2        && < 0.3    }
 common extra                    { build-depends: extra                                              }
 common fail                     { build-depends: fail                                               }
 common gauge                    { build-depends: gauge                                              }
@@ -85,167 +86,174 @@ common vector                   { build-depends: vector                         
 common zlib                     { build-depends: zlib                                               }
 
 common config
-  default-language: Haskell2010
+  default-language:     Haskell2010
   if flag(templatehaskell)
-    other-extensions: TemplateHaskell
-    build-depends:
-        template-haskell >=2.4
+    other-extensions:   TemplateHaskell
+    build-depends:      template-haskell >=2.4
   if flag(dev)
-    ghc-options: -Wall -Werror
+    ghc-options:        -Wall -Werror
 
 library
-  import:   base
-          , aeson
-          , array
-          , base16-bytestring
-          , bifunctors
-          , binary
-          , bytestring
-          , containers
-          , config
-          , data-binary-ieee754
-          , deepseq
-          , fail
-          , hashable
-          , mtl
-          , scientific
-          , semigroups
-          , tagged
-          , text
-          , tf-random
-          , unordered-containers
-          , vector
-          , zlib
-  exposed-modules:
-      Data.Avro
-      Data.Avro.Codec
-      Data.Avro.Decode
-      Data.Avro.Decode.Get
-      Data.Avro.Decode.Lazy
-      Data.Avro.Decode.Lazy.Convert
-      Data.Avro.Decode.Lazy.Deconflict
-      Data.Avro.Decode.Lazy.FromLazyAvro
-      Data.Avro.Decode.Lazy.LazyValue
-      Data.Avro.Decode.Strict
-      Data.Avro.Decode.Strict.Internal
-      Data.Avro.DecodeRaw
-      Data.Avro.Deconflict
-      Data.Avro.Deriving
-      Data.Avro.Deriving.Lift
-      Data.Avro.Deriving.NormSchema
-      Data.Avro.EitherN
-      Data.Avro.Encode
-      Data.Avro.EncodeRaw
-      Data.Avro.FromAvro
-      Data.Avro.HasAvroSchema
-      Data.Avro.JSON
-      Data.Avro.Schema
-      Data.Avro.ToAvro
-      Data.Avro.Types
-      Data.Avro.Types.Value
-      Data.Avro.Zag
-      Data.Avro.Zig
-  hs-source-dirs: src
-  other-extensions: OverloadedStrings
+  import:               base
+                      , aeson
+                      , array
+                      , base16-bytestring
+                      , bifunctors
+                      , binary
+                      , bytestring
+                      , containers
+                      , config
+                      , data-binary-ieee754
+                      , deepseq
+                      , fail
+                      , hashable
+                      , mtl
+                      , scientific
+                      , semigroups
+                      , tagged
+                      , text
+                      , tf-random
+                      , unordered-containers
+                      , vector
+                      , zlib
+  exposed-modules:      Data.Avro
+                        Data.Avro.Codec
+                        Data.Avro.Decode
+                        Data.Avro.Decode.Get
+                        Data.Avro.Decode.Lazy
+                        Data.Avro.Decode.Lazy.Convert
+                        Data.Avro.Decode.Lazy.Deconflict
+                        Data.Avro.Decode.Lazy.FromLazyAvro
+                        Data.Avro.Decode.Lazy.LazyValue
+                        Data.Avro.Decode.Strict
+                        Data.Avro.Decode.Strict.Internal
+                        Data.Avro.DecodeRaw
+                        Data.Avro.Deconflict
+                        Data.Avro.Deriving
+                        Data.Avro.Deriving.Lift
+                        Data.Avro.Deriving.NormSchema
+                        Data.Avro.EitherN
+                        Data.Avro.Encode
+                        Data.Avro.EncodeRaw
+                        Data.Avro.FromAvro
+                        Data.Avro.HasAvroSchema
+                        Data.Avro.JSON
+                        Data.Avro.Schema
+                        Data.Avro.ToAvro
+                        Data.Avro.Types
+                        Data.Avro.Types.Value
+                        Data.Avro.Zag
+                        Data.Avro.Zig
+  hs-source-dirs:       src
+  other-extensions:     OverloadedStrings
 
 test-suite test
-  import:   base
-          , aeson
-          , array
-          , avro
-          , base16-bytestring
-          , bifunctors
-          , binary
-          , bytestring
-          , containers
-          , directory
-          , extra
-          , fail
-          , hashable
-          , hspec
-          , lens
-          , lens-aeson
-          , mtl
-          , pure-zlib
-          , QuickCheck
-          , raw-strings-qq
-          , scientific
-          , semigroups
-          , tagged
-          , text
-          , tf-random
-          , transformers
-          , unordered-containers
-          , vector
-  type: exitcode-stdio-1.0
-  ghc-options: -threaded
-  default-language: Haskell2010
-  main-is: Spec.hs
-  build-tool-depends: hspec-discover:hspec-discover
+  import:               base
+                      , aeson
+                      , array
+                      , avro
+                      , base16-bytestring
+                      , bifunctors
+                      , binary
+                      , bytestring
+                      , containers
+                      , directory
+                      , extra
+                      , fail
+                      , hashable
+                      , hspec
+                      , lens
+                      , lens-aeson
+                      , mtl
+                      , pure-zlib
+                      , QuickCheck
+                      , raw-strings-qq
+                      , scientific
+                      , semigroups
+                      , tagged
+                      , text
+                      , tf-random
+                      , transformers
+                      , unordered-containers
+                      , vector
+  type:                 exitcode-stdio-1.0
+  ghc-options:          -threaded
+  default-language:     Haskell2010
+  main-is:              Spec.hs
+  build-tool-depends:   hspec-discover:hspec-discover
   other-modules:
-      Avro.Codec.ArraySpec
-      Avro.Codec.BoolSpec
-      Avro.Codec.CodecRawSpec
-      Avro.Codec.DoubleSpec
-      Avro.Codec.FloatSpec
-      Avro.Codec.Int64Spec
-      Avro.Codec.MaybeSpec
-      Avro.Codec.NestedSpec
-      Avro.Codec.TextSpec
-      Avro.Codec.ZigZagSpec
-      Avro.Decode.Lazy.ContainerSpec
-      Avro.Decode.Lazy.RawBlocksSpec
-      Avro.Decode.Lazy.RawValuesSpec
-      Avro.Decode.Lazy.ValuesSpec
-      Avro.Deconflict.A.Reader
-      Avro.Deconflict.A.Writer
-      Avro.Deconflict.B.Reader
-      Avro.Deconflict.B.Writer
-      Avro.Deconflict.C.Reader
-      Avro.Deconflict.C.Writer
-      Avro.DeconflictSpec
-      Avro.DefaultsSpec
-      Avro.EncodeRawSpec
-      Avro.JSONSpec
-      Avro.NamespaceSpec
-      Avro.NormSchemaSpec
-      Avro.ReuseFixedSpec
-      Avro.SchemaSpec
-      Avro.THEncodeContainerSpec
-      Avro.THEnumSpec
-      Avro.THLogicalTypeSpec
-      Avro.THReusedSpec
-      Avro.THSimpleSpec
-      Avro.THUnionSpec
-      Avro.ToAvroSpec
-      DecodeContainer
-      Example1
-      Paths_avro
-  autogen-modules:    Paths_avro
-  hs-source-dirs:     test
-
+                        Avro.Codec.ArraySpec
+                        Avro.Codec.BoolSpec
+                        Avro.Codec.CodecRawSpec
+                        Avro.Codec.DoubleSpec
+                        Avro.Codec.FloatSpec
+                        Avro.Codec.Int64Spec
+                        Avro.Codec.MaybeSpec
+                        Avro.Codec.NestedSpec
+                        Avro.Codec.TextSpec
+                        Avro.Codec.ZigZagSpec
+                        Avro.Decode.Lazy.ContainerSpec
+                        Avro.Decode.Lazy.RawBlocksSpec
+                        Avro.Decode.Lazy.RawValuesSpec
+                        Avro.Decode.Lazy.ValuesSpec
+                        Avro.Deconflict.A.Reader
+                        Avro.Deconflict.A.Writer
+                        Avro.Deconflict.B.Reader
+                        Avro.Deconflict.B.Writer
+                        Avro.Deconflict.C.Reader
+                        Avro.Deconflict.C.Writer
+                        Avro.DeconflictSpec
+                        Avro.DefaultsSpec
+                        Avro.EncodeRawSpec
+                        Avro.JSONSpec
+                        Avro.NamespaceSpec
+                        Avro.NormSchemaSpec
+                        Avro.ReuseFixedSpec
+                        Avro.SchemaSpec
+                        Avro.THEncodeContainerSpec
+                        Avro.THEnumSpec
+                        Avro.THLogicalTypeSpec
+                        Avro.THReusedSpec
+                        Avro.THSimpleSpec
+                        Avro.THUnionSpec
+                        Avro.ToAvroSpec
+                        DecodeContainer
+                        Example1
+                        Paths_avro
+  autogen-modules:      Paths_avro
+  hs-source-dirs:       test
 
 benchmark bench-time
-  import:   base, config
-          , avro
-          , aeson
-          , bytestring
-          , containers
-          , gauge
-          , hashable
-          , mtl
-          , random
-          , raw-strings-qq
-          , text
-          , transformers
-          , unordered-containers
-          , vector
-  default-language: Haskell2010
-  type: exitcode-stdio-1.0
-  main-is: Main.hs
-  other-modules:
-    Bench.Deconflict
-    Bench.Deconflict.Reader
-    Bench.Deconflict.Writer
-    Bench.Time
-  hs-source-dirs: bench
+  import:               base, config
+                      , avro
+                      , aeson
+                      , bytestring
+                      , containers
+                      , gauge
+                      , hashable
+                      , mtl
+                      , random
+                      , raw-strings-qq
+                      , text
+                      , transformers
+                      , unordered-containers
+                      , vector
+  default-language:     Haskell2010
+  type:                 exitcode-stdio-1.0
+  main-is:              Main.hs
+  other-modules:        Bench.Deconflict
+                        Bench.Deconflict.Reader
+                        Bench.Deconflict.Writer
+                        Bench.Time
+  hs-source-dirs:       bench
+
+test-suite doctest
+  import:               base, config
+                      , avro
+                      , doctest
+                      , doctest-discover
+  type:                 exitcode-stdio-1.0
+  ghc-options:          -threaded
+  main-is:              DoctestDriver.hs
+  HS-Source-Dirs:       doctest
+  build-tool-depends:   doctest-discover:doctest-discover
