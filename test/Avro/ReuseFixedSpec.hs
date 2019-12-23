@@ -8,7 +8,7 @@ where
 import qualified Data.Aeson           as Aeson
 import           Data.Avro            as Avro
 import           Data.Avro.Deriving
-import           Data.Avro.Schema     (Type (..), fields, fldType, mkUnion)
+import           Data.Avro.Schema     (Schema (..), fields, fldType, mkUnion)
 import           Data.ByteString.Lazy as LBS
 import           Data.List.NonEmpty   (NonEmpty (..))
 import qualified Data.Set             as S

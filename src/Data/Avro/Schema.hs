@@ -20,7 +20,7 @@
 module Data.Avro.Schema
   (
    -- * Schema description types
-    Schema, Type(..)
+    Schema(..), Type
   , Field(..), Order(..)
   , TypeName(..)
   , renderFullname
@@ -94,11 +94,11 @@ import GHC.Generics (Generic)
 -- N.B. It is possible to create a Haskell value (of 'Schema' type) that is
 -- not a valid Avro schema by violating one of the above or one of the
 -- conditions called out in 'validateSchema'.
-type Schema = Type
+type Type = Schema
 
 -- |Avro types are considered either primitive (string, int, etc) or
 -- complex/declared (structures, unions etc).
-data Type
+data Schema
       =
       -- Basic types
         Null
@@ -106,8 +106,8 @@ data Type
       | Int   | Long
       | Float | Double
       | Bytes | String
-      | Array { item :: Type }
-      | Map   { values :: Type }
+      | Array { item :: Schema }
+      | Map   { values :: Schema }
       | NamedType TypeName
       -- Declared types
       | Record { name    :: TypeName
@@ -121,7 +121,7 @@ data Type
              , doc     :: Maybe Text
              , symbols :: V.Vector Text
              }
-      | Union { options     :: V.Vector Type
+      | Union { options     :: V.Vector Schema
               }
       | Fixed { name    :: TypeName
               , aliases :: [TypeName]
@@ -129,7 +129,7 @@ data Type
               }
     deriving (Show, Generic, NFData)
 
-instance Eq Type where
+instance Eq Schema where
   Null == Null = True
   Boolean == Boolean = True
   Int == Int = True
@@ -162,13 +162,13 @@ mkEnum :: TypeName
           -- ^ Optional documentation for the enum.
        -> [Text]
           -- ^ The symbols of the enum.
-       -> Type
+       -> Schema
 mkEnum name aliases doc symbols = Enum name aliases doc (V.fromList symbols)
 
 -- | @mkUnion subTypes@ Defines a union of the provided subTypes.  N.B. it is
 -- invalid Avro to include another union or to have more than one of the same
 -- type as a direct member of the union.  No check is done for this condition!
-mkUnion :: NonEmpty Type -> Type
+mkUnion :: NonEmpty Schema -> Schema
 mkUnion  = Union . V.fromList . NE.toList
 
 -- | A named type in Avro has a name and, optionally, a namespace.
@@ -281,7 +281,7 @@ instance Hashable TypeName where
 
 -- |Get the name of the type.  In the case of unions, get the name of the
 -- first value in the union schema.
-typeName :: Type -> Text
+typeName :: Schema -> Text
 typeName bt =
   case bt of
     Null           -> "null"
@@ -302,15 +302,15 @@ data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
                    , fldDoc     :: Maybe Text
                    , fldOrder   :: Maybe Order
-                   , fldType    :: Type
-                   , fldDefault :: Maybe (Ty.Value Type)
+                   , fldType    :: Schema
+                   , fldDefault :: Maybe (Ty.Value Schema)
                    }
   deriving (Eq, Show, Generic, NFData)
 
 data Order = Ascending | Descending | Ignore
   deriving (Eq, Ord, Show, Generic, NFData)
 
-instance FromJSON Type where
+instance FromJSON Schema where
   parseJSON = parseSchemaJSON Nothing
 
 -- | A helper function that parses an Avro schema from JSON, resolving
@@ -421,7 +421,7 @@ parseField record = \case
     return $ Field name aliases doc order ty def
   invalid    -> typeMismatch "Field" invalid
 
-instance ToJSON Type where
+instance ToJSON Schema where
   toJSON = schemaToJSON Nothing
 
 -- | Serializes a 'Schema' to JSON.
@@ -493,7 +493,7 @@ schemaToJSON context = \case
              , "aliases" .= fldAliases
              ]
 
-instance ToJSON (Ty.Value Type) where
+instance ToJSON (Ty.Value Schema) where
   toJSON av =
     case av of
       Ty.Null              -> A.Null
@@ -568,7 +568,7 @@ instance Traversable Result where
 -- | Field defaults are in the normal Avro JSON format except for
 -- unions. Default values for unions are specified as JSON encodings
 -- of the first type in the union.
-parseFieldDefault :: (TypeName -> Maybe Type)
+parseFieldDefault :: (TypeName -> Maybe Schema)
                      -- ^ Lookup function for names defined in schema.
                   -> Schema
                      -- ^ The schema of the default value being parsed.
@@ -580,7 +580,7 @@ parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
         defaultUnion _ _            = error "Impossible: not Union."
 
 -- | Parse JSON-encoded avro data.
-parseAvroJSON :: (Type -> A.Value -> Result (Ty.Value Type))
+parseAvroJSON :: (Schema -> A.Value -> Result (Ty.Value Schema))
                  -- ^ How to handle unions. The way unions are
                  -- formatted in JSON depends on whether we're parsing
                  -- a normal Avro object or we're parsing a default
@@ -589,10 +589,10 @@ parseAvroJSON :: (Type -> A.Value -> Result (Ty.Value Type))
                  -- This function will only ever be passed 'Union'
                  -- schemas. It /should/ error out if this is not the
                  -- case—it represents a bug in this code.
-              -> (TypeName -> Maybe Type)
-              -> Type
+              -> (TypeName -> Maybe Schema)
+              -> Schema
               -> A.Value
-              -> Result (Ty.Value Type)
+              -> Result (Ty.Value Schema)
 parseAvroJSON union env (NamedType name) av =
   case env name of
     Nothing -> fail $ "Could not resolve type name for " <> T.unpack (renderFullname name)
@@ -659,7 +659,7 @@ parseBytes bytes = case T.find (not . inRange) bytes of
 serializeBytes :: B.ByteString -> Text
 serializeBytes = T.pack . map (Char.chr . fromIntegral) . B.unpack
 
-avroTypeMismatch :: Type -> Text -> Result a
+avroTypeMismatch :: Schema -> Text -> Result a
 avroTypeMismatch expected actual =
   fail $ "Could not resolve type '" <> T.unpack actual <> "' with expected type: " <> show expected
 
@@ -700,13 +700,13 @@ validateSchema _sch = return () -- XXX TODO
 -- This mapping includes both the base type names and any aliases they
 -- have. Aliases and normal names are not differentiated in any way.
 buildTypeEnvironment :: Applicative m
-                     => (TypeName -> m Type)
+                     => (TypeName -> m Schema)
                         -- ^ Callback to handle type names not in the
                         -- schema.
                      -> Schema
                         -- ^ The schema that we're generating a lookup
                         -- function for.
-                     -> (TypeName -> m Type)
+                     -> (TypeName -> m Schema)
 buildTypeEnvironment failure from =
     \ forTy -> case HashMap.lookup forTy env of
                  Nothing  -> failure forTy
@@ -719,7 +719,7 @@ buildTypeEnvironment failure from =
 --
 -- This extends recursively: two records match if they have the same
 -- name, the same number of fields and the fields all match.
-matches :: Type -> Type -> Bool
+matches :: Schema -> Schema -> Bool
 matches n@NamedType{} t             = typeName n == typeName t
 matches t n@NamedType{}             = typeName t == typeName n
 matches (Array itemA) (Array itemB) = matches itemA itemB
@@ -737,7 +737,7 @@ matches t1 t2                       = t1 == t2
 --
 -- Types declared implicitly in record field definitions are also included. No distinction
 -- is made between aliases and normal names.
-extractBindings :: Type -> HashMap.HashMap TypeName Type
+extractBindings :: Schema -> HashMap.HashMap TypeName Schema
 extractBindings = \case
   t@Record{..} ->
     let withRecord = HashMap.fromList $ (name : aliases) `zip` repeat t
@@ -775,7 +775,7 @@ expandNamedTypes =
 
 -- | Merge two schemas to produce a third.
 -- Specifically, @overlay schema reference@ fills in 'NamedTypes' in 'schema' using any matching definitions from 'reference'.
-overlay :: Type -> Type -> Type
+overlay :: Schema -> Schema -> Schema
 overlay input supplement = overlayType input
   where
     overlayField f@Field{..}      = f { fldType = overlayType fldType }
@@ -790,5 +790,5 @@ overlay input supplement = overlayType input
     bindings              = extractBindings supplement
 
 -- | Extract the named inner type definition as its own schema.
-subdefinition :: Type -> Text -> Maybe Type
+subdefinition :: Schema -> Text -> Maybe Schema
 subdefinition schema name = mkTypeName Nothing name Nothing `HashMap.lookup` extractBindings schema

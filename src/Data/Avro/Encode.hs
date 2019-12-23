@@ -164,13 +164,13 @@ putAvro = fst . runAvro . avro
 getSchema :: forall a. EncodeAvro a => a -> Schema
 getSchema = snd . runAvro . avro
 
-getType :: EncodeAvro a => Proxy a -> Type
+getType :: EncodeAvro a => Proxy a -> Schema
 getType = getSchema . (asProxyTypeOf undefined)
 -- N.B. ^^^ Local knowledge that 'fst' won't be used,
 -- so the bottom of 'undefined' will not escape so long as schema creation
 -- remains lazy in the argument.
 
-newtype AvroM = AvroM { runAvro :: (Builder,Type) }
+newtype AvroM = AvroM { runAvro :: (Builder, Schema) }
 
 class EncodeAvro a where
   avro :: a -> AvroM
@@ -277,7 +277,7 @@ instance EncodeAvro Bool where
 --------------------------------------------------------------------------------
 --  Common Intermediate Representation Encoding
 
-instance EncodeAvro (T.Value Type) where
+instance EncodeAvro (T.Value Schema) where
   avro v =
     case v of
       T.Null      -> avro ()

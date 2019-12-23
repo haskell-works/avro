@@ -114,24 +114,24 @@ instance Bitraversable (Either5 a b c) where
   bitraverse _ g (E5_5 a) = E5_5 <$> g a
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c) => HasAvroSchema (Either3 a b c) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [
-                             untag (schema :: Tagged b Type),
-                             untag (schema :: Tagged c Type)
+  schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
+                             untag (schema :: Tagged b Schema),
+                             untag (schema :: Tagged c Schema)
                             ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d) => HasAvroSchema (Either4 a b c d) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [
-                             untag (schema :: Tagged b Type),
-                             untag (schema :: Tagged c Type),
-                             untag (schema :: Tagged d Type)
+  schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
+                             untag (schema :: Tagged b Schema),
+                             untag (schema :: Tagged c Schema),
+                             untag (schema :: Tagged d Schema)
                             ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e) => HasAvroSchema (Either5 a b c d e) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Type) :| [
-                             untag (schema :: Tagged b Type),
-                             untag (schema :: Tagged c Type),
-                             untag (schema :: Tagged d Type),
-                             untag (schema :: Tagged e Type)
+  schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
+                             untag (schema :: Tagged b Schema),
+                             untag (schema :: Tagged c Schema),
+                             untag (schema :: Tagged d Schema),
+                             untag (schema :: Tagged e Schema)
                             ])
 
 instance (FromAvro a, FromAvro b, FromAvro c) => FromAvro (Either3 a b c) where
@@ -140,9 +140,9 @@ instance (FromAvro a, FromAvro b, FromAvro c) => FromAvro (Either3 a b c) where
     | matches branch schemaB = E3_2 <$> fromAvro x
     | matches branch schemaC = E3_3 <$> fromAvro x
     | otherwise              = badValue e "Either3"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
-          Tagged schemaC = schema :: Tagged c Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
+          Tagged schemaC = schema :: Tagged c Schema
   fromAvro x = badValue x "Either3"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d) => FromAvro (Either4 a b c d) where
@@ -152,10 +152,10 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d) => FromAvro (Either4 a
     | matches branch schemaC = E4_3 <$> fromAvro x
     | matches branch schemaD = E4_4 <$> fromAvro x
     | otherwise              = badValue e "Either4"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
-          Tagged schemaC = schema :: Tagged c Type
-          Tagged schemaD = schema :: Tagged d Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
+          Tagged schemaC = schema :: Tagged c Schema
+          Tagged schemaD = schema :: Tagged d Schema
   fromAvro x = badValue x "Either4"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e) => FromAvro (Either5 a b c d e) where
@@ -166,11 +166,11 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e) => FromAvr
     | matches branch schemaD = E5_4 <$> fromAvro x
     | matches branch schemaE = E5_5 <$> fromAvro x
     | otherwise              = badValue e "Either5"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
-          Tagged schemaC = schema :: Tagged c Type
-          Tagged schemaD = schema :: Tagged d Type
-          Tagged schemaE = schema :: Tagged e Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
+          Tagged schemaC = schema :: Tagged c Schema
+          Tagged schemaD = schema :: Tagged d Schema
+          Tagged schemaE = schema :: Tagged e Schema
   fromAvro x = badValue x "Either5"
 
 instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c) => FromLazyAvro (Either3 a b c) where
@@ -179,9 +179,9 @@ instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c) => FromLazyAvro (Eithe
     | matches branch schemaB = E3_2 <$> fromLazyAvro x
     | matches branch schemaC = E3_3 <$> fromLazyAvro x
     | otherwise              = badValue e "Either3"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
-          Tagged schemaC = schema :: Tagged c Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
+          Tagged schemaC = schema :: Tagged c Schema
   fromLazyAvro x = badValue x "Either3"
 
 instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d) => FromLazyAvro (Either4 a b c d) where
@@ -191,10 +191,10 @@ instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d) => Fro
     | matches branch schemaC = E4_3 <$> fromLazyAvro x
     | matches branch schemaD = E4_4 <$> fromLazyAvro x
     | otherwise              = badValue e "Either4"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
-          Tagged schemaC = schema :: Tagged c Type
-          Tagged schemaD = schema :: Tagged d Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
+          Tagged schemaC = schema :: Tagged c Schema
+          Tagged schemaD = schema :: Tagged d Schema
   fromLazyAvro x = badValue x "Either4"
 
 instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e) => FromLazyAvro (Either5 a b c d e) where
@@ -205,11 +205,11 @@ instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLa
     | matches branch schemaD = E5_4 <$> fromLazyAvro x
     | matches branch schemaE = E5_5 <$> fromLazyAvro x
     | otherwise              = badValue e "Either5"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
-          Tagged schemaC = schema :: Tagged c Type
-          Tagged schemaD = schema :: Tagged d Type
-          Tagged schemaE = schema :: Tagged e Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
+          Tagged schemaC = schema :: Tagged c Schema
+          Tagged schemaD = schema :: Tagged d Schema
+          Tagged schemaE = schema :: Tagged e Schema
   fromLazyAvro x = badValue x "Either5"
 
 instance (ToAvro a, ToAvro b, ToAvro c) => ToAvro (Either3 a b c) where

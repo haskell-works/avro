@@ -51,7 +51,7 @@ import           Data.Avro.Zag
 import           Data.Avro.Decode.Strict.Internal
 
 -- | Decode bytes into a 'Value' as described by Schema.
-decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
+decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Schema)
 decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
 {-# INLINABLE decodeAvro #-}
 
@@ -61,7 +61,7 @@ decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFai
 --
 -- "Data.Avro.Decode.Lazy" provides functions to decode Avro containers
 -- in a lazy, streaming fashion.
-decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Type]])
+decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Schema]])
 decodeContainer = decodeContainerWith getAvroOf
 {-# INLINABLE decodeContainer #-}
 

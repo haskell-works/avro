@@ -31,8 +31,8 @@ import qualified Data.Vector                     as V
 -- To avoid it use 'deconflictNoResolve' when possible.
 deconflict :: Schema        -- ^ Writer schema
            -> Schema        -- ^ Reader schema
-           -> T.LazyValue Type
-           -> T.LazyValue Type
+           -> T.LazyValue Schema
+           -> T.LazyValue Schema
 deconflict writerSchema readerSchema =
   deconflictNoResolve (S.expandNamedTypes writerSchema) (S.expandNamedTypes readerSchema)
 
@@ -48,17 +48,17 @@ deconflict writerSchema readerSchema =
 -- to be used in 'deconflictNoResolve'.
 deconflictNoResolve :: Schema         -- ^ Writer schema
                     -> Schema         -- ^ Reader schema
-                    -> T.LazyValue Type
-                    -> T.LazyValue Type
+                    -> T.LazyValue Schema
+                    -> T.LazyValue Schema
 deconflictNoResolve writerSchema readerSchema =
   deconflictValue writerSchema readerSchema
 
-deconflictValue :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
+deconflictValue :: Schema -> Schema -> T.LazyValue Schema -> T.LazyValue Schema
 deconflictValue writerSchema readerSchema v
   | writerSchema == readerSchema    = v
   | otherwise = go writerSchema readerSchema v
   where
-    go :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
+    go :: Schema -> Schema -> T.LazyValue Schema -> T.LazyValue Schema
     go _ _ val@(T.Error _) = val
     go (S.Array aTy) (S.Array bTy) (T.Array vec) =
         T.Array $ fmap (go aTy bTy) vec
@@ -89,7 +89,7 @@ deconflictValue writerSchema readerSchema v
         _                            -> T.Error $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
 -- The writer's symbol must be present in the reader's enum
-deconflictEnum :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
+deconflictEnum :: Schema -> Schema -> T.LazyValue Schema -> T.LazyValue Schema
 deconflictEnum e d val@(T.Enum _ _ _txt) = val
   -- --  | txt `elem` symbols d = Right val
   -- --  | otherwise = Left "Decoded enum does not appear in reader's symbol list."
@@ -104,7 +104,7 @@ withSchemaIn schema schemas f =
     Nothing    -> T.Error $ "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> schemas) <> " does not contain schema " <> Text.unpack (typeName schema)
     Just found -> f found
 
-deconflictReaderUnion :: Type -> Vector Type -> T.LazyValue Type -> T.LazyValue Type
+deconflictReaderUnion :: Schema -> Vector Schema -> T.LazyValue Schema -> T.LazyValue Schema
 deconflictReaderUnion valueType unionTypes val =
   let hdl [] = T.Error $ "No corresponding union value for " <> Text.unpack (typeName valueType)
       hdl (d:rest) =
@@ -113,7 +113,7 @@ deconflictReaderUnion valueType unionTypes val =
               v         -> T.Union unionTypes d v
   in hdl (V.toList unionTypes)
 
-deconflictRecord :: Type -> Type -> T.LazyValue Type -> T.LazyValue Type
+deconflictRecord :: Schema -> Schema -> T.LazyValue Schema -> T.LazyValue Schema
 deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
   T.Record readerSchema . HashMap.fromList $ fmap (deconflictFields fldVals (fields writerSchema)) (fields readerSchema)
 
@@ -123,7 +123,7 @@ deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
 --  3) If there is no default, fail.
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
-deconflictFields :: HashMap Text (T.LazyValue Type) -> [Field] -> Field -> (Text,T.LazyValue Type)
+deconflictFields :: HashMap Text (T.LazyValue Schema) -> [Field] -> Field -> (Text,T.LazyValue Schema)
 deconflictFields hm writerFields readerField =
   let
     mbWriterField = findField readerField writerFields

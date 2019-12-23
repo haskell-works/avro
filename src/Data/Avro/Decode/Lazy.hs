@@ -132,7 +132,7 @@ decodeContainerWithSchema' readerSchema bs = do
     convertValue w r v = resultToEither $ fromLazyAvro (C.deconflictNoResolve w r v)
 
 -- |Decode bytes into a 'Value' as described by Schema.
-decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Type
+decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Schema
 decodeAvro s = snd . getAvroOf s
 {-# INLINABLE decodeAvro #-}
 
@@ -147,7 +147,7 @@ decodeAvro s = snd . getAvroOf s
 --
 -- The "outer" error represents the error in opening the container itself
 -- (including problems like reading schemas embedded into the container.)
-getContainerValues :: BL.ByteString -> Either String (Schema, [[T.LazyValue Type]])
+getContainerValues :: BL.ByteString -> Either String (Schema, [[T.LazyValue Schema]])
 getContainerValues = getContainerValuesWith getAvroOf
 {-# INLINABLE getContainerValues #-}
 
@@ -210,9 +210,9 @@ getNextBlock sync decompress bs =
         (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
         (_, rest)                    -> Right rest
 
-getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Type))
+getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema))
                  -> BL.ByteString
-                 -> Either String (Schema, [[T.LazyValue Type]])
+                 -> Either String (Schema, [[T.LazyValue Schema]])
 getContainerValuesWith schemaToGet bs =
   case decodeRawBlocks bs of
     Left err            -> Left err
@@ -225,7 +225,7 @@ getContainerValuesWith schemaToGet bs =
         let (_, vs) = consumeN (fromIntegral nObj) getValue bytes
         in vs
 
-decodeGet :: GetAvro a => (a -> T.LazyValue Type) -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
+decodeGet :: GetAvro a => (a -> T.LazyValue Schema) -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
 decodeGet f bs =
   let res = runGetOrFail (f <$> getAvro) bs
   in either (\(rest,_,s) -> (rest, T.Error s)) (\(rest,_,a) -> (rest, a)) res
@@ -251,7 +251,7 @@ getContainerValuesBytes =
 -- This is particularly useful when slicing up containers into one or more
 -- smaller files.  By extracting the original bytestring it is possible to
 -- avoid re-encoding data.
-getContainerValuesBytes' :: BL.ByteString -> Either String (Schema, [Either String (TypesStrict.Value S.Type, BL.ByteString)])
+getContainerValuesBytes' :: BL.ByteString -> Either String (Schema, [Either String (TypesStrict.Value S.Schema, BL.ByteString)])
 getContainerValuesBytes' =
   extractContainerValues readBytes
   where
@@ -285,13 +285,13 @@ consumeN n f a =
       in (r, b:bs)
 {-# INLINE consumeN #-}
 
-getAvroOf :: Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
+getAvroOf :: Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
 getAvroOf ty0 bs = go ty0 bs
   where
   env = S.buildTypeEnvironment envFail ty0
   envFail t = fail $ "Named type not in schema: " <> show t
 
-  go :: Type -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
+  go :: Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
   go ty bs =
     case ty of
       Null    -> (bs, T.Null)
@@ -343,8 +343,8 @@ getKVPair getElement bs =
 {-# INLINE getKVPair #-}
 
 getKVPairs :: BL.ByteString
-           -> (BL.ByteString -> (BL.ByteString, T.LazyValue Type))
-           -> (BL.ByteString, [[(Text, T.LazyValue Type)]])
+           -> (BL.ByteString -> (BL.ByteString, T.LazyValue Schema))
+           -> (BL.ByteString, [[(Text, T.LazyValue Schema)]])
 getKVPairs bs getElement =
   case runGetOrFail (abs <$> getLong) bs of
     Left (bs', _, err) -> (bs', [[("", T.Error err)]])
@@ -357,8 +357,8 @@ getKVPairs bs getElement =
 
 
 getElements :: BL.ByteString
-            -> (BL.ByteString -> (BL.ByteString, T.LazyValue Type))
-            -> (BL.ByteString, [[T.LazyValue Type]])
+            -> (BL.ByteString -> (BL.ByteString, T.LazyValue Schema))
+            -> (BL.ByteString, [[T.LazyValue Schema]])
 getElements bs getElement  =
   case runGetOrFail (abs <$> getLong) bs of
     Left (bs', _, err) -> (bs', [[T.Error err]])

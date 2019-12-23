@@ -25,9 +25,9 @@ import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 
 class HasAvroSchema a => ToAvro a where
-  toAvro :: a -> T.Value Type
+  toAvro :: a -> T.Value Schema
 
-(.=)  :: ToAvro a => Text -> a -> (Text,T.Value Type)
+(.=)  :: ToAvro a => Text -> a -> (Text,T.Value Schema)
 (.=) nm val = (nm,toAvro val)
 
 instance ToAvro Bool where

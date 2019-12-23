@@ -7,7 +7,7 @@ where
 
 import           Data.Avro
 import           Data.Avro.Deriving
-import           Data.Avro.Schema   (Type (..), fields, fldType, mkUnion)
+import           Data.Avro.Schema   (Schema (..), fields, fldType, mkUnion)
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Set           as S
 

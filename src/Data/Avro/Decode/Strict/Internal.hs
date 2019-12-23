@@ -39,13 +39,13 @@ import qualified Data.Avro.Types      as T
 import           Data.Avro.Zag
 
 {-# INLINABLE getAvroOf #-}
-getAvroOf :: Schema -> Get (T.Value Type)
+getAvroOf :: Schema -> Get (T.Value Schema)
 getAvroOf ty0 = go ty0
  where
  env = S.buildTypeEnvironment envFail ty0
  envFail t = fail $ "Named type not in schema: " <> show t
 
- go :: Type -> Get (T.Value Type)
+ go :: Schema -> Get (T.Value Schema)
  go ty =
   case ty of
     Null    -> return T.Null
@@ -77,7 +77,7 @@ getAvroOf ty0 = go ty0
           Just t  -> T.Union ts t <$> go t
     Fixed {..} -> T.Fixed ty <$> G.getByteString (fromIntegral size)
 
- getKVBlocks :: Type -> Get [[(Text,T.Value Type)]]
+ getKVBlocks :: Schema -> Get [[(Text,T.Value Schema)]]
  getKVBlocks t =
   do blockLength <- abs <$> getLong
      if blockLength == 0
@@ -86,7 +86,7 @@ getAvroOf ty0 = go ty0
               (vs:) <$> getKVBlocks t
  {-# INLINE getKVBlocks #-}
 
- getBlocksOf :: Type -> Get [[T.Value Type]]
+ getBlocksOf :: Schema -> Get [[T.Value Schema]]
  getBlocksOf t =
   do blockLength <- abs <$> getLong
      if blockLength == 0
