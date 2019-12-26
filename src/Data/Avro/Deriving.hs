@@ -488,7 +488,7 @@ genType opts (S.Fixed n _ s) = do
   sequenceA [genNewtype dname]
 genType _ _ = pure []
 
-mkFieldTypeName :: NamespaceBehavior -> S.Type -> Q TH.Type
+mkFieldTypeName :: NamespaceBehavior -> S.Schema -> Q TH.Type
 mkFieldTypeName namespaceBehavior = \case
   S.Boolean          -> [t| Bool |]
   S.Long             -> [t| Int64 |]

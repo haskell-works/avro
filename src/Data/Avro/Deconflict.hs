@@ -31,8 +31,8 @@ import qualified Data.Vector         as V
 -- To avoid it use 'deconflictNoResolve' when possible.
 deconflict :: Schema        -- ^ Writer schema
            -> Schema        -- ^ Reader schema
-           -> T.Value Type
-           -> Either String (T.Value Type)
+           -> T.Value Schema
+           -> Either String (T.Value Schema)
 deconflict writerSchema readerSchema =
   deconflictNoResolve (S.expandNamedTypes writerSchema) (S.expandNamedTypes readerSchema)
 
@@ -48,20 +48,20 @@ deconflict writerSchema readerSchema =
 -- to be used in 'deconflictNoResolve'.
 deconflictNoResolve :: Schema         -- ^ Writer schema
                     -> Schema         -- ^ Reader schema
-                    -> T.Value Type
-                    -> Either String (T.Value Type)
+                    -> T.Value Schema
+                    -> Either String (T.Value Schema)
 deconflictNoResolve writerSchema readerSchema =
   deconflictValue writerSchema readerSchema
 
 deconflictValue :: Schema
               -> Schema
-              -> T.Value Type
-              -> Either String (T.Value Type)
+              -> T.Value Schema
+              -> Either String (T.Value Schema)
 deconflictValue writerSchema readerSchema v
   | writerSchema == readerSchema    = Right v
   | otherwise = go writerSchema readerSchema v
   where
-  go :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
+  go :: Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)
   go (S.Array aTy) (S.Array bTy) (T.Array vec) =
        T.Array <$> mapM (go aTy bTy) vec
   go (S.Map aTy) (S.Map bTy) (T.Map mp)    =
@@ -91,7 +91,7 @@ deconflictValue writerSchema readerSchema v
       _                            -> Left $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
 -- The writer's symbol must be present in the reader's enum
-deconflictEnum :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
+deconflictEnum :: Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)
 deconflictEnum e d val@(T.Enum _ _ _txt) = Right val
   -- --  | txt `elem` symbols d = Right val
   -- --  | otherwise = Left "Decoded enum does not appear in reader's symbol list."
@@ -106,7 +106,7 @@ withSchemaIn schema schemas f =
     Nothing    -> Left $ "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> schemas) <> " does not contain schema " <> Text.unpack (typeName schema)
     Just found -> f found
 
-deconflictReaderUnion :: Type -> Vector Type -> T.Value Type -> Either String (T.Value Type)
+deconflictReaderUnion :: Schema -> Vector Schema -> T.Value Schema -> Either String (T.Value Schema)
 deconflictReaderUnion valueSchema unionTypes val =
     let hdl [] = Left "Impossible: empty non-empty list."
         hdl (d:rest) =
@@ -115,7 +115,7 @@ deconflictReaderUnion valueSchema unionTypes val =
                 Left _  -> hdl rest
     in hdl (V.toList unionTypes)
 
-deconflictRecord :: Type -> Type -> T.Value Type -> Either String (T.Value Type)
+deconflictRecord :: Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)
 deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
   T.Record readerSchema . HashMap.fromList <$> mapM (deconflictFields fldVals (fields writerSchema)) (fields readerSchema)
 
@@ -125,7 +125,7 @@ deconflictRecord writerSchema readerSchema (T.Record ty fldVals)  =
 --  3) If there is no default, fail.
 --
 -- XXX: Consider aliases in the writer schema, use those to retry on failed lookup.
-deconflictFields :: HashMap Text (T.Value Type) -> [Field] -> Field -> Either String (Text,T.Value Type)
+deconflictFields :: HashMap Text (T.Value Schema) -> [Field] -> Field -> Either String (Text,T.Value Schema)
 deconflictFields hm writerFields readerField =
   let
     mbWriterField = findField readerField writerFields

@@ -35,10 +35,10 @@ import           Data.Word
 -- without converting to strict `Value` and then 'FromAvro'
 -- can be very beneficial from the performance point of view.
 class HasAvroSchema a => FromLazyAvro a where
-  fromLazyAvro :: LazyValue Type -> Result a
+  fromLazyAvro :: LazyValue Schema -> Result a
 
 --  | Same as '(.:)' but works on `LazyValue`.
-(.~:) :: FromLazyAvro a => HashMap.HashMap Text (LazyValue Type) -> Text -> Result a
+(.~:) :: FromLazyAvro a => HashMap.HashMap Text (LazyValue Schema) -> Text -> Result a
 (.~:) obj key =
   case HashMap.lookup key obj of
     Nothing -> fail $ "Requested field not available: " <> show key
@@ -49,8 +49,8 @@ instance (FromLazyAvro a, FromLazyAvro b) => FromLazyAvro (Either a b) where
     | S.matches branch schemaA = Left  <$> fromLazyAvro x
     | S.matches branch schemaB = Right <$> fromLazyAvro x
     | otherwise              = badValue e "Either"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
   fromLazyAvro x = badValue x "Either"
 
 instance FromLazyAvro Bool where

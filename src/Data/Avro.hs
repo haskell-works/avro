@@ -102,7 +102,7 @@ type Avro a = (FromAvro a, ToAvro a)
 -- | Decode a lazy bytestring using a 'Schema' of the return type.
 decode :: forall a. FromAvro a => ByteString -> Result a
 decode bytes =
-  case D.decodeAvro (untag (schema :: Tagged a Type)) bytes of
+  case D.decodeAvro (untag (schema :: Tagged a Schema)) bytes of
       Right val -> fromAvro val
       Left err  -> Error err
 
@@ -189,14 +189,14 @@ decodeContainerBytes bs =
                                  G.bytesRead
        G.getLazyByteString (end-start)
 
-record :: Foldable f => Type -> f (Text,T.Value Type) -> T.Value Type
+record :: Foldable f => Schema -> f (Text,T.Value Schema) -> T.Value Schema
 record ty = T.Record ty . HashMap.fromList . toList
 
-fixed :: Type -> B.ByteString -> T.Value Type
+fixed :: Schema -> B.ByteString -> T.Value Schema
 fixed = T.Fixed
 -- @enumToAvro val@ will generate an Avro encoded value of enum suitable
 -- for serialization ('encode').
--- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Type
+-- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Schema
 -- enumToAvro e = T.Enum ty (show e)
 --  where
 --   ty = S.Enum nm Nothing [] Nothing (map (Text.pack . show) [minBound..maxBound])

@@ -34,4 +34,4 @@ deriving instance Lift f => Lift (Avro.Value f)
 deriving instance Lift Schema.Field
 deriving instance Lift Schema.Order
 deriving instance Lift Schema.TypeName
-deriving instance Lift Schema.Type
+deriving instance Lift Schema.Schema

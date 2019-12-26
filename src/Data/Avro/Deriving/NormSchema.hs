@@ -28,7 +28,7 @@ extractDerivables s = flip evalState state . normSchema . snd <$> rawRecs
     rawRecs = getTypes s
     state = M.fromList rawRecs
 
-getTypes :: Type -> [(TypeName, Type)]
+getTypes :: Schema -> [(TypeName, Schema)]
 getTypes rec = case rec of
   r@Record{name, fields} -> (name,r) : (fields >>= (getTypes . fldType))
   Array t                -> getTypes t

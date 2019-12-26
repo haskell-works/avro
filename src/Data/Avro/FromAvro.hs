@@ -30,9 +30,9 @@ import qualified Data.Vector.Unboxed     as U
 import           Data.Word
 
 class HasAvroSchema a => FromAvro a where
-  fromAvro :: Value Type -> Result a
+  fromAvro :: Value Schema -> Result a
 
-(.:) :: FromAvro a => HashMap.HashMap Text (Value Type) -> Text -> Result a
+(.:) :: FromAvro a => HashMap.HashMap Text (Value Schema) -> Text -> Result a
 (.:) obj key =
   case HashMap.lookup key obj of
     Nothing -> fail $ "Requested field not available: " <> show key
@@ -43,8 +43,8 @@ instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
     | S.matches branch schemaA = Left  <$> fromAvro x
     | S.matches branch schemaB = Right <$> fromAvro x
     | otherwise              = badValue e "Either"
-    where Tagged schemaA = schema :: Tagged a Type
-          Tagged schemaB = schema :: Tagged b Type
+    where Tagged schemaA = schema :: Tagged a Schema
+          Tagged schemaB = schema :: Tagged b Schema
   fromAvro x = badValue x "Either"
 
 instance FromAvro Bool where
