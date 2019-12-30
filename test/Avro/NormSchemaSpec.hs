@@ -7,7 +7,7 @@ where
 
 import           Data.Avro
 import           Data.Avro.Deriving
-import           Data.Avro.Schema   (Schema (..), fields, fldType, mkUnion)
+import           Data.Avro.Schema   (Schema (..), fields, fldType, mkUnion, ReadRule(..))
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Set           as S
 
@@ -25,4 +25,4 @@ spec = describe "Avro.NormSchemaSpec" $ do
     (fldType <$> fields schema'ContainerChild) `shouldBe` [schema'ReusedChild, NamedType "Boo.ReusedChild"]
 
   it "should normalise schemas from unions" $
-     fldType <$> fields schema'Curse `shouldBe` [mkUnion (Null :| [schema'Geo])]
+     fldType <$> fields schema'Curse `shouldBe` [mkUnion (Null ReadAsIs :| [schema'Geo])]

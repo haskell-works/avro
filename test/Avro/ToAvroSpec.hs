@@ -33,14 +33,14 @@ tmSchema :: Schema
 tmSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
    in Record "avro.haskell.test.TypesTestMessage" [] Nothing Nothing
-        [ fld "id" Long Nothing
+        [ fld "id" (Long ReadAsIs) Nothing
         , fld "name" String Nothing
-        , fld "timestamp" (mkUnion (Null :| [Long])) Nothing
-        , fld "foreignId" (mkUnion (Null :| [Long])) Nothing
-        , fld "competence" (mkUnion (Null :| [Double])) Nothing
-        , fld "relevance" (mkUnion (Null :| [Float])) Nothing
-        , fld "severity" Float Nothing
-        , fld "attraction" Double Nothing
+        , fld "timestamp" (mkUnion (Null ReadAsIs :| [Long ReadAsIs])) Nothing
+        , fld "foreignId" (mkUnion (Null ReadAsIs :| [Long ReadAsIs])) Nothing
+        , fld "competence" (mkUnion (Null ReadAsIs :| [Double ReadAsIs])) Nothing
+        , fld "relevance" (mkUnion (Null ReadAsIs :| [Float ReadAsIs])) Nothing
+        , fld "severity" (Float ReadAsIs) Nothing
+        , fld "attraction" (Double ReadAsIs) Nothing
         ]
 
 instance HasAvroSchema TypesTestMessage where

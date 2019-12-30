@@ -21,7 +21,7 @@ onlyFloatSchema :: Schema
 onlyFloatSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
   in Record "test.contract.OnlyFloat" [] Nothing Nothing
-        [ fld "onlyFloatValue" Float Nothing
+        [ fld "onlyFloatValue" (Float ReadAsIs) Nothing
         ]
 
 instance HasAvroSchema OnlyFloat where

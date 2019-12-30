@@ -67,57 +67,21 @@ deconflict writerSchema readerSchema = go writerSchema readerSchema
     go nonUnion (S.Union ys)
       | Just y <- findType nonUnion ys =
         S.FreeUnion (go nonUnion y)
-    go from S.Int | isIntIn from = S.Int
-    go from to | isIntIn   from && isLongOut   to = S.IntLongCoercion
-    go from to | isIntIn   from && isFloatOut  to = S.IntFloatCoercion
-    go from to | isIntIn   from && isDoubleOut to = S.IntDoubleCoercion
-    go from to | isLongIn  from && isLongOut   to = S.Long
-    go from to | isLongIn  from && isFloatOut  to = S.LongFloatCoercion
-    go from to | isLongIn  from && isDoubleOut to = S.LongDoubleCoercion
-    go from to | isFloatIn from && isFloatOut  to = S.Float
-    go from to | isFloatIn from && isDoubleOut to = S.FloatDoubleCoercion
-    go S.Double to | isDoubleOut to = S.Double
+
+    go (S.Int _) (S.Long _)   = S.Long S.ReadLongFromInt
+    go (S.Int _) (S.Float _)  = S.Float S.ReadFloatFromInt
+    go (S.Int _) (S.Double _) = S.Double S.ReadDoubleFromInt
+    
+    go (S.Long _) (S.Double _) = S.Double S.ReadDoubleFromLong
+    go (S.Long _) (S.Float _) = S.Float S.ReadFloatFromLong
+
+    go (S.Float _) (S.Double _) = S.Double (S.ReadDoubleFromFloat)
+
     go S.Bytes  S.String = S.Bytes  -- These are free coercions
     go S.String S.Bytes  = S.String -- These are free coercions
     go (S.FreeUnion a) b = go a b -- Free unions are free to discard
     go a (S.FreeUnion b) = go a b -- Free unions are free to discard
     go a b = S.Panic a $ "Can not resolve differing writer and reader schemas: " ++ show (a, b)
-
-isIntIn :: Schema -> Bool
-isIntIn S.Int               = True
-isIntIn S.IntLongCoercion   = True
-isIntIn S.IntFloatCoercion  = True
-isIntIn S.IntDoubleCoercion = True
-isIntIn _                   = False
-
-isLongIn :: Schema -> Bool
-isLongIn S.Long               = True
-isLongIn S.LongFloatCoercion  = True
-isLongIn S.LongDoubleCoercion = True
-isLongIn _                    = False
-
-isFloatIn :: Schema -> Bool
-isFloatIn S.Float               = True
-isFloatIn S.FloatDoubleCoercion = True
-isFloatIn _                     = False
-
-isLongOut :: Schema -> Bool
-isLongOut S.Long            = True
-isLongOut S.IntLongCoercion = True
-isLongOut _                 = False
-
-isFloatOut :: Schema -> Bool
-isFloatOut S.Float             = True
-isFloatOut S.IntFloatCoercion  = True
-isFloatOut S.LongFloatCoercion = True
-isFloatOut _                   = False
-
-isDoubleOut :: Schema -> Bool
-isDoubleOut S.Double              = True
-isDoubleOut S.IntDoubleCoercion   = True
-isDoubleOut S.LongDoubleCoercion  = True
-isDoubleOut S.FloatDoubleCoercion = True
-isDoubleOut _                     = False
 
 moreSpecified :: Maybe Order -> Maybe Order -> Bool
 moreSpecified _ Nothing       = True

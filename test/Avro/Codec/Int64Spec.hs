@@ -34,7 +34,7 @@ onlyInt64Schema :: Schema
 onlyInt64Schema =
   let fld nm = Field nm [] Nothing Nothing AsIs
    in Record "test.contract.OnlyInt64" [] Nothing Nothing
-        [ fld "onlyInt64Value"    Long Nothing
+        [ fld "onlyInt64Value"    (Long ReadAsIs) Nothing
         ]
 
 instance HasAvroSchema OnlyInt64 where

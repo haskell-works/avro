@@ -27,7 +27,7 @@ onlyBoolSchema :: Schema
 onlyBoolSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
    in Record "test.contract.OnlyBool" [] Nothing Nothing
-        [ fld "onlyBoolValue" Boolean Nothing
+        [ fld "onlyBoolValue" (Boolean ReadAsIs) Nothing
         ]
 
 instance HasAvroSchema OnlyBool where

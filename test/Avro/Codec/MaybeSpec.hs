@@ -24,7 +24,7 @@ onlyMaybeBoolSchema :: Schema
 onlyMaybeBoolSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
    in Record "test.contract.onlyMaybeBool" [] Nothing Nothing
-        [ fld "onlyMaybeBoolValue" (mkUnion (Null :| [Boolean])) Nothing
+        [ fld "onlyMaybeBoolValue" (mkUnion (Null ReadAsIs :| [Boolean ReadAsIs])) Nothing
         ]
 
 instance HasAvroSchema OnlyMaybeBool where

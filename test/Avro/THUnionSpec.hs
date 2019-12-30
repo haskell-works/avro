@@ -58,18 +58,18 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
       foo    = named "haskell.avro.example.Foo"
       notFoo = named "haskell.avro.example.NotFoo"
       expectedSchema = record "haskell.avro.example.Unions"
-        [ field "scalars"     (Schema.mkUnion (NE.fromList [Schema.String, Schema.Long])) scalarsDefault
-        , field "nullable"    (Schema.mkUnion (NE.fromList [Schema.Null, Schema.Int]))    nullableDefault
+        [ field "scalars"     (Schema.mkUnion (NE.fromList [Schema.String, Schema.Long Schema.ReadAsIs])) scalarsDefault
+        , field "nullable"    (Schema.mkUnion (NE.fromList [Schema.Null Schema.ReadAsIs, Schema.Int Schema.ReadAsIs]))    nullableDefault
         , field "records"     (Schema.mkUnion (NE.fromList [fooSchema, barSchema]))       Nothing
         , field "sameFields"  (Schema.mkUnion (NE.fromList [foo, notFooSchema]))          Nothing
         , field "arrayAndMap" (Schema.mkUnion (NE.fromList [array, map]))                 Nothing
 
-        , field "three" (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long]))              Nothing
-        , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long, foo]))         Nothing
-        , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int, Schema.String, Schema.Long, foo, notFoo])) Nothing
+        , field "three" (Schema.mkUnion (NE.fromList [Schema.Int Schema.ReadAsIs, Schema.String, Schema.Long Schema.ReadAsIs]))              Nothing
+        , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int Schema.ReadAsIs, Schema.String, Schema.Long Schema.ReadAsIs, foo]))         Nothing
+        , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int Schema.ReadAsIs, Schema.String, Schema.Long Schema.ReadAsIs, foo, notFoo])) Nothing
         ]
-      scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String, Schema.Long]) Schema.String (Avro.String "foo")
-      nullableDefault = Just $ Avro.Union (V.fromList [Schema.Null, Schema.Int])    Schema.Null   Avro.Null
+      scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String, Schema.Long Schema.ReadAsIs]) Schema.String (Avro.String "foo")
+      nullableDefault = Just $ Avro.Union (V.fromList [Schema.Null Schema.ReadAsIs, Schema.Int Schema.ReadAsIs])    (Schema.Null Schema.ReadAsIs)   Avro.Null
 
       fooSchema = record "haskell.avro.example.Foo" [field "stuff" Schema.String Nothing]
       barSchema = record "haskell.avro.example.Bar"
@@ -79,7 +79,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
       notFooSchema = record "haskell.avro.example.NotFoo" [field "stuff" Schema.String Nothing]
 
       array = Schema.Array { Schema.item = Schema.String }
-      map   = Schema.Map { Schema.values = Schema.Long }
+      map   = Schema.Map { Schema.values = Schema.Long Schema.ReadAsIs }
 
   unionsSchemaFile <- runIO $ getFileName "test/data/unions.avsc" >>= LBS.readFile
   let Just unionsSchemaFromJSON = Aeson.decode unionsSchemaFile

@@ -25,15 +25,15 @@ childTypeSchema :: Schema
 childTypeSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
   in Record "test.contract.ChildType" [] Nothing Nothing
-        [ fld "childValue1" Long Nothing
-        , fld "childValue2" Long Nothing
+        [ fld "childValue1" (Long ReadAsIs) Nothing
+        , fld "childValue2" (Long ReadAsIs) Nothing
         ]
 
 parentTypeSchema :: Schema
 parentTypeSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
   in Record "test.contract.ParentType" [] Nothing Nothing
-        [ fld "parentValue1" Long             Nothing
+        [ fld "parentValue1" (Long ReadAsIs)             Nothing
         , fld "parentValue2" (Array childTypeSchema)  Nothing]
 
 instance HasAvroSchema ParentType where

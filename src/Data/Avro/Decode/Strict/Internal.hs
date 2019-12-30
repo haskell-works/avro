@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE GADTs               #-}
 module Data.Avro.Decode.Strict.Internal
 where
 
@@ -49,12 +50,22 @@ getAvroOf ty0 = go ty0
  go :: Schema -> Get (T.Value Schema)
  go ty =
   case ty of
-    Null    -> return T.Null
-    Boolean -> T.Boolean <$> getAvro
-    Int     -> T.Int     <$> getAvro
-    Long    -> T.Long    <$> getAvro
-    Float   -> T.Float   <$> getAvro
-    Double  -> T.Double  <$> getAvro
+    Null ReadAsIs    -> return T.Null
+    Boolean ReadAsIs -> T.Boolean <$> getAvro
+    Int ReadAsIs     -> T.Int     <$> getAvro
+
+    Long ReadAsIs    -> T.Long    <$> getAvro
+    Long ReadLongFromInt -> T.Long   . fromIntegral <$> getAvro @Int32
+
+    Float ReadAsIs          -> T.Float   <$> getAvro
+    Float ReadFloatFromInt  -> T.Float  . fromIntegral <$> getAvro @Int32
+    Float ReadFloatFromLong -> T.Float  . fromIntegral <$> getAvro @Int64
+
+    Double ReadAsIs            -> T.Double  <$> getAvro
+    Double ReadDoubleFromInt   -> T.Double . fromIntegral <$> getAvro @Int32
+    Double ReadDoubleFromLong  -> T.Double . fromIntegral <$> getAvro @Int64
+    Double ReadDoubleFromFloat -> T.Double . realToFrac   <$> getAvro @Float
+
     Bytes   -> T.Bytes   <$> getAvro
     String  -> T.String  <$> getAvro
     Array t ->
@@ -76,12 +87,6 @@ getAvroOf ty0 = go ty0
           Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (V.map typeName ts)
           Just t  -> T.Union ts t <$> go t
     Fixed {..} -> T.Fixed ty <$> G.getByteString (fromIntegral size)
-    IntLongCoercion     -> T.Long   . fromIntegral <$> getAvro @Int32
-    IntFloatCoercion    -> T.Float  . fromIntegral <$> getAvro @Int32
-    IntDoubleCoercion   -> T.Double . fromIntegral <$> getAvro @Int32
-    LongFloatCoercion   -> T.Float  . fromIntegral <$> getAvro @Int64
-    LongDoubleCoercion  -> T.Double . fromIntegral <$> getAvro @Int64
-    FloatDoubleCoercion -> T.Double . realToFrac   <$> getAvro @Float
     FreeUnion ty -> T.Union (V.singleton ty) ty <$> go ty
     Panic {..} -> fail err
 

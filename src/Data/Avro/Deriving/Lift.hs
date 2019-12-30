@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveLift         #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE GADTs              #-}
+
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -36,3 +38,14 @@ deriving instance Lift Schema.Order
 deriving instance Lift Schema.TypeName
 deriving instance Lift Schema.Schema
 deriving instance Lift Schema.FieldStatus
+deriving instance Lift (Schema.ReadRule a)
+
+-- instance Lift (Schema.ReadRule a) where
+--   lift Schema.ReadAsIs = [| Schema.ReadAsIs |]
+--   lift Schema.ReadIgnore = [| Schema.ReadIgnore |]
+--   lift Schema.ReadLongFromInt = [| Schema.ReadLongFromInt |]     
+--   lift Schema.ReadFloatFromInt = [| Schema.ReadFloatFromInt |]   
+--   lift Schema.ReadDoubleFromInt = [| Schema.ReadDoubleFromInt |]   
+--   lift Schema.ReadFloatFromLong = [| Schema.ReadFloatFromLong |]   
+--   lift Schema.ReadDoubleFromLong = [| Schema.ReadDoubleFromLong |]  
+--   lift Schema.ReadDoubleFromFloat = [| Schema.ReadDoubleFromFloat |] 

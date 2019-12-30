@@ -23,7 +23,7 @@ msSchema  :: Schema
 msSchema =
   Record "MyStruct" [] Nothing Nothing
       [ fld "enumOrString" eOrS (Just $ Ty.String "The Default")
-      , fld "intvalue" Long Nothing
+      , fld "intvalue" (Long ReadAsIs) Nothing
       ]
      where
      fld nm ty def = Field nm [] Nothing Nothing AsIs ty def

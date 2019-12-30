@@ -167,19 +167,19 @@ mkStrictPrimitiveField _ field =
   where
     unpackedness =
       case S.fldType field of
-        S.Null    -> NonUnpackedField
-        S.Boolean -> NonUnpackedField
-        _         -> UnpackedField
+        S.Null _    -> NonUnpackedField
+        S.Boolean _ -> NonUnpackedField
+        _           -> UnpackedField
 
     shouldStricten =
       case S.fldType field of
-        S.Null    -> True
-        S.Boolean -> True
-        S.Int     -> True
-        S.Long    -> True
-        S.Float   -> True
-        S.Double  -> True
-        _         -> False
+        S.Null _    -> True
+        S.Boolean _ -> True
+        S.Int _     -> True
+        S.Long _    -> True
+        S.Float _   -> True
+        S.Double _  -> True
+        _           -> False
 
 -- | Generates a field name that matches the field name in schema
 -- (sanitised for Haskell, so first letter is lower cased)
@@ -490,11 +490,11 @@ genType _ _ = pure []
 
 mkFieldTypeName :: NamespaceBehavior -> S.Schema -> Q TH.Type
 mkFieldTypeName namespaceBehavior = \case
-  S.Boolean          -> [t| Bool |]
-  S.Long             -> [t| Int64 |]
-  S.Int              -> [t| Int32 |]
-  S.Float            -> [t| Float |]
-  S.Double           -> [t| Double |]
+  S.Boolean _        -> [t| Bool |]
+  S.Long _           -> [t| Int64 |]
+  S.Int _            -> [t| Int32 |]
+  S.Float _          -> [t| Float |]
+  S.Double _         -> [t| Double |]
   S.Bytes            -> [t| ByteString |]
   S.String           -> [t| Text |]
   S.Union branches   -> union (V.toList branches)
@@ -507,8 +507,8 @@ mkFieldTypeName namespaceBehavior = \case
   t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior
         union = \case
-          [Null, x]       -> [t| Maybe $(go x) |]
-          [x, Null]       -> [t| Maybe $(go x) |]
+          [Null _, x]     -> [t| Maybe $(go x) |]
+          [x, Null _]     -> [t| Maybe $(go x) |]
           [x, y]          -> [t| Either $(go x) $(go y) |]
           [a, b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
           [a, b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]

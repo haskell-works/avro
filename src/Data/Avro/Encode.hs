@@ -176,10 +176,10 @@ class EncodeAvro a where
   avro :: a -> AvroM
 
 avroInt :: forall a. (FiniteBits a, Integral a, EncodeRaw a) => a -> AvroM
-avroInt n = AvroM (encodeRaw n, S.Int)
+avroInt n = AvroM (encodeRaw n, S.Int ReadAsIs)
 
 avroLong :: forall a. (FiniteBits a, Integral a, EncodeRaw a) => a -> AvroM
-avroLong n = AvroM (encodeRaw n, S.Long)
+avroLong n = AvroM (encodeRaw n, S.Long ReadAsIs)
 
 -- Put a Haskell Int.
 putI :: Int -> Builder
@@ -222,10 +222,10 @@ instance EncodeAvro String where
   avro s = let t = T.pack s in avro t
 
 instance EncodeAvro Double where
-  avro d = AvroM (word64LE (IEEE.doubleToWord d), S.Double)
+  avro d = AvroM (word64LE (IEEE.doubleToWord d), S.Double ReadAsIs)
 
 instance EncodeAvro Float where
-  avro d = AvroM (word32LE (IEEE.floatToWord d), S.Float)
+  avro d = AvroM (word32LE (IEEE.floatToWord d), S.Float ReadAsIs)
 
 -- Terminating word for array and map types.
 long0 :: Builder
@@ -265,14 +265,14 @@ instance EncodeAvro a => EncodeAvro (HashMap Text a) where
 
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance EncodeAvro a => EncodeAvro (Maybe a) where
-  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null:|[S.Int]))
-  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null:|[S.Int]))
+  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null ReadAsIs :|[S.Int ReadAsIs]))
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null ReadAsIs :|[S.Int ReadAsIs]))
 
 instance EncodeAvro () where
-  avro () = AvroM (mempty, S.Null)
+  avro () = AvroM (mempty, S.Null ReadAsIs)
 
 instance EncodeAvro Bool where
-  avro b = AvroM (word8 $ fromIntegral $ fromEnum b, S.Boolean)
+  avro b = AvroM (word8 $ fromIntegral $ fromEnum b, S.Boolean ReadAsIs)
 
 --------------------------------------------------------------------------------
 --  Common Intermediate Representation Encoding

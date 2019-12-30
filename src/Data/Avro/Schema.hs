@@ -10,6 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE GADTs                 #-}
 
 -- | Avro 'Schema's, represented here as values of type 'Schema',
 -- describe the serialization and de-serialization of values.
@@ -20,7 +21,7 @@
 module Data.Avro.Schema
   (
    -- * Schema description types
-    Schema(..), Type
+    Schema(..), Type, ReadRule(..)
   , Field(..), Order(..), FieldStatus(..)
   , TypeName(..)
   , renderFullname
@@ -81,11 +82,39 @@ import qualified Data.Text              as T
 import           Data.Text.Encoding     as T
 import qualified Data.Vector            as V
 import           Prelude                as P
+-- import qualified GHC.Types              as GHC
 
 import GHC.Generics (Generic)
 
 {-# DEPRECATED Type "Use Schema instead" #-}
 type Type = Schema
+
+data ReadRule a where
+  ReadAsIs            :: ReadRule a
+  ReadIgnore          :: ReadRule a
+  ReadLongFromInt     :: ReadRule Int64
+  ReadFloatFromInt    :: ReadRule Float
+  ReadDoubleFromInt   :: ReadRule Double
+  ReadFloatFromLong   :: ReadRule Float
+  ReadDoubleFromLong  :: ReadRule Double
+  ReadDoubleFromFloat :: ReadRule Double
+
+instance Show (ReadRule a) where
+  show ReadAsIs             = "AsIs"
+  show ReadIgnore           = "Ignore"
+  show ReadLongFromInt      = "LongFromInt"
+  show ReadFloatFromInt     = "FloatFromInt"
+  show ReadDoubleFromInt    = "DoubleFromInt"
+  show ReadFloatFromLong    = "FloatFromLong"
+  show ReadDoubleFromLong   = "DoubleFromLong"
+  show ReadDoubleFromFloat  = "DoubleFromFloat"
+
+
+instance Eq (ReadRule a) where
+  ReadAsIs          == ReadAsIs           = True
+  ReadIgnore        == ReadIgnore         = True
+  ReadLongFromInt   == ReadLongFromInt    = True
+  ReadFloatFromInt  == ReadFloatFromInt   = True
 
 -- | N.B. It is possible to create a Haskell value (of 'Schema' type) that is
 -- not a valid Avro schema by violating one of the above or one of the
@@ -93,11 +122,14 @@ type Type = Schema
 data Schema
       =
       -- Basic types
-        Null
-      | Boolean
-      | Int   | Long
-      | Float | Double
-      | Bytes | String
+        Null    (ReadRule ())
+      | Boolean (ReadRule Bool)
+      | Int     (ReadRule Int)
+      | Long    (ReadRule Int64)
+      | Float   (ReadRule Float)
+      | Double  (ReadRule Double)
+      | Bytes 
+      | String
       | Array { item :: Schema }
       | Map   { values :: Schema }
       | NamedType TypeName
@@ -119,23 +151,17 @@ data Schema
               , aliases :: [TypeName]
               , size    :: Int
               }
-      | IntLongCoercion
-      | IntFloatCoercion
-      | IntDoubleCoercion
-      | LongFloatCoercion
-      | LongDoubleCoercion
-      | FloatDoubleCoercion
-      | FreeUnion { ty :: Type }
-      | Panic { ty :: Type, err :: String }
-    deriving (Show, Generic, NFData)
+      | FreeUnion { ty :: Schema }
+      | Panic { ty :: Schema, err :: String }
+    deriving (Show, Generic)
 
 instance Eq Schema where
-  Null == Null = True
-  Boolean == Boolean = True
-  Int == Int = True
-  Long == Long = True
-  Float == Float = True
-  Double == Double = True
+  Null x == Null y = True
+  Boolean x == Boolean y = True
+  Int x == Int y = True
+  Long x == Long y = True
+  Float x == Float y = True
+  Double x == Double y = True
   Bytes == Bytes = True
   String == String = True
 
@@ -151,12 +177,6 @@ instance Eq Schema where
   Fixed name1 _ s == Fixed name2 _ s2 =
     and [name1 == name2, s == s2]
 
-  IntLongCoercion     == IntLongCoercion     = True
-  IntFloatCoercion    == IntFloatCoercion    = True
-  IntDoubleCoercion   == IntDoubleCoercion   = True
-  LongFloatCoercion   == LongFloatCoercion   = True
-  LongDoubleCoercion  == LongDoubleCoercion  = True
-  FloatDoubleCoercion == FloatDoubleCoercion = True
   FreeUnion ty1 == FreeUnion ty2 = ty1 == ty2
   Panic ty1 _ == Panic ty2 _ = ty1 == ty2
 
@@ -293,12 +313,12 @@ instance Hashable TypeName where
 typeName :: Schema -> Text
 typeName bt =
   case bt of
-    Null           -> "null"
-    Boolean        -> "boolean"
-    Int            -> "int"
-    Long           -> "long"
-    Float          -> "float"
-    Double         -> "double"
+    Null _          -> "null"
+    Boolean _       -> "boolean"
+    Int _           -> "int"
+    Long _          -> "long"
+    Float _         -> "float"
+    Double _        -> "double"
     Bytes          -> "bytes"
     String         -> "string"
     Array _        -> "array"
@@ -311,7 +331,7 @@ data FieldStatus =
     AsIs
   | Ignored
   | Defaulted (Ty.Value Type)
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Generic)
 
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
@@ -321,10 +341,10 @@ data Field = Field { fldName    :: Text
                    , fldType    :: Schema
                    , fldDefault :: Maybe (Ty.Value Schema)
                    }
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Generic)
 
 data Order = Ascending | Descending | Ignore
-  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic)
 
 instance FromJSON Schema where
   parseJSON = parseSchemaJSON Nothing
@@ -341,12 +361,12 @@ parseSchemaJSON :: Maybe TypeName
                 -> Parser Schema
 parseSchemaJSON context = \case
   A.String s -> case s of
-    "null"    -> return Null
-    "boolean" -> return Boolean
-    "int"     -> return Int
-    "long"    -> return Long
-    "float"   -> return Float
-    "double"  -> return Double
+    "null"    -> return (Null ReadAsIs)
+    "boolean" -> return (Boolean ReadAsIs)
+    "int"     -> return (Int ReadAsIs)
+    "long"    -> return (Long ReadAsIs)
+    "float"   -> return (Float ReadAsIs)
+    "double"  -> return (Double ReadAsIs)
     "bytes"   -> return Bytes
     "string"  -> return String
     somename  -> return $ NamedType $ mkTypeName context somename Nothing
@@ -390,12 +410,12 @@ parseSchemaJSON context = \case
           aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
           size    <- o .: "size"
           pure $ Fixed typeName aliases size
-        "null"    -> pure Null
-        "boolean" -> pure Boolean
-        "int"     -> pure Int
-        "long"    -> pure Long
-        "float"   -> pure Float
-        "double"  -> pure Double
+        "null"    -> pure (Null ReadAsIs)
+        "boolean" -> pure (Boolean ReadAsIs)
+        "int"     -> pure (Int ReadAsIs)
+        "long"    -> pure (Long ReadAsIs)
+        "float"   -> pure (Float ReadAsIs)
+        "double"  -> pure (Double ReadAsIs)
         "bytes"   -> pure Bytes
         "string"  -> pure String
         s        -> fail $ "Unrecognized object type: " <> T.unpack s
@@ -453,12 +473,12 @@ schemaToJSON :: Maybe TypeName
                 -- ^ The schema to serialize to JSON.
              -> A.Value
 schemaToJSON context = \case
-  Null           -> A.String "null"
-  Boolean        -> A.String "boolean"
-  Int            -> A.String "int"
-  Long           -> A.String "long"
-  Float          -> A.String "float"
-  Double         -> A.String "double"
+  Null ReadAsIs          -> A.String "null"
+  Boolean ReadAsIs       -> A.String "boolean"
+  Int ReadAsIs           -> A.String "int"
+  Long ReadAsIs          -> A.String "long"
+  Float ReadAsIs         -> A.String "float"
+  Double ReadAsIs        -> A.String "double"
   Bytes          -> A.String "bytes"
   String         -> A.String "string"
   Array tn       ->
@@ -633,15 +653,15 @@ parseAvroJSON union env ty av                  =
           _ -> fail $ "Expected type String, Enum, Bytes, or Fixed, but found (Type,Value)="
              <> show (ty, av)
       A.Bool b       -> case ty of
-                          Boolean -> return $ Ty.Boolean b
+                          Boolean ReadAsIs -> return $ Ty.Boolean b
                           _       -> avroTypeMismatch ty "boolean"
       A.Number i     ->
         case ty of
-          Int    -> return $ Ty.Int    (floor i)
-          Long   -> return $ Ty.Long   (floor i)
-          Float  -> return $ Ty.Float  (realToFrac i)
-          Double -> return $ Ty.Double (realToFrac i)
-          _      -> avroTypeMismatch ty "number"
+          Int ReadAsIs    -> return $ Ty.Int    (floor i)
+          Long ReadAsIs   -> return $ Ty.Long   (floor i)
+          Float ReadAsIs  -> return $ Ty.Float  (realToFrac i)
+          Double ReadAsIs -> return $ Ty.Double (realToFrac i)
+          _               -> avroTypeMismatch ty "number"
       A.Array vec    ->
         case ty of
           Array t -> Ty.Array <$> V.mapM (parseAvroJSON union env t) vec
@@ -659,7 +679,7 @@ parseAvroJSON union env ty av                  =
               Ty.Record ty . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
-                  Null -> return Ty.Null
+                  Null ReadAsIs -> return Ty.Null
                   _    -> avroTypeMismatch ty "null"
 
 -- | Parses a string literal into a bytestring in the format expected

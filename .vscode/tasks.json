@@ -5,7 +5,7 @@
       "label": "Build",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-build && echo 'Done'"],
+      "args": ["-lc", "cabal v2-build && echo 'Done'"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -37,7 +37,7 @@
       "label": "Test",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-test && echo 'Done'"],
+      "args": ["-lc", "cabal v2-test --enable-tests && echo 'Done'"],
       "group": {
         "kind": "test",
         "isDefault": true

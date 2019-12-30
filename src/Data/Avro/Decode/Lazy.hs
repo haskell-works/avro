@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE GADTs               #-}
 
 module Data.Avro.Decode.Lazy
   ( decodeAvro
@@ -293,12 +294,22 @@ getAvroOf ty0 bs = go ty0 bs
   go :: Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
   go ty bs =
     case ty of
-      Null    -> (bs, T.Null)
-      Boolean -> decodeGet T.Boolean  bs
-      Int     -> decodeGet T.Int      bs
-      Long    -> decodeGet T.Long     bs
-      Float   -> decodeGet T.Float    bs
-      Double  -> decodeGet T.Double   bs
+      Null ReadAsIs    -> (bs, T.Null)
+      Boolean ReadAsIs -> decodeGet T.Boolean  bs
+      Int ReadAsIs     -> decodeGet T.Int      bs
+      
+      Long ReadAsIs         -> decodeGet T.Long     bs
+      Long ReadLongFromInt  -> decodeGet @Int32 (T.Long   . fromIntegral) bs
+
+      Float ReadAsIs          -> decodeGet T.Float    bs
+      Float ReadFloatFromInt  -> decodeGet @Int32 (T.Float  . fromIntegral) bs
+      Float ReadFloatFromLong -> decodeGet @Int64 (T.Float  . fromIntegral) bs
+      
+      Double ReadAsIs             -> decodeGet T.Double   bs
+      Double ReadDoubleFromInt    -> decodeGet @Int32 (T.Double . fromIntegral) bs
+      Double ReadDoubleFromLong   -> decodeGet @Int64 (T.Double . fromIntegral) bs
+      Double ReadDoubleFromFloat  -> decodeGet @Float (T.Double . realToFrac)   bs
+
       Bytes   -> decodeGet T.Bytes    bs
       String  -> decodeGet T.String   bs
       Array t -> T.Array . V.fromList . mconcat <$> getElements bs (go t)
@@ -333,12 +344,6 @@ getAvroOf ty0 bs = go ty0 bs
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, v)  -> (bs', T.Fixed ty v)
 
-      IntLongCoercion     -> decodeGet @Int32 (T.Long   . fromIntegral) bs
-      IntFloatCoercion    -> decodeGet @Int32 (T.Float  . fromIntegral) bs
-      IntDoubleCoercion   -> decodeGet @Int32 (T.Double . fromIntegral) bs
-      LongFloatCoercion   -> decodeGet @Int64 (T.Float  . fromIntegral) bs
-      LongDoubleCoercion  -> decodeGet @Int64 (T.Double . fromIntegral) bs
-      FloatDoubleCoercion -> decodeGet @Float (T.Double . realToFrac)   bs
       FreeUnion {..} -> T.Union (V.singleton ty) ty <$> go ty bs
       Panic {..} -> (fst (go ty bs), T.Error err)
 

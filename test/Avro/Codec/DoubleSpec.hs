@@ -21,7 +21,7 @@ onlyDoubleSchema :: Schema
 onlyDoubleSchema =
   let fld nm = Field nm [] Nothing Nothing AsIs
   in Record "test.contract.OnlyDouble" [] Nothing Nothing
-        [ fld "onlyDoubleValue" Double Nothing
+        [ fld "onlyDoubleValue" (Double ReadAsIs) Nothing
         ]
 
 instance HasAvroSchema OnlyDouble where

@@ -91,8 +91,8 @@ instance FromLazyAvro Float where
 
 instance FromLazyAvro a => FromLazyAvro (Maybe a) where
   fromLazyAvro (T.Union ts _ v) = case (V.toList ts, v) of
-    ([S.Null, _], T.Null) -> pure Nothing
-    ([S.Null, _], v')     -> Just <$> fromLazyAvro v'
+    ([S.Null _, _], T.Null) -> pure Nothing
+    ([S.Null _, _], v')     -> Just <$> fromLazyAvro v'
     _                     -> badValue v "Maybe a"
   fromLazyAvro v                = badValue v "Maybe a"
 

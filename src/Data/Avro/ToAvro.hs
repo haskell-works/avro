@@ -92,7 +92,7 @@ instance (ToAvro a) => ToAvro (Maybe a) where
   toAvro a =
     let sch = options (schemaOf a)
     in case a of
-      Nothing -> T.Union sch S.Null (toAvro ())
+      Nothing -> T.Union sch (S.Null ReadAsIs) (toAvro ())
       Just v  -> T.Union sch (schemaOf v) (toAvro v)
 
 instance (ToAvro a) => ToAvro [a] where

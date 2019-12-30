@@ -33,43 +33,43 @@ schemaOf :: (HasAvroSchema a) => a -> Schema
 schemaOf = witness schema
 
 instance HasAvroSchema Word8 where
-  schema = Tagged S.Int
+  schema = Tagged (S.Int ReadAsIs)
 
 instance HasAvroSchema Word16 where
-  schema = Tagged S.Int
+  schema = Tagged (S.Int ReadAsIs)
 
 instance HasAvroSchema Word32 where
-  schema = Tagged S.Long
+  schema = Tagged (S.Long ReadAsIs)
 
 instance HasAvroSchema Word64 where
-  schema = Tagged S.Long
+  schema = Tagged (S.Long ReadAsIs)
 
 instance HasAvroSchema Bool where
-  schema = Tagged S.Boolean
+  schema = Tagged (S.Boolean ReadAsIs)
 
 instance HasAvroSchema () where
-  schema = Tagged S.Null
+  schema = Tagged (S.Null ReadAsIs)
 
 instance HasAvroSchema Int where
-  schema = Tagged S.Long
+  schema = Tagged (S.Long ReadAsIs)
 
 instance HasAvroSchema Int8 where
-  schema = Tagged S.Int
+  schema = Tagged (S.Int ReadAsIs)
 
 instance HasAvroSchema Int16 where
-  schema = Tagged S.Int
+  schema = Tagged (S.Int ReadAsIs)
 
 instance HasAvroSchema Int32 where
-  schema = Tagged S.Int
+  schema = Tagged (S.Int ReadAsIs)
 
 instance HasAvroSchema Int64 where
-  schema = Tagged S.Long
+  schema = Tagged (S.Long ReadAsIs)
 
 instance HasAvroSchema Double where
-  schema = Tagged S.Double
+  schema = Tagged (S.Double ReadAsIs)
 
 instance HasAvroSchema Float where
-  schema = Tagged S.Float
+  schema = Tagged (S.Float ReadAsIs)
 
 instance HasAvroSchema Text.Text where
   schema = Tagged S.String
@@ -105,7 +105,7 @@ instance (HasAvroSchema a) => HasAvroSchema (HashMap.HashMap String a) where
   schema = wrapTag S.Map (schema :: Tagged a Schema)
 
 instance (HasAvroSchema a) => HasAvroSchema (Maybe a) where
-  schema = Tagged $ mkUnion (S.Null:| [untag (schema :: Tagged a Schema)])
+  schema = Tagged $ mkUnion (S.Null ReadAsIs :| [untag (schema :: Tagged a Schema)])
 
 instance (HasAvroSchema a) => HasAvroSchema [a] where
   schema = wrapTag S.Array (schema :: Tagged a Schema)

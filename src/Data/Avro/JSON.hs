@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs               #-}
 -- | Avro supports a JSON representation of Avro objects alongside the
 -- Avro binary format. An Avro schema can be used to generate and
 -- validate JSON representations of Avro objects.
@@ -87,8 +88,8 @@ decodeAvroJSON schema json =
       fail ("Type " <> show name <> " not in schema")
 
     union (Schema.Union schemas) Aeson.Null
-      | Schema.Null `elem` schemas =
-          pure $ Avro.Union schemas Schema.Null Avro.Null
+      | Schema.Null Schema.ReadAsIs `elem` schemas =
+          pure $ Avro.Union schemas (Schema.Null Schema.ReadAsIs) Avro.Null
       | otherwise                  =
           fail "Null not in union."
     union (Schema.Union schemas) (Aeson.Object obj)

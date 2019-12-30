@@ -91,12 +91,12 @@ startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema re
     go aTy bTy val | aTy == bTy = val
     go eTy dTy val =
       case val of
-        T.Int i32  | dTy == S.Long   -> T.Long   (fromIntegral i32)
-                   | dTy == S.Float  -> T.Float  (fromIntegral i32)
-                   | dTy == S.Double -> T.Double (fromIntegral i32)
-        T.Long i64 | dTy == S.Float  -> T.Float  (fromIntegral i64)
-                   | dTy == S.Double -> T.Double (fromIntegral i64)
-        T.Float f  | dTy == S.Double -> T.Double (realToFrac f)
+        T.Int i32  | dTy == S.Long ReadAsIs   -> T.Long   (fromIntegral i32)
+                   | dTy == S.Float ReadAsIs  -> T.Float  (fromIntegral i32)
+                   | dTy == S.Double ReadAsIs -> T.Double (fromIntegral i32)
+        T.Long i64 | dTy == S.Float ReadAsIs  -> T.Float  (fromIntegral i64)
+                   | dTy == S.Double ReadAsIs -> T.Double (fromIntegral i64)
+        T.Float f  | dTy == S.Double ReadAsIs -> T.Double (realToFrac f)
         T.String s | dTy == S.Bytes  -> T.Bytes  (Text.encodeUtf8 s)
         T.Bytes bs | dTy == S.String -> T.String (Text.decodeUtf8 bs)
         _                            -> T.Error $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
