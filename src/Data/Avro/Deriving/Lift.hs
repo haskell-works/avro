@@ -35,4 +35,3 @@ deriving instance Lift Schema.Field
 deriving instance Lift Schema.Order
 deriving instance Lift Schema.TypeName
 deriving instance Lift Schema.Schema
-deriving instance Lift Schema.FieldStatus

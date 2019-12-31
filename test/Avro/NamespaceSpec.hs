@@ -42,7 +42,7 @@ expected = Record
   , order   = Just Ascending
   , fields  = [field "bar" bar, field "baz" $ NamedType "com.example.baz.Baz"]
   }
-  where field name schema = Field name [] Nothing (Just Ascending) AsIs schema Nothing
+  where field name schema = Field name [] Nothing (Just Ascending) False schema Nothing
 
         bar = Record
           { name    = "com.example.Bar"
@@ -73,7 +73,7 @@ expectedNullNamespace = Record
   , order   = Just Ascending
   , fields  = [field "bar" $ NamedType "Bar", field "baz" $ NamedType "com.example.Baz"]
   }
-  where field name schema = Field name [] Nothing (Just Ascending) AsIs schema Nothing
+  where field name schema = Field name [] Nothing (Just Ascending) False schema Nothing
 
 
 getFileName :: FilePath -> IO FilePath

@@ -21,7 +21,7 @@ module Data.Avro.Schema
   (
    -- * Schema description types
     Schema(..), Type
-  , Field(..), Order(..), FieldStatus(..)
+  , Field(..), Order(..)
   , TypeName(..)
   , renderFullname
   , parseFullname
@@ -304,19 +304,13 @@ typeName bt =
     Union ts       -> typeName (V.head ts)
     _              -> renderFullname $ name bt
 
-data FieldStatus =
-    AsIs
-  | Ignored
-  | Defaulted (Ty.Value Schema)
-  deriving (Eq, Show, Generic, NFData)
-
-data Field = Field { fldName    :: Text
-                   , fldAliases :: [Text]
-                   , fldDoc     :: Maybe Text
-                   , fldOrder   :: Maybe Order
-                   , fldStatus  :: FieldStatus
-                   , fldType    :: Schema
-                   , fldDefault :: Maybe (Ty.Value Schema)
+data Field = Field { fldName       :: Text
+                   , fldAliases    :: [Text]
+                   , fldDoc        :: Maybe Text
+                   , fldOrder      :: Maybe Order
+                   , fldReadIgnore :: Bool
+                   , fldType       :: Schema
+                   , fldDefault    :: Maybe (Ty.Value Schema)
                    }
   deriving (Eq, Show, Generic, NFData)
 
@@ -431,7 +425,7 @@ parseField record = \case
 
     let mkAlias name = mkTypeName (Just record) name Nothing
     aliases  <- o .:? "aliases"  .!= []
-    return $ Field name aliases doc order AsIs ty def
+    return $ Field name aliases doc order False ty def
   invalid    -> typeMismatch "Field" invalid
 
 instance ToJSON Schema where
