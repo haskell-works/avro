@@ -28,60 +28,57 @@ import qualified Data.Vector         as V
 -- get in the way of pure parsing).
 deconflict :: Schema -- ^ Writer schema
            -> Schema -- ^ Reader schema
-           -> Schema
-deconflict writerSchema readerSchema = go writerSchema readerSchema
-  where
-    go :: Schema -> Schema -> Schema
-    go aTy bTy
-      | aTy == bTy = aTy
-    go (S.Array aTy) (S.Array bTy) =
-      S.Array $ go aTy bTy
-    go (S.Map aTy) (S.Map bTy) =
-      S.Map $ go aTy bTy
-    go a@S.Enum{} b@S.Enum{}
-      | name a == name b && symbols b `contains` symbols a = S.Enum
-        { name    = name a
-        , aliases = aliases a <> aliases b
-        , doc     = doc a
-        , symbols = symbols a
-        }
-    go a@S.Fixed {} b@S.Fixed {}
-      | name a == name b && size a == size b = S.Fixed
-        { name    = name a
-        , aliases = aliases a <> aliases b
-        , size    = size a
-        }
-    go a@S.Record {} b@S.Record {}
-      | name a == name b && order b `moreSpecified` order a =
-        let fields' = deconflictFields (fields a) (fields b)
-        in S.Record
-          { name    = name a
-          , aliases = aliases a <> aliases b
-          , doc     = doc a
-          , order   = order b
-          , fields  = fields'
-          }
-    go (S.Union xs) (S.Union ys) =
-      let err x = S.Panic x $ "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> ys) <> " does not contain schema " <> Text.unpack (typeName x)
-      in S.Union $ (\x -> maybe (err x) (go x) (findType x ys)) <$> xs
-    go nonUnion (S.Union ys)
-      | Just y <- findType nonUnion ys =
-        S.FreeUnion (go nonUnion y)
-    go from S.Int | isIntIn from = S.Int
-    go from to | isIntIn   from && isLongOut   to = S.IntLongCoercion
-    go from to | isIntIn   from && isFloatOut  to = S.IntFloatCoercion
-    go from to | isIntIn   from && isDoubleOut to = S.IntDoubleCoercion
-    go from to | isLongIn  from && isLongOut   to = S.Long
-    go from to | isLongIn  from && isFloatOut  to = S.LongFloatCoercion
-    go from to | isLongIn  from && isDoubleOut to = S.LongDoubleCoercion
-    go from to | isFloatIn from && isFloatOut  to = S.Float
-    go from to | isFloatIn from && isDoubleOut to = S.FloatDoubleCoercion
-    go S.Double to | isDoubleOut to = S.Double
-    go S.Bytes  S.String = S.Bytes  -- These are free coercions
-    go S.String S.Bytes  = S.String -- These are free coercions
-    go (S.FreeUnion a) b = go a b -- Free unions are free to discard
-    go a (S.FreeUnion b) = go a b -- Free unions are free to discard
-    go a b = S.Panic a $ "Can not resolve differing writer and reader schemas: " ++ show (a, b)
+           -> Either String Schema
+deconflict aTy bTy
+  | aTy == bTy = pure aTy
+deconflict (S.Array aTy) (S.Array bTy) =
+  S.Array <$> deconflict aTy bTy
+deconflict (S.Map aTy) (S.Map bTy) =
+  S.Map <$> deconflict aTy bTy
+deconflict a@S.Enum{} b@S.Enum{}
+  | name a == name b && symbols b `contains` symbols a = pure S.Enum
+    { name    = name a
+    , aliases = aliases a <> aliases b
+    , doc     = doc a
+    , symbols = symbols a
+    }
+deconflict a@S.Fixed {} b@S.Fixed {}
+  | name a == name b && size a == size b = pure S.Fixed
+    { name    = name a
+    , aliases = aliases a <> aliases b
+    , size    = size a
+    }
+deconflict a@S.Record {} b@S.Record {}
+  | name a == name b && order b `moreSpecified` order a = do
+    fields' <- deconflictFields (fields a) (fields b)
+    pure S.Record
+      { name    = name a
+      , aliases = aliases a <> aliases b
+      , doc     = doc a
+      , order   = order b
+      , fields  = fields'
+      }
+deconflict (S.Union xs) (S.Union ys) =
+  let err x = "Incorrect payload: union " <> (show . Foldable.toList $ typeName <$> ys) <> " does not contain schema " <> Text.unpack (typeName x)
+  in S.Union <$> V.mapM (\x -> maybe (Left $ err x) (deconflict x) (findType x ys)) xs
+deconflict nonUnion (S.Union ys)
+  | Just y <- findType nonUnion ys =
+    S.FreeUnion <$> deconflict nonUnion y
+deconflict from S.Int | isIntIn from = pure S.Int
+deconflict from to | isIntIn   from && isLongOut   to = pure S.IntLongCoercion
+deconflict from to | isIntIn   from && isFloatOut  to = pure S.IntFloatCoercion
+deconflict from to | isIntIn   from && isDoubleOut to = pure S.IntDoubleCoercion
+deconflict from to | isLongIn  from && isLongOut   to = pure S.Long
+deconflict from to | isLongIn  from && isFloatOut  to = pure S.LongFloatCoercion
+deconflict from to | isLongIn  from && isDoubleOut to = pure S.LongDoubleCoercion
+deconflict from to | isFloatIn from && isFloatOut  to = pure S.Float
+deconflict from to | isFloatIn from && isDoubleOut to = pure S.FloatDoubleCoercion
+deconflict S.Double to | isDoubleOut to = pure S.Double
+deconflict S.Bytes  S.String = pure S.Bytes  -- These are free coercions
+deconflict S.String S.Bytes  = pure S.String -- These are free coercions
+deconflict (S.FreeUnion a) b = deconflict a b -- Free unions are free to discard
+deconflict a (S.FreeUnion b) = deconflict a b -- Free unions are free to discard
+deconflict a b = Left $ "Can not resolve differing writer and reader schemas: " ++ show (a, b)
 
 isIntIn :: Schema -> Bool
 isIntIn S.Int               = True
@@ -133,26 +130,26 @@ contains container elts =
 -- For each field:
 --  1) If it exists in both schemas, deconflict it
 --  2) If it's only in the reader schema and has a default, mark it defaulted.
---  2) If it's only in the reader schema and has no default, set its type to Panic.
+--  2) If it's only in the reader schema and has no default, fail.
 --  3) If it's only in the writer schema, mark it ignored.
-deconflictFields :: [Field] -> [Field] -> [Field]
+deconflictFields :: [Field] -> [Field] -> Either String [Field]
 deconflictFields writerFields readerFields =
-  (deconflictField <$> writerFields) <> defaultedFields
+  sequence $ (deconflictField <$> writerFields) <> defaultedFields
   where
     defaultedFields = [makeDefaulted f | f <- readerFields, findField f writerFields == Nothing]
 
-    makeDefaulted :: Field -> Field
+    makeDefaulted :: Field -> Either String Field
     makeDefaulted f
-      | Just def <- fldDefault f = f { fldStatus = Defaulted def }
-      | otherwise = f { fldType =
-        S.Panic (fldType f) ("No default found for deconflicted field "<>Text.unpack (fldName f)) }
+      | Just def <- fldDefault f = pure f { fldStatus = Defaulted def }
+      | otherwise = Left $ "No default found for deconflicted field " <> Text.unpack (fldName f)
 
-    deconflictField :: Field -> Field
+    deconflictField :: Field -> Either String Field
     deconflictField writerField
-      | Just readerField <- findField writerField readerFields =
-        writerField { fldType = deconflict (fldType writerField) (fldType readerField) }
+      | Just readerField <- findField writerField readerFields = do
+        t <- deconflict (fldType writerField) (fldType readerField)
+        pure writerField { fldType = t }
       | otherwise =
-        writerField { fldStatus = Ignored }
+        pure writerField { fldStatus = Ignored }
 
 findField :: Field -> [Field] -> Maybe Field
 findField f fs =

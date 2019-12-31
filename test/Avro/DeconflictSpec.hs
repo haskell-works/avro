@@ -33,13 +33,13 @@ spec = describe "Avro.DeconflictSpec" $ do
   describe "Type A" $ do
     it "should deconflict simple message" $ do
       let payload = A.encode $ AW.Inner 3
-      let deconflictedSchema = Dec.deconflict AW.schema'Inner AR.schema'Inner
+      let Right deconflictedSchema = Dec.deconflict AW.schema'Inner AR.schema'Inner
       let Right deconflicted = A.decodeAvro deconflictedSchema payload
       fromAvro deconflicted `shouldBe` Success (AR.Inner 3 Nothing)
 
     it "should deconflict strict message" $ do
       let payload = A.encode AW.sampleValue
-      let deconflictedSchema = Dec.deconflict AW.schema'Outer AR.schema'Outer
+      let Right deconflictedSchema = Dec.deconflict AW.schema'Outer AR.schema'Outer
       let Right deconflicted = A.decodeAvro deconflictedSchema payload
 
       fromAvro deconflicted `shouldBe` Success AR.sampleValue
@@ -54,7 +54,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict lazy value" $ do
       let payload = A.encode AW.sampleValue
-      let deconflictedSchema = Dec.deconflict AW.schema'Outer AR.schema'Outer
+      let Right deconflictedSchema = Dec.deconflict AW.schema'Outer AR.schema'Outer
       let deconflicted = AL.decodeAvro deconflictedSchema payload
 
       AL.fromLazyAvro deconflicted `shouldBe` Success AR.sampleValue
@@ -67,7 +67,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict lazy value" $ do
       let payload = A.encode BW.sampleValue
-      let deconflictedSchema = Dec.deconflict BW.schema'Foo BR.schema'Foo
+      let Right deconflictedSchema = Dec.deconflict BW.schema'Foo BR.schema'Foo
       let deconflicted = AL.decodeAvro deconflictedSchema payload
 
       AL.fromLazyAvro deconflicted `shouldBe` Success BR.sampleValue
@@ -78,7 +78,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict strict value" $ do
       let payload = A.encode BW.sampleValue
-      let deconflictedSchema = Dec.deconflict BW.schema'Foo BR.schema'Foo
+      let Right deconflictedSchema = Dec.deconflict BW.schema'Foo BR.schema'Foo
       let Right deconflicted = A.decodeAvro deconflictedSchema payload
 
       A.fromAvro deconflicted `shouldBe` Success BR.sampleValue
@@ -90,7 +90,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict lazy value" $ do
       let payload = A.encode CW.sampleValue
-      let deconflictedSchema = Dec.deconflict CW.schema'Foo CR.schema'Foo
+      let Right deconflictedSchema = Dec.deconflict CW.schema'Foo CR.schema'Foo
       let deconflicted = AL.decodeAvro deconflictedSchema payload
 
       AL.fromLazyAvro deconflicted `shouldBe` Success CR.sampleValue
@@ -101,7 +101,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict strict value" $ do
       let payload = A.encode CW.sampleValue
-      let deconflictedSchema = Dec.deconflict CW.schema'Foo CR.schema'Foo
+      let Right deconflictedSchema = Dec.deconflict CW.schema'Foo CR.schema'Foo
       let Right deconflicted = A.decodeAvro deconflictedSchema payload
 
       A.fromAvro deconflicted `shouldBe` Success CR.sampleValue
@@ -113,7 +113,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict lazy value" $ do
       let payload = A.encode DW.sampleValue
-      let deconflictedSchema = Dec.deconflict DW.schema'Foo DR.schema'Foo
+      let Right deconflictedSchema = Dec.deconflict DW.schema'Foo DR.schema'Foo
       let deconflicted = AL.decodeAvro deconflictedSchema payload
 
       AL.fromLazyAvro deconflicted `shouldBe` Success DR.sampleValue
@@ -124,7 +124,7 @@ spec = describe "Avro.DeconflictSpec" $ do
 
     it "should deconflict strict value" $ do
       let payload = A.encode DW.sampleValue
-      let deconflictedSchema = Dec.deconflict DW.schema'Foo DR.schema'Foo
+      let Right deconflictedSchema = Dec.deconflict DW.schema'Foo DR.schema'Foo
       let Right deconflicted = A.decodeAvro deconflictedSchema payload
 
       A.fromAvro deconflicted `shouldBe` Success DR.sampleValue

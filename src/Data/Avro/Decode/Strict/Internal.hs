@@ -83,7 +83,6 @@ getAvroOf ty0 = go ty0
     LongDoubleCoercion  -> T.Double . fromIntegral <$> getAvro @Int64
     FloatDoubleCoercion -> T.Double . realToFrac   <$> getAvro @Float
     FreeUnion ty -> T.Union (V.singleton ty) ty <$> go ty
-    Panic {..} -> fail err
 
  getField :: Field -> Get (Maybe (Text, T.Value Type))
  getField Field{..} =

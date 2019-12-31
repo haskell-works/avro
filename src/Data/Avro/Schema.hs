@@ -27,7 +27,6 @@ module Data.Avro.Schema
   , parseFullname
   , mkEnum, mkUnion
   , validateSchema
-  , isSchemaStrict
   -- * Lower level utilities
   , typeName
   , buildTypeEnvironment
@@ -126,7 +125,6 @@ data Schema
       | LongDoubleCoercion
       | FloatDoubleCoercion
       | FreeUnion { ty :: Type }
-      | Panic { ty :: Type, err :: String }
     deriving (Show, Generic, NFData)
 
 instance Eq Schema where
@@ -158,7 +156,6 @@ instance Eq Schema where
   LongDoubleCoercion  == LongDoubleCoercion  = True
   FloatDoubleCoercion == FloatDoubleCoercion = True
   FreeUnion ty1 == FreeUnion ty2 = ty1 == ty2
-  Panic ty1 _ == Panic ty2 _ = ty1 == ty2
 
   _ == _ = False
 
@@ -711,16 +708,6 @@ instance FromJSON Order where
 --  * Named types are resolvable
 validateSchema :: Schema -> Parser ()
 validateSchema _sch = return () -- XXX TODO
-
--- | True iff there are no errors in the schema.
-isSchemaStrict :: Schema -> Bool
-isSchemaStrict Array{item}    = isSchemaStrict item
-isSchemaStrict Map{values}    = isSchemaStrict values
-isSchemaStrict Record{fields} = all (isSchemaStrict . fldType) fields
-isSchemaStrict Union{options} = V.all isSchemaStrict options
-isSchemaStrict FreeUnion{ty}  = isSchemaStrict ty
-isSchemaStrict Panic{}        = False
-isSchemaStrict _              = True
 
 -- | @buildTypeEnvironment schema@ builds a function mapping type names to
 -- the types declared in the traversed schema.

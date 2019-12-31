@@ -68,7 +68,7 @@ import qualified Data.Avro.Decode.Strict.Internal as DecodeStrict
 
 import Data.Avro.Decode.Get
 import Data.Avro.Decode.Lazy.Convert      (fromStrictValue, toStrictValue)
-import Data.Avro.Schema.Deconflict   as Dec
+import Data.Avro.Schema.Deconflict
 import Data.Avro.Decode.Lazy.FromLazyAvro
 import Data.Avro.FromAvro
 
@@ -128,7 +128,10 @@ decodeContainerWithSchema' readerSchema bs = do
   (_, vals) <- getDeconflictedValues bs
   pure $ (fmap . fmap) (resultToEither . fromLazyAvro) vals
   where
-    getDeconflictedValues = getContainerValuesWith (getAvroOf . flip deconflict readerSchema)
+    getDeconflictedValues = getContainerValuesWith (getAvroOf' . flip deconflict readerSchema)
+    getAvroOf' :: Either String Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
+    getAvroOf' (Left err) bs = (bs, T.Error err)
+    getAvroOf' (Right sc) bs = getAvroOf sc bs
 
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> T.LazyValue Schema
@@ -340,7 +343,6 @@ getAvroOf ty0 bs = go ty0 bs
       LongDoubleCoercion  -> decodeGet @Int64 (T.Double . fromIntegral) bs
       FloatDoubleCoercion -> decodeGet @Float (T.Double . realToFrac)   bs
       FreeUnion {..} -> T.Union (V.singleton ty) ty <$> go ty bs
-      Panic {..} -> (fst (go ty bs), T.Error err)
 
   getField :: Field -> BL.ByteString -> (BL.ByteString, Maybe (Text, T.LazyValue Type))
   getField Field{..} bs =

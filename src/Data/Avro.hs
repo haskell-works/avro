@@ -129,7 +129,7 @@ decodeContainer bs =
 -- allow this function to be read lazy (to be done in some later version).
 decodeContainerWithSchema :: FromAvro a => Schema -> ByteString -> [[a]]
 decodeContainerWithSchema readerSchema bs =
-  case D.decodeContainerWith (D.getAvroOf . flip deconflict readerSchema) bs of
+  case D.decodeContainerWith (either fail D.getAvroOf . flip deconflict readerSchema) bs of
     Right (_, val) ->
       let
         from v = case fromAvro v of
