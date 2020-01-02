@@ -84,7 +84,7 @@ getAvroOf ty0 = go ty0
     FloatDoubleCoercion -> T.Double . realToFrac   <$> getAvro @Float
     FreeUnion ty -> T.Union (V.singleton ty) ty <$> go ty
 
- getField :: Field -> Get (Maybe (Text, T.Value Type))
+ getField :: Field -> Get (Maybe (Text, T.Value Schema))
  getField Field{..} =
   case (fldReadIgnore, fldDefault) of
     (False, _)       -> Just . (fldName,) <$> go fldType

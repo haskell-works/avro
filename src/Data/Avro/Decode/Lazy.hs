@@ -129,7 +129,7 @@ decodeContainerWithSchema' readerSchema bs = do
   pure $ (fmap . fmap) (resultToEither . fromLazyAvro) vals
   where
     getDeconflictedValues = getContainerValuesWith (getAvroOf' . flip deconflict readerSchema)
-    getAvroOf' :: Either String Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Type)
+    getAvroOf' :: Either String Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
     getAvroOf' (Left err) bs = (bs, T.Error err)
     getAvroOf' (Right sc) bs = getAvroOf sc bs
 
@@ -344,7 +344,7 @@ getAvroOf ty0 bs = go ty0 bs
       FloatDoubleCoercion -> decodeGet @Float (T.Double . realToFrac)   bs
       FreeUnion {..} -> T.Union (V.singleton ty) ty <$> go ty bs
 
-  getField :: Field -> BL.ByteString -> (BL.ByteString, Maybe (Text, T.LazyValue Type))
+  getField :: Field -> BL.ByteString -> (BL.ByteString, Maybe (Text, T.LazyValue Schema))
   getField Field{..} bs =
     case (fldReadIgnore, fldDefault) of
       (False, _)       -> Just . (fldName,) <$> go fldType bs
