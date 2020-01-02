@@ -452,6 +452,13 @@ schemaToJSON context = \case
   Double         -> A.String "double"
   Bytes          -> A.String "bytes"
   String         -> A.String "string"
+  IntLongCoercion     -> A.String "long"
+  IntFloatCoercion    -> A.String "float"
+  IntDoubleCoercion   -> A.String "double"
+  LongFloatCoercion   -> A.String "float"
+  LongDoubleCoercion  -> A.String "double"
+  FloatDoubleCoercion -> A.String "double"
+  FreeUnion ty        -> schemaToJSON context ty
   Array tn       ->
     object [ "type" .= ("array" :: Text), "items" .= schemaToJSON context tn ]
   Map tn         ->
