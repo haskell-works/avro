@@ -71,7 +71,6 @@ common hspec                    { build-depends: hspec                          
 common lens                     { build-depends: lens                                               }
 common lens-aeson               { build-depends: lens-aeson                                         }
 common mtl                      { build-depends: mtl                                                }
-common pure-zlib                { build-depends: pure-zlib                                          }
 common QuickCheck               { build-depends: QuickCheck                                         }
 common random                   { build-depends: random                                             }
 common raw-strings-qq           { build-depends: raw-strings-qq                                     }
@@ -165,7 +164,7 @@ test-suite test
                       , lens
                       , lens-aeson
                       , mtl
-                      , pure-zlib
+                      , zlib
                       , QuickCheck
                       , raw-strings-qq
                       , scientific
