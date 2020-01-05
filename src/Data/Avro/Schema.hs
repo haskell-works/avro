@@ -504,7 +504,7 @@ instance ToJSON (Ty.Value Schema) where
       Ty.Enum _ _ txt      -> A.String txt
 
 data Result a = Success a | Error String
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 badValue :: Show t => t -> String -> Result a
 badValue v t = fail $ "Unexpected value for '" <> t <> "': " <> show v

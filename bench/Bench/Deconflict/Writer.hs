@@ -2,11 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE DeriveAnyClass   #-}
 module Bench.Deconflict.Writer
 where
 
 import Data.Avro.Deriving
 import Text.RawString.QQ
+
+import Control.DeepSeq
 
 deriveAvroFromByteString [r|
 {
@@ -26,3 +30,6 @@ deriveAvroFromByteString [r|
   ]
 }
 |]
+
+deriving instance NFData Inner
+deriving instance NFData Outer

@@ -228,6 +228,7 @@ benchmark bench-time
                       , aeson
                       , bytestring
                       , containers
+                      , deepseq
                       , gauge
                       , hashable
                       , mtl
