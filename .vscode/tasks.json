@@ -37,7 +37,7 @@
       "label": "Test",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-test && echo 'Done'"],
+      "args": ["-lc", "cabal new-test --enable-tests --enable-benchmarks --test-show-details=direct && echo 'Done'"],
       "group": {
         "kind": "test",
         "isDefault": true
