@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE TupleSections       #-}
 
 module Data.Avro.Decode.Lazy
@@ -170,7 +171,7 @@ decodeRawBlocks bs =
       in Right (containedSchema, blocks)
   where
     allBlocks sync decompress bytes =
-      flip unfoldr (Just bytes) $ \acc -> case acc of
+      flip unfoldr (Just bytes) $ \case
         Just rest -> next sync decompress rest
         Nothing   -> Nothing
 
@@ -318,7 +319,7 @@ getAvroOf ty0 bs = go ty0 bs
         case runGetOrFail getLong bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, i)  ->
-            case symbols V.!? (fromIntegral i) of
+            case symbols V.!? fromIntegral i of
               Nothing  -> (bs', T.Error ("Unknown value {" <> show i <> "} for enum " <> Text.unpack (typeName ty) ))
               Just sym -> (bs', T.Enum ty (fromIntegral i) sym)
 
@@ -326,7 +327,7 @@ getAvroOf ty0 bs = go ty0 bs
         case runGetOrFail getLong bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, i)  ->
-            case ts V.!? (fromIntegral i) of
+            case ts V.!? fromIntegral i of
               Nothing -> (bs', T.Error $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (V.map typeName ts))
               Just t  -> T.Union ts t <$> go t bs'
 

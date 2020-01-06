@@ -135,12 +135,12 @@ instance Eq Schema where
   NamedType t == NamedType t2 = t == t2
 
   Record name1 _ _ _ fs1 == Record name2 _ _ _ fs2 =
-    and [name1 == name2, fs1 == fs2]
+    (name1 == name2) && (fs1 == fs2)
   Enum name1 _ _ s == Enum name2 _ _ s2 =
-    and [name1 == name2, s == s2]
+    (name1 == name2) && (s == s2)
   Union a == Union b = a == b
   Fixed name1 _ s == Fixed name2 _ s2 =
-    and [name1 == name2, s == s2]
+    (name1 == name2) && (s == s2)
 
   _ == _ = False
 
@@ -256,7 +256,7 @@ mkTypeName context name ns
   | isFullName name = parseFullname name
   | otherwise       = case ns of
       Just ns -> TN name $ filter (/= "") (T.splitOn "." ns)
-      Nothing -> TN name $ fromMaybe [] $ namespace <$> context
+      Nothing -> TN name $ maybe [] namespace context
   where isFullName = isJust . T.find (== '.')
 
 -- | This lets us write 'TypeName's as string literals in a fully

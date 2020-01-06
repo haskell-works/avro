@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+
 module Data.Avro.HasAvroSchema where
 
 import qualified Data.Array           as Ar

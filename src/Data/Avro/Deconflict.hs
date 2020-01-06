@@ -50,8 +50,7 @@ deconflictNoResolve :: Schema         -- ^ Writer schema
                     -> Schema         -- ^ Reader schema
                     -> T.Value Schema
                     -> Either String (T.Value Schema)
-deconflictNoResolve writerSchema readerSchema =
-  deconflictValue writerSchema readerSchema
+deconflictNoResolve = deconflictValue 
 
 deconflictValue :: Schema
               -> Schema
