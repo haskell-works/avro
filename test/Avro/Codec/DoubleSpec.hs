@@ -1,12 +1,15 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-overflowed-literals #-}
+
 module Avro.Codec.DoubleSpec (spec) where
 
-import           Data.Avro
-import           Data.Avro.Schema
-import           Data.Tagged
-import           Test.Hspec
+import Data.Avro
+import Data.Avro.Schema
+import Data.Tagged
+import Test.Hspec
+
 import qualified Data.Avro.Types      as AT
 import qualified Data.ByteString.Lazy as BL
 import qualified Test.QuickCheck      as Q
@@ -14,7 +17,7 @@ import qualified Test.QuickCheck      as Q
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
 newtype OnlyDouble = OnlyDouble
-  {onlyDoubleValue :: Double
+  { onlyDoubleValue :: Double
   } deriving (Show, Eq)
 
 onlyDoubleSchema :: Schema
