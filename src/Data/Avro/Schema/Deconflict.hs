@@ -140,7 +140,7 @@ deconflictFields writerFields readerFields =
 
     confirmDefaulted :: Field -> Either String Field
     confirmDefaulted f
-      | Just def <- fldDefault f = pure f { fldReadIgnore = True }
+      | Just def <- fldDefault f = pure f { fldStatus = Defaulted }
       | otherwise = Left $ "No default found for deconflicted field " <> Text.unpack (fldName f)
 
     deconflictField :: Field -> Either String Field
@@ -149,7 +149,7 @@ deconflictFields writerFields readerFields =
         t <- deconflict (fldType writerField) (fldType readerField)
         pure writerField { fldType = t }
       | otherwise =
-        pure writerField { fldReadIgnore = True, fldDefault = Nothing }
+        pure writerField { fldStatus = Ignored, fldDefault = Nothing }
 
 findField :: Field -> [Field] -> Maybe Field
 findField f fs =

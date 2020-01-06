@@ -5,7 +5,7 @@
       "label": "Build",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-build && echo 'Done'"],
+      "args": ["-lc", "cabal new-build --enable-tests --enable-benchmarks && echo 'Done'"],
       "group": {
         "kind": "build",
         "isDefault": true

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -7,18 +6,18 @@ module Avro.Codec.Int64Spec (spec) where
 import           Data.Avro
 import           Data.Avro.Encode
 import           Data.Avro.Schema
+import qualified Data.Avro.Types         as AT
 import           Data.Avro.Zig
 import           Data.Bits
 import           Data.ByteString.Builder
+import qualified Data.ByteString.Lazy    as BL
 import           Data.Int
 import           Data.List.Extra
 import           Data.Tagged
 import           Data.Word
-import           Numeric (showHex)
+import           Numeric                 (showHex)
 import           Test.Hspec
-import qualified Data.Avro.Types      as AT
-import qualified Data.ByteString.Lazy as BL
-import qualified Test.QuickCheck      as Q
+import qualified Test.QuickCheck         as Q
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
@@ -32,9 +31,9 @@ newtype OnlyInt64 = OnlyInt64
 
 onlyInt64Schema :: Schema
 onlyInt64Schema =
-  let fld nm = Field nm [] Nothing Nothing False
+  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
    in Record "test.contract.OnlyInt64" [] Nothing Nothing
-        [ fld "onlyInt64Value"    Long' Nothing
+        [ fld 0 "onlyInt64Value"    Long' Nothing
         ]
 
 instance HasAvroSchema OnlyInt64 where
@@ -57,9 +56,9 @@ bitStringToWord8s = reverse . map (toWord . reverse) . chunksOf 8 . reverse . to
         toBinary (_  :xs) = toBinary xs
         toBinary       [] = []
         toWord' :: Word8 -> [Bool] -> Word8
-        toWord' n (True :bs)  = toWord' ((n `shiftL` 1) .|. 1) bs
-        toWord' n (False:bs)  = toWord' ((n `shiftL` 1) .|. 0) bs
-        toWord' n _           = n
+        toWord' n (True :bs) = toWord' ((n `shiftL` 1) .|. 1) bs
+        toWord' n (False:bs) = toWord' ((n `shiftL` 1) .|. 0) bs
+        toWord' n _          = n
         toWord = toWord' 0
 
 spec :: Spec

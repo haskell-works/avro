@@ -240,6 +240,7 @@ benchmark bench-time
   import:               base, config
                       , avro
                       , aeson
+                      , binary
                       , bytestring
                       , containers
                       , deepseq

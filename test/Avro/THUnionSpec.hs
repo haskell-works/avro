@@ -67,7 +67,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
                                           }
         }
 
-      field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) False schema def
+      field ix name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) (Schema.AsIs ix) schema def
       record name fields =
         Schema.Record name [] Nothing (Just Schema.Ascending) fields
       named = Schema.NamedType
@@ -76,29 +76,29 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
       notFoo = named "haskell.avro.example.NotFoo"
       bar = named "haskell.avro.example.Bar"
       expectedSchema = record "haskell.avro.example.Unions"
-        [ field "scalars"     (Schema.mkUnion (NE.fromList [Schema.String', Schema.Long'])) scalarsDefault
-        , field "nullable"    (Schema.mkUnion (NE.fromList [Schema.Null, Schema.Int']))    nullableDefault
-        , field "records"     (Schema.mkUnion (NE.fromList [fooSchema, barSchema]))       Nothing
-        , field "sameFields"  (Schema.mkUnion (NE.fromList [foo, notFooSchema]))          Nothing
-        , field "arrayAndMap" (Schema.mkUnion (NE.fromList [array, map]))                 Nothing
+        [ field 0 "scalars"     (Schema.mkUnion (NE.fromList [Schema.String', Schema.Long'])) scalarsDefault
+        , field 1 "nullable"    (Schema.mkUnion (NE.fromList [Schema.Null, Schema.Int']))    nullableDefault
+        , field 2 "records"     (Schema.mkUnion (NE.fromList [fooSchema, barSchema]))       Nothing
+        , field 3 "sameFields"  (Schema.mkUnion (NE.fromList [foo, notFooSchema]))          Nothing
+        , field 4 "arrayAndMap" (Schema.mkUnion (NE.fromList [array, map]))                 Nothing
 
-        , field "one"   (Schema.mkUnion (NE.fromList [Schema.Int']))                                          Nothing
-        , field "three" (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long']))              Nothing
-        , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo]))         Nothing
-        , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo])) Nothing
-        , field "six"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float])) Nothing
-        , field "seven"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean])) Nothing
-        , field "eight"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double])) Nothing
-        , field "nine"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes'])) Nothing
-        , field "ten"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes', bar])) Nothing
+        , field 5 "one"   (Schema.mkUnion (NE.fromList [Schema.Int']))                                          Nothing
+        , field 6 "three" (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long']))              Nothing
+        , field 7 "four"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo]))         Nothing
+        , field 8 "five"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo])) Nothing
+        , field 9 "six"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float])) Nothing
+        , field 10 "seven"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean])) Nothing
+        , field 11 "eight"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double])) Nothing
+        , field 12 "nine"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes'])) Nothing
+        , field 13 "ten"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes', bar])) Nothing
         ]
       scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String', Schema.Long']) Schema.String' (Avro.String "foo")
       nullableDefault = Just $ Avro.Union (V.fromList [Schema.Null, Schema.Int'])    Schema.Null   Avro.Null
 
       fooSchema = record "haskell.avro.example.Foo" [field "stuff" Schema.String' Nothing]
       barSchema = record "haskell.avro.example.Bar"
-        [ field "stuff"  Schema.String' Nothing
-        , field "things" (named "haskell.avro.example.Foo") Nothing
+        [ field 0 "stuff"  Schema.String' Nothing
+        , field 1 "things" (named "haskell.avro.example.Foo") Nothing
         ]
       notFooSchema = record "haskell.avro.example.NotFoo" [field "stuff" Schema.String' Nothing]
 

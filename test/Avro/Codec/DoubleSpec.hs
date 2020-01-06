@@ -22,9 +22,9 @@ newtype OnlyDouble = OnlyDouble
 
 onlyDoubleSchema :: Schema
 onlyDoubleSchema =
-  let fld nm = Field nm [] Nothing Nothing False
+  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
   in Record "test.contract.OnlyDouble" [] Nothing Nothing
-        [ fld "onlyDoubleValue" Double Nothing
+        [ fld 0 "onlyDoubleValue" Double Nothing
         ]
 
 instance HasAvroSchema OnlyDouble where

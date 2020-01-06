@@ -346,10 +346,10 @@ getAvroOf ty0 bs = go ty0 bs
 
   getField :: Field -> BL.ByteString -> (BL.ByteString, Maybe (Text, T.LazyValue Schema))
   getField Field{..} bs =
-    case (fldReadIgnore, fldDefault) of
-      (False, _)       -> Just . (fldName,) <$> go fldType bs
-      (True,  Just v)  -> (bs, Just (fldName, fromStrictValue v))
-      (True,  Nothing) -> (fst (go fldType bs), Nothing)
+    case (fldStatus, fldDefault) of
+      (AsIs _, _)          -> Just . (fldName,) <$> go fldType bs
+      (Defaulted, Just v)  -> (bs, Just (fldName, fromStrictValue v))
+      (Ignored, _)         -> (fst (go fldType bs), Nothing)
 {-# INLINABLE getAvroOf #-}
 
 getKVPair getElement bs =

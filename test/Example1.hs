@@ -22,11 +22,11 @@ meSchema = mkEnum "MyEnum" [] Nothing ["A","B","C","D"]
 msSchema  :: Schema
 msSchema =
   Record "MyStruct" [] Nothing Nothing
-      [ fld "enumOrString" eOrS (Just $ Ty.String "The Default")
-      , fld "intvalue" Long' Nothing
+      [ fld 0 "enumOrString" eOrS (Just $ Ty.String "The Default")
+      , fld 1 "intvalue" Long' Nothing
       ]
      where
-     fld nm ty def = Field nm [] Nothing Nothing AsIs ty def
+     fld ix nm ty def = Field nm [] Nothing Nothing (AsIs ix) ty def
      eOrS = mkUnion (meSchema :| [String'])
 
 -- Encoding data, via the ToAvro class, requires both the routine that encodes

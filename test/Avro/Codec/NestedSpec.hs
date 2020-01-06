@@ -23,18 +23,18 @@ data ParentType = ParentType
 
 childTypeSchema :: Schema
 childTypeSchema =
-  let fld nm = Field nm [] Nothing Nothing False
+  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
   in Record "test.contract.ChildType" [] Nothing Nothing
-        [ fld "childValue1" Long' Nothing
-        , fld "childValue2" Long' Nothing
+        [ fld 0 "childValue1" Long' Nothing
+        , fld 1 "childValue2" Long' Nothing
         ]
 
 parentTypeSchema :: Schema
 parentTypeSchema =
-  let fld nm = Field nm [] Nothing Nothing False
+  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
   in Record "test.contract.ParentType" [] Nothing Nothing
-        [ fld "parentValue1" Long'             Nothing
-        , fld "parentValue2" (Array childTypeSchema)  Nothing]
+        [ fld 0 "parentValue1" Long'             Nothing
+        , fld 1 "parentValue2" (Array childTypeSchema)  Nothing]
 
 instance HasAvroSchema ParentType where
   schema = pure parentTypeSchema

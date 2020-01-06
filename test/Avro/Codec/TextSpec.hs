@@ -5,11 +5,11 @@ module Avro.Codec.TextSpec (spec) where
 
 import           Data.Avro
 import           Data.Avro.Schema
-import           Data.Text
+import qualified Data.Avro.Types      as AT
 import qualified Data.ByteString.Lazy as BSL
 import           Data.Tagged
+import           Data.Text
 import           Test.Hspec
-import qualified Data.Avro.Types      as AT
 import qualified Test.QuickCheck      as Q
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
@@ -20,9 +20,9 @@ newtype OnlyText = OnlyText
 
 onlyTextSchema :: Schema
 onlyTextSchema =
-  let fld nm = Field nm [] Nothing Nothing False
+  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
   in Record "test.contract.OnlyText" [] Nothing Nothing
-        [ fld "onlyTextValue" String' Nothing
+        [ fld 0 "onlyTextValue" String' Nothing
         ]
 
 instance HasAvroSchema OnlyText where

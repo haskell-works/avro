@@ -22,9 +22,9 @@ newtype OnlyFloat = OnlyFloat
 
 onlyFloatSchema :: Schema
 onlyFloatSchema =
-  let fld nm = Field nm [] Nothing Nothing False
+  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
   in Record "test.contract.OnlyFloat" [] Nothing Nothing
-        [ fld "onlyFloatValue" Float Nothing
+        [ fld 0 "onlyFloatValue" Float Nothing
         ]
 
 instance HasAvroSchema OnlyFloat where

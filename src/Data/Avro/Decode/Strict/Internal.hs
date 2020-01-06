@@ -86,10 +86,10 @@ getAvroOf ty0 = go ty0
 
  getField :: Field -> Get (Maybe (Text, T.Value Schema))
  getField Field{..} =
-  case (fldReadIgnore, fldDefault) of
-    (False, _)       -> Just . (fldName,) <$> go fldType
-    (True,  Just v)  -> pure $ Just (fldName, v)
-    (True,  Nothing) -> go fldType >> pure Nothing
+  case (fldStatus, fldDefault) of
+    (AsIs _, _)           -> Just . (fldName,) <$> go fldType
+    (Defaulted, Just v)  -> pure $ Just (fldName, v)
+    (Ignored,   Nothing) -> go fldType >> pure Nothing
 
  getKVBlocks :: Schema -> Get [[(Text,T.Value Schema)]]
  getKVBlocks t =

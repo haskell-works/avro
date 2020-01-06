@@ -11,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ViewPatterns          #-}
+-- {-# LANGUAGE StrictData            #-}
 
 -- | Avro 'Schema's, represented here as values of type 'Schema',
 -- describe the serialization and de-serialization of values.
@@ -364,11 +365,12 @@ typeName bt =
   where
     decimalName (Decimal prec sc) = "decimal(" <> T.pack (show prec) <> "," <> T.pack (show sc) <> ")"
 
-data FieldStatus =
-    AsIs
+data FieldStatus
+  = AsIs Int
   | Ignored
-  | Defaulted (Ty.Value Schema)
-  deriving (Eq, Ord, Show, Generic, NFData)
+  | Defaulted
+  deriving (Show, Ord, Eq, Generic, NFData)
+
 
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
@@ -465,7 +467,7 @@ parseSchemaJSON context = \case
           aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
           doc     <- o .:? "doc"
           order   <- o .:? "order" .!= Just Ascending
-          fields  <- mapM (parseField typeName) =<< o .: "fields"
+          fields  <- mapM (parseField typeName) =<< (fmap (zip [0..]) (o .: "fields"))
           pure $ Record typeName aliases doc order fields
         "enum"   -> do
           name      <- o .: "name"
@@ -513,11 +515,11 @@ mkAliases context = map $ \ name ->
 -- details).
 parseField :: TypeName
               -- ^ The name of the record this field belongs to.
-           -> A.Value
+           -> (Int, A.Value)
               -- ^ The JSON object defining the field in the schema.
            -> Parser Field
 parseField record = \case
-  A.Object o -> do
+  (ix, A.Object o) -> do
     name  <- o .: "name"
     doc   <- o .:? "doc"
     ty    <- parseSchemaJSON (Just record) =<< o .: "type"
@@ -531,8 +533,8 @@ parseField record = \case
 
     let mkAlias name = mkTypeName (Just record) name Nothing
     aliases  <- o .:? "aliases"  .!= []
-    return $ Field name aliases doc order AsIs ty def
-  invalid    -> typeMismatch "Field" invalid
+    return $ Field name aliases doc order (AsIs ix) ty def
+  (_, invalid)    -> typeMismatch "Field" invalid
 
 instance ToJSON Schema where
   toJSON = schemaToJSON Nothing

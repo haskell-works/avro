@@ -31,6 +31,7 @@ instance (Lift k, Lift v) => Lift (HashMap.HashMap k v) where
   lift m = [| HashMap.fromList $(lift $ HashMap.toList m) |]
 
 deriving instance Lift f => Lift (Avro.Value f)
+deriving instance Lift Schema.FieldStatus
 deriving instance Lift Schema.Field
 deriving instance Lift Schema.Order
 deriving instance Lift Schema.TypeName

@@ -12,8 +12,10 @@ import Gauge
 
 main :: IO ()
 main = defaultMain
-  [ Time.encode
-  , Time.decode
+  [
+    --  Time.encode
+  -- , Time.decode
 
-  , Deconflict.only
+  Deconflict.only
+  , Deconflict.notOnly
   ]
