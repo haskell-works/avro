@@ -33,25 +33,29 @@ module Data.Avro.Deriving
 )
 where
 
-import           Control.Monad          (join)
-import           Control.Monad.Identity (Identity)
-import           Data.Aeson             (eitherDecode)
-import qualified Data.Aeson             as J
-import           Data.Avro              hiding (decode, encode)
-import           Data.Avro.Schema       as S
-import qualified Data.Avro.Types        as AT
-import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as B
-import           Data.Char              (isAlphaNum)
+import           Control.Monad                 (join)
+import           Control.Monad.Identity        (Identity)
+import           Data.Aeson                    (eitherDecode)
+import qualified Data.Aeson                    as J
+import           Data.Avro                     hiding (decode, encode)
+import           Data.Avro.Encoding.ToEncoding (ToEncoding (..), putI)
+import           Data.Avro.Schema              as S
+import qualified Data.Avro.Types               as AT
+import           Data.ByteString               (ByteString)
+import qualified Data.ByteString               as B
+import           Data.Char                     (isAlphaNum)
+import qualified Data.Foldable                 as Foldable
 import           Data.Int
-import           Data.List.NonEmpty (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty as NE
-import           Data.Map           (Map)
-import           Data.Maybe         (fromMaybe)
-import           Data.Semigroup     ((<>))
-import qualified Data.Text          as Text
-import           Data.Time          (Day, DiffTime)
-import           Data.UUID          (UUID)
+import           Data.List.NonEmpty            (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty            as NE
+import           Data.Map                      (Map)
+import           Data.Maybe                    (fromMaybe)
+import           Data.Semigroup                ((<>))
+import qualified Data.Text                     as Text
+import           Data.Time                     (Day, DiffTime, UTCTime)
+import           Data.UUID                     (UUID)
+
+import qualified Data.Avro.Encoding.Value as AV
 
 import GHC.Generics (Generic)
 
@@ -243,8 +247,10 @@ deriveAvroWithOptions' o s = do
   hasSchema <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
   fromAvros <- traverse (genFromAvro $ namespaceBehavior o) schemas
   fromLazyAvros <- traverse (genFromLazyAvro $ namespaceBehavior o) schemas
+  fromValues <- traverse (genFromValue $ namespaceBehavior o) schemas
   toAvros   <- traverse (genToAvro o) schemas
-  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros <> join toAvros
+  toEncodings <- traverse (genToEncoding o) schemas
+  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros <> join toAvros <> join fromValues <> join toEncodings
 
 -- | Derives "read only" Avro from a given schema file. For a schema
 -- with a top-level definition @com.example.Foo@, this generates:
@@ -276,7 +282,8 @@ deriveFromAvroWithOptions' o s = do
   hasSchema <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
   fromAvros <- traverse (genFromAvro $ namespaceBehavior o) schemas
   fromLazyAvros <- traverse (genFromLazyAvro $ namespaceBehavior o) schemas
-  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros
+  fromValues <- traverse (genFromValue $ namespaceBehavior o) schemas
+  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros <> join fromValues
 
 -- | Same as 'deriveAvroWithOptions' but uses 'defaultDeriveOptions'
 --
@@ -367,6 +374,39 @@ genFromAvroFieldsExp n (x:xs) =
      )
   |]
 
+---------------------------- New FromAvro -----------------------------------------
+
+badValueNew :: Show v => v -> String -> Either String a
+badValueNew v t = Left $ "Unexpected value for '" <> t <> "': " <> show v
+
+genFromValue :: NamespaceBehavior -> Schema -> Q [Dec]
+genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
+  [d| instance AV.FromValue $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromValue (AV.Enum _ i _) = $([| pure . toEnum|]) i
+        fromValue value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+  |]
+genFromValue namespaceBehavior (S.Record n _ _ _ fs) =
+  [d| instance AV.FromValue $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromValue (AV.Record r) =
+           $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
+        fromValue value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+  |]
+genFromValue namespaceBehavior (S.Fixed n _ s _) =
+  [d| instance AV.FromValue $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromValue (AV.Fixed _ v)
+          | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
+        fromValue value = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+  |]
+genFromValue _ _                             = pure []
+
+genFromAvroNewFieldsExp :: Name -> [Field] -> Q Exp
+genFromAvroNewFieldsExp n xs =
+  [| \r ->
+    $(let ctor = [| pure $(conE n) |]
+      in foldl (\expr (i, _) -> [| $expr <*> AV.fromValue (r V.! i) |]) ctor (zip [(0 :: Int)..] xs)
+    )
+  |]
+
 -------------------------------- FromLazyAvro ---------------------------------
 genFromLazyAvro :: NamespaceBehavior -> Schema -> Q [Dec]
 genFromLazyAvro namespaceBehavior (S.Enum n _ _ _) =
@@ -418,6 +458,46 @@ newNames :: String
             -- ^ count
          -> Q [Name]
 newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
+
+------------------------- ToEncoding ------------------------------------------------
+
+genToEncoding :: DeriveOptions -> Schema -> Q [Dec]
+genToEncoding opts s@(S.Enum n _ _ _) =
+  toEncodingInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  where
+    toEncodingInstance sname =
+      [d| instance ToEncoding $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toEncoding = $([| \_ x -> putI (fromEnum x) |])
+      |]
+
+genToEncoding opts s@(S.Record n _ _ _ fs) =
+  toEncodingInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  where
+    toEncodingInstance sname =
+      [d| instance ToEncoding $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toEncoding = $(toEncodingFieldsExp sname)
+      |]
+    toEncodingFieldsExp sname = do
+      names <- newNames "p_" (length fs)
+      wn <- varP <$> newName "_"
+      let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
+      lamE [wn, con]
+            [| mconcat $( let build (fld, n) = [| toEncoding (fldType fld) $(varE n) |]
+                          in listE $ build <$> (zip fs names)
+                        )
+            |]
+
+genToEncoding opts s@(S.Fixed n _ _ _) =
+  toEncodingInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  where
+    toEncodingInstance sname =
+      [d| instance ToEncoding $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toEncoding = $(do
+              x <- newName "x"
+              wc <- newName "_"
+              lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toEncoding $(varE sname) $(varE x) |])
+      |]
+genToEncoding _ _ = pure []
 
 ------------------------- ToAvro ----------------------------------------------
 
@@ -498,15 +578,21 @@ mkFieldTypeName namespaceBehavior = \case
                      -> [t| Decimal $(litT $ numTyLit p) $(litT $ numTyLit s) |]
   S.Long (Just TimeMicros)
                      -> [t| DiffTime |]
+  S.Long (Just TimestampMicros)
+                     -> [t| UTCTime |]
+  S.Long (Just TimestampMillis)
+                     -> [t| UTCTime |]
   S.Long _           -> [t| Int64 |]
   S.Int (Just Date)  -> [t| Day |]
+  S.Int (Just TimeMillis)
+                     -> [t| DiffTime |]
   S.Int _            -> [t| Int32 |]
   S.Float            -> [t| Float |]
   S.Double           -> [t| Double |]
   S.Bytes _          -> [t| ByteString |]
   S.String Nothing   -> [t| Text |]
   S.String (Just UUID) -> [t| UUID |]
-  S.Union branches   -> union (V.toList branches)
+  S.Union branches   -> union (Foldable.toList branches)
   S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
   S.Map x            -> [t| Map Text $(go x) |]
   S.Array x          -> [t| [$(go x)] |]
@@ -625,15 +711,15 @@ genNewtype dn = do
 genEnum :: Name -> [Name] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Bounded|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Bounded|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
 #else
 genEnum dn vs = do
-  [ConT eq, ConT sh, ConT or, ConT en, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  [ConT eq, ConT sh, ConT or, ConT en, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Bounded|], [t|Generic|]]
   pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en, gen]
 #endif
 

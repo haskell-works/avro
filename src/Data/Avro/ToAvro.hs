@@ -5,13 +5,13 @@ module Data.Avro.ToAvro
 
 where
 
-import           Control.Monad.Identity  (Identity(..))
 import           Control.Arrow           (first)
+import           Control.Monad.Identity  (Identity (..))
 import           Data.Avro.HasAvroSchema
+import           Data.Avro.Internal.Time
 import           Data.Avro.Schema        as S
 import           Data.Avro.Types         as T
 import           Data.Avro.Types.Decimal as D
-import           Data.Avro.Types.Time
 import qualified Data.ByteString         as B
 import           Data.ByteString.Lazy    (ByteString)
 import qualified Data.ByteString.Lazy    as BL
@@ -44,53 +44,56 @@ instance ToAvro () where
   toAvro _ = T.Null
 
 instance ToAvro Int where
-  toAvro = T.Long . fromIntegral
+  toAvro = T.Long S.Long' . fromIntegral
 
 instance ToAvro Int32 where
-  toAvro = T.Int
+  toAvro = T.Int S.Int'
 
 instance ToAvro Int64 where
-  toAvro = T.Long
+  toAvro = T.Long S.Long'
 
 instance ToAvro Double where
-  toAvro = T.Double
+  toAvro = T.Double S.Double
 
 instance ToAvro Float where
-  toAvro = T.Float
+  toAvro = T.Float S.Float
 
 instance ToAvro Text.Text where
-  toAvro = T.String
+  toAvro = T.String S.String'
 
 instance ToAvro TL.Text where
-  toAvro = T.String . TL.toStrict
+  toAvro = T.String S.String' . TL.toStrict
 
 instance ToAvro B.ByteString where
-  toAvro = T.Bytes
+  toAvro = T.Bytes S.Bytes'
 
 instance ToAvro BL.ByteString where
-  toAvro = T.Bytes . BL.toStrict
+  toAvro = T.Bytes S.Bytes' . BL.toStrict
 
 instance (KnownNat p, KnownNat s) => ToAvro (D.Decimal p s) where
-  toAvro = T.Long . fromIntegral . fromJust . D.underlyingValue
+  toAvro d = T.Long (schemaOf d) $ (fromIntegral . fromJust . D.underlyingValue) d
 
 instance ToAvro UUID.UUID where
-  toAvro = T.String . UUID.toText
+  toAvro = T.String (S.String $ Just S.UUID) . UUID.toText
 
 instance ToAvro Time.Day where
-  toAvro = T.Long . fromIntegral . daysSinceEpoch
+  toAvro = T.Long (S.Long $ Just S.TimestampMicros) . fromIntegral . daysSinceEpoch
 
 instance ToAvro Time.DiffTime where
-  toAvro = T.Long . fromIntegral . diffTimeToMicros
+  toAvro = T.Long (S.Long $ Just S.TimestampMicros) . fromIntegral . diffTimeToMicros
+
+instance ToAvro Time.UTCTime where
+  toAvro = T.Long (S.Long $ Just S.TimestampMicros) . fromIntegral . utcTimeToMicros
 
 instance (ToAvro a) => ToAvro (Identity a) where
   toAvro e@(Identity a) =
-    let sch = options (schemaOf e)
+    let sch = extractValues $ options (schemaOf e)
     in
       T.Union sch (schemaOf a) (toAvro a)
 
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   toAvro e =
-    let sch = options (schemaOf e)
+    let sch = extractValues $ options (schemaOf e)
     in case e of
          Left a  -> T.Union sch (schemaOf a) (toAvro a)
          Right b -> T.Union sch (schemaOf b) (toAvro b)
@@ -115,7 +118,7 @@ instance (ToAvro a) => ToAvro (HashMap.HashMap String a) where
 
 instance (ToAvro a) => ToAvro (Maybe a) where
   toAvro a =
-    let sch = options (schemaOf a)
+    let sch = extractValues $ options (schemaOf a)
     in case a of
       Nothing -> T.Union sch S.Null (toAvro ())
       Just v  -> T.Union sch (schemaOf v) (toAvro v)

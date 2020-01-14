@@ -92,15 +92,15 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , field 12 "nine"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes'])) Nothing
         , field 13 "ten"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes', bar])) Nothing
         ]
-      scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String', Schema.Long']) Schema.String' (Avro.String "foo")
+      scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String', Schema.Long']) Schema.String' ((Avro.String Schema.String') "foo")
       nullableDefault = Just $ Avro.Union (V.fromList [Schema.Null, Schema.Int'])    Schema.Null   Avro.Null
 
-      fooSchema = record "haskell.avro.example.Foo" [field "stuff" Schema.String' Nothing]
+      fooSchema = record "haskell.avro.example.Foo" [field 0 "stuff" Schema.String' Nothing]
       barSchema = record "haskell.avro.example.Bar"
         [ field 0 "stuff"  Schema.String' Nothing
         , field 1 "things" (named "haskell.avro.example.Foo") Nothing
         ]
-      notFooSchema = record "haskell.avro.example.NotFoo" [field "stuff" Schema.String' Nothing]
+      notFooSchema = record "haskell.avro.example.NotFoo" [field 0 "stuff" Schema.String' Nothing]
 
       array = Schema.Array { Schema.item = Schema.String' }
       map   = Schema.Map { Schema.values = Schema.Long' }

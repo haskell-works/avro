@@ -37,7 +37,7 @@ spec = describe "Avro.DefaultsSpec: Schema with named types" $ do
       defaults = fldDefault <$> fields msgSchema
     in defaults `shouldBe` [ Just $ Ty.Union (V.fromList [Null, String']) Null Ty.Null
                            , Just $ Ty.Fixed fixedSchema "\0\42\255"
-                           , Just $ Ty.Bytes "\0\37\255"
+                           , Just $ (Ty.Bytes Bytes') "\0\37\255"
                            ]
 
   it "should encode schema with default" $

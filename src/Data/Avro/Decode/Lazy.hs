@@ -70,6 +70,8 @@ import Data.Avro.Decode.Get
 import Data.Avro.Decode.Lazy.Convert      (fromStrictValue, toStrictValue)
 import Data.Avro.Decode.Lazy.FromLazyAvro
 import Data.Avro.FromAvro
+import Data.Avro.Internal.Container       (ContainerHeader (..), consumeN, decodeRawBlocks, extractContainerValuesBytes, getContainerHeader, nrSyncBytes)
+import Data.Avro.Internal.Get
 import Data.Avro.Schema.Deconflict
 
 -- | Decodes the container as a lazy list of values of the requested type.
@@ -153,65 +155,6 @@ getContainerValues :: BL.ByteString -> Either String (Schema, [[T.LazyValue Sche
 getContainerValues = getContainerValuesWith getAvroOf
 {-# INLINABLE getContainerValues #-}
 
--- | Reads the container as a list of blocks without decoding them into actual values.
---
--- This can be useful for streaming / splitting / merging Avro containers without
--- paying the cost for Avro encoding/decoding.
---
--- Each block is returned as a raw 'ByteString' annotated with the number of Avro values
--- that are contained in this block.
---
--- The "outer" error represents the error in opening the container itself
--- (including problems like reading schemas embedded into the container.)
-decodeRawBlocks :: BL.ByteString -> Either String (Schema, [Either String (Int, BL.ByteString)])
-decodeRawBlocks bs =
-  case runGetOrFail getAvro bs of
-    Left (bs', _, err) -> Left err
-    Right (bs', _, ContainerHeader {..}) ->
-      let blocks = allBlocks syncBytes decompress bs'
-      in Right (containedSchema, blocks)
-  where
-    allBlocks sync decompress bytes =
-      flip unfoldr (Just bytes) $ \acc -> case acc of
-        Just rest -> next sync decompress rest
-        Nothing   -> Nothing
-
-    next syncBytes decompress bytes =
-      case getNextBlock syncBytes decompress bytes of
-        Right (Just (numObj, block, rest)) -> Just (Right (numObj, block), Just rest)
-        Right Nothing                      -> Nothing
-        Left err                           -> Just (Left err, Nothing)
-
-getNextBlock :: BL.ByteString
-             -> Decompress BL.ByteString
-             -> BL.ByteString
-             -> Either String (Maybe (Int, BL.ByteString, BL.ByteString))
-getNextBlock sync decompress bs =
-  if BL.null bs
-    then Right Nothing
-    else case runGetOrFail (getRawBlock decompress) bs of
-      Left (bs', _, err)             -> Left err
-      Right (bs', _, (nrObj, bytes)) ->
-        case checkMarker sync bs' of
-          Left err   -> Left err
-          Right rest -> Right $ Just (nrObj, bytes, rest)
-  where
-    getRawBlock :: Decompress BL.ByteString -> Get (Int, BL.ByteString)
-    getRawBlock decompress = do
-      nrObj    <- getLong >>= sFromIntegral
-      nrBytes  <- getLong
-      compressed <- G.getLazyByteString nrBytes
-      bytes <- case decompress compressed G.getRemainingLazyByteString of
-        Right x  -> pure x
-        Left err -> fail err
-      pure (nrObj, bytes)
-
-    checkMarker :: BL.ByteString -> BL.ByteString -> Either String BL.ByteString
-    checkMarker sync bs =
-      case BL.splitAt nrSyncBytes bs of
-        (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
-        (_, rest)                    -> Right rest
-
 getContainerValuesWith :: (Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema))
                  -> BL.ByteString
                  -> Either String (Schema, [[T.LazyValue Schema]])
@@ -239,13 +182,8 @@ decodeGet f bs =
 -- smaller files.  By extracting the original bytestring it is possible to
 -- avoid re-encoding data.
 getContainerValuesBytes :: BL.ByteString -> Either String (Schema, [Either String BL.ByteString])
-getContainerValuesBytes =
-  extractContainerValues readBytes
-  where
-    readBytes sch = do
-      start <- G.bytesRead
-      end <- G.lookAhead (DecodeStrict.getAvroOf sch >> G.bytesRead)
-      G.getLazyByteString (end-start)
+getContainerValuesBytes = (fmap . fmap . fmap . fmap) snd . extractContainerValuesBytes pure DecodeStrict.getAvroOf
+{-# INLINE getContainerValuesBytes #-}
 
 -- | Splits container into a list of individual avro-encoded values.
 -- This version provides both encoded and decoded values.
@@ -254,38 +192,8 @@ getContainerValuesBytes =
 -- smaller files.  By extracting the original bytestring it is possible to
 -- avoid re-encoding data.
 getContainerValuesBytes' :: BL.ByteString -> Either String (Schema, [Either String (TypesStrict.Value S.Schema, BL.ByteString)])
-getContainerValuesBytes' =
-  extractContainerValues readBytes
-  where
-    readBytes sch = do
-      start <- G.bytesRead
-      (val, end) <- G.lookAhead (DecodeStrict.getAvroOf sch >>= (\v -> (v, ) <$> G.bytesRead))
-      res <- G.getLazyByteString (end-start)
-      pure (val, res)
-
-extractContainerValues :: (Schema -> Get a) -> BL.ByteString -> Either String (Schema, [Either String a])
-extractContainerValues f bs =
-  case decodeRawBlocks bs of
-    Left err            -> Left err
-    Right (sch, blocks) -> Right (sch, blocks >>= decodeBlock sch)
-  where
-    decodeBlock _ (Left err)               = undefined
-    decodeBlock sch (Right (nrObj, bytes)) = snd $ consumeN (fromIntegral nrObj) (decodeValue sch) bytes
-
-    decodeValue sch bytes =
-      case G.runGetOrFail (f sch) bytes of
-        Left (bs', _, err)  -> (bs', Left err)
-        Right (bs', _, res) -> (bs', Right res)
-
-consumeN :: Int64 -> (a -> (a, b)) -> a -> (a, [b])
-consumeN n f a =
-  if n == 0
-    then (a, [])
-    else
-      let (a', b) = f a
-          (r, bs) = consumeN (n-1) f a'
-      in (r, b:bs)
-{-# INLINE consumeN #-}
+getContainerValuesBytes' = extractContainerValuesBytes pure DecodeStrict.getAvroOf
+{-# INLINE getContainerValuesBytes' #-}
 
 getAvroOf :: Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
 getAvroOf ty0 bs = go ty0 bs
@@ -297,13 +205,13 @@ getAvroOf ty0 bs = go ty0 bs
   go ty bs =
     case ty of
       Null     -> (bs, T.Null)
-      Boolean  -> decodeGet T.Boolean  bs
-      Int _    -> decodeGet T.Int      bs
-      Long _   -> decodeGet T.Long     bs
-      Float    -> decodeGet T.Float    bs
-      Double   -> decodeGet T.Double   bs
-      Bytes _  -> decodeGet T.Bytes    bs
-      String _ -> decodeGet T.String   bs
+      Boolean  -> decodeGet T.Boolean     bs
+      Int _    -> decodeGet (T.Int ty)    bs
+      Long _   -> decodeGet (T.Long ty)   bs
+      Float    -> decodeGet (T.Float ty)  bs
+      Double   -> decodeGet (T.Double ty) bs
+      Bytes _  -> decodeGet (T.Bytes ty)  bs
+      String _ -> decodeGet (T.String ty) bs
       Array t  -> T.Array . V.fromList . mconcat <$> getElements bs (go t)
       Map t    -> T.Map . HashMap.fromList . mconcat <$> getKVPairs bs (go t)
       NamedType tn ->
@@ -327,29 +235,29 @@ getAvroOf ty0 bs = go ty0 bs
         case runGetOrFail getLong bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, i)  ->
-            case ts V.!? (fromIntegral i) of
-              Nothing -> (bs', T.Error $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (V.map typeName ts))
-              Just t  -> T.Union ts t <$> go t bs'
+            case ts `ivElem` (fromIntegral i) of
+              Nothing -> (bs', T.Error $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show ts)
+              Just t  -> T.Union (extractValues ts) t <$> go t bs'
 
       Fixed {..} ->
         case runGetOrFail (G.getByteString (fromIntegral size)) bs of
           Left (bs', _, err) -> (bs', T.Error err)
           Right (bs', _, v)  -> (bs', T.Fixed ty v)
 
-      IntLongCoercion     -> decodeGet @Int32 (T.Long   . fromIntegral) bs
-      IntFloatCoercion    -> decodeGet @Int32 (T.Float  . fromIntegral) bs
-      IntDoubleCoercion   -> decodeGet @Int32 (T.Double . fromIntegral) bs
-      LongFloatCoercion   -> decodeGet @Int64 (T.Float  . fromIntegral) bs
-      LongDoubleCoercion  -> decodeGet @Int64 (T.Double . fromIntegral) bs
-      FloatDoubleCoercion -> decodeGet @Float (T.Double . realToFrac)   bs
+      IntLongCoercion     -> decodeGet @Int32 (T.Long ty   . fromIntegral) bs
+      IntFloatCoercion    -> decodeGet @Int32 (T.Float ty  . fromIntegral) bs
+      IntDoubleCoercion   -> decodeGet @Int32 (T.Double ty . fromIntegral) bs
+      LongFloatCoercion   -> decodeGet @Int64 (T.Float ty  . fromIntegral) bs
+      LongDoubleCoercion  -> decodeGet @Int64 (T.Double ty . fromIntegral) bs
+      FloatDoubleCoercion -> decodeGet @Float (T.Double ty . realToFrac)   bs
       FreeUnion {..} -> T.Union (V.singleton ty) ty <$> go ty bs
 
   getField :: Field -> BL.ByteString -> (BL.ByteString, Maybe (Text, T.LazyValue Schema))
   getField Field{..} bs =
-    case (fldStatus, fldDefault) of
-      (AsIs _, _)          -> Just . (fldName,) <$> go fldType bs
-      (Defaulted, Just v)  -> (bs, Just (fldName, fromStrictValue v))
-      (Ignored, _)         -> (fst (go fldType bs), Nothing)
+    case fldStatus of
+      AsIs _        -> Just . (fldName,) <$> go fldType bs
+      Defaulted _ v -> (bs, Just (fldName, fromStrictValue v))
+      Ignored       -> (fst (go fldType bs), Nothing)
 {-# INLINABLE getAvroOf #-}
 
 getKVPair getElement bs =

@@ -6,6 +6,7 @@ module Main
 where
 
 import qualified Bench.Deconflict as Deconflict
+import qualified Bench.Encoding   as Encoding
 import qualified Bench.Time       as Time
 
 import Gauge
@@ -18,4 +19,6 @@ main = defaultMain
 
   Deconflict.only
   , Deconflict.notOnly
+  , Encoding.encodeToBS
+  , Deconflict.container
   ]

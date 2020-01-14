@@ -11,12 +11,12 @@ import Data.Vector
 data LazyValue f
       = Null
       | Boolean Bool
-      | Int Int32
-      | Long Int64
-      | Float Float
-      | Double Double
-      | Bytes ByteString
-      | String Text
+      | Int f Int32
+      | Long f Int64
+      | Float f Float
+      | Double f Double
+      | Bytes f ByteString
+      | String f Text
       | Array (Vector (LazyValue f))            -- ^ Dynamically enforced monomorphic type.
       | Map (HashMap Text (LazyValue f))        -- ^ Dynamically enforced monomorphic type
       | Record f (HashMap Text (LazyValue f))   -- ^ Order and a map

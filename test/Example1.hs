@@ -22,7 +22,7 @@ meSchema = mkEnum "MyEnum" [] Nothing ["A","B","C","D"]
 msSchema  :: Schema
 msSchema =
   Record "MyStruct" [] Nothing Nothing
-      [ fld 0 "enumOrString" eOrS (Just $ Ty.String "The Default")
+      [ fld 0 "enumOrString" eOrS (Just $ (Ty.String String') "The Default")
       , fld 1 "intvalue" Long' Nothing
       ]
      where

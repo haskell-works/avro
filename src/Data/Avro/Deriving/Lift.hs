@@ -41,4 +41,5 @@ deriving instance Lift Schema.LogicalTypeFixed
 deriving instance Lift Schema.LogicalTypeInt
 deriving instance Lift Schema.LogicalTypeLong
 deriving instance Lift Schema.LogicalTypeString
+deriving instance Lift a => Lift (Schema.IndexedVector a)
 deriving instance Lift Schema.Schema

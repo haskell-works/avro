@@ -1,10 +1,13 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE QuasiQuotes        #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 module Bench.Deconflict.Reader
 where
 
+import Control.DeepSeq
 import Data.Avro.Deriving
 import Text.RawString.QQ
 
@@ -27,3 +30,6 @@ deriveAvroFromByteString [r|
   ]
 }
 |]
+
+deriving instance NFData Inner
+deriving instance NFData Outer

@@ -16,12 +16,12 @@ import GHC.Generics (Generic)
 data Value f
       = Null
       | Boolean !Bool
-      | Int {-# UNPACK #-} !Int32
-      | Long {-# UNPACK #-} !Int64
-      | Float {-# UNPACK #-} !Float
-      | Double {-# UNPACK #-} !Double
-      | Bytes {-# UNPACK #-} !ByteString
-      | String {-# UNPACK #-} !Text
+      | Int f {-# UNPACK #-} !Int32
+      | Long f {-# UNPACK #-} !Int64
+      | Float f {-# UNPACK #-} !Float
+      | Double f {-# UNPACK #-} !Double
+      | Bytes f {-# UNPACK #-} !ByteString
+      | String f {-# UNPACK #-} !Text
       | Array (Vector (Value f))       -- ^ Dynamically enforced monomorphic type.
       | Map (HashMap Text (Value f))   -- ^ Dynamically enforced monomorphic type
       | Record f (HashMap Text (Value f)) -- Order and a map

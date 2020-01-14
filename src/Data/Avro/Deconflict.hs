@@ -79,9 +79,9 @@ startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema re
   go a@S.Record {} b@S.Record {} val
        | name a == name b = deconflictRecord go a b val
   go (S.Union xs) (S.Union ys) (T.Union _ tyVal val) =
-       withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion go sch ys val
+       withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion go sch (extractValues ys) val
   go nonUnion (S.Union ys) val =
-       deconflictReaderUnion go nonUnion ys val
+       deconflictReaderUnion go nonUnion (extractValues ys) val
   go (S.Union xs) nonUnion (T.Union _ tyVal val) =
        withSchemaIn tyVal xs $ \sch -> go sch nonUnion val
   go (S.NamedType t) bTy val = do
@@ -93,15 +93,15 @@ startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema re
   go aTy bTy val | aTy == bTy = Right val
   go eTy dTy val =
     case val of
-      T.Int i32  | S.Long _ <- dTy   -> Right $ T.Long   (fromIntegral i32)
-                 | dTy == S.Float    -> Right $ T.Float  (fromIntegral i32)
-                 | dTy == S.Double   -> Right $ T.Double (fromIntegral i32)
-      T.Long i64 | dTy == S.Float    -> Right $ T.Float (fromIntegral i64)
-                 | dTy == S.Double   -> Right $ T.Double (fromIntegral i64)
-      T.Float f  | dTy == S.Double   -> Right $ T.Double (realToFrac f)
-      T.String s | S.Bytes _ <- dTy  -> Right $ T.Bytes (Text.encodeUtf8 s)
-      T.Bytes bs | S.String _ <- dTy -> Right $ T.String (Text.decodeUtf8 bs)
-      _                              -> Left $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
+      T.Int s v  | S.Long _ <- dTy    -> Right $ T.Long   s (fromIntegral v)
+                 | dTy == S.Float     -> Right $ T.Float  s (fromIntegral v)
+                 | dTy == S.Double    -> Right $ T.Double s (fromIntegral v)
+      T.Long s v | dTy == S.Float     -> Right $ T.Float  s (fromIntegral v)
+                 | dTy == S.Double    -> Right $ T.Double s (fromIntegral v)
+      T.Float s v  | dTy == S.Double  -> Right $ T.Double s (realToFrac v)
+      T.String s v | S.Bytes _ <- dTy -> Right $ T.Bytes s (Text.encodeUtf8 v)
+      T.Bytes s v | S.String _ <- dTy -> Right $ T.String s (Text.decodeUtf8 v)
+      _                               -> Left $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
 -- The writer's symbol must be present in the reader's enum
 deconflictEnum :: Schema -> Schema -> T.Value Schema -> Either String (T.Value Schema)

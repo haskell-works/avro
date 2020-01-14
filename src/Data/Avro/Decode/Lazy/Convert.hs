@@ -11,12 +11,12 @@ toStrictValue :: LazyValue f -> Either String (Value f)
 toStrictValue d = case d of
   D.Null         -> Right V.Null
   D.Boolean v    -> Right $ V.Boolean v
-  D.Int v        -> Right $ V.Int v
-  D.Long v       -> Right $ V.Long v
-  D.Float v      -> Right $ V.Float v
-  D.Double v     -> Right $ V.Double v
-  D.Bytes v      -> Right $ V.Bytes v
-  D.String v     -> Right $ V.String v
+  D.Int s v      -> Right $ V.Int s v
+  D.Long s v     -> Right $ V.Long s v
+  D.Float s v    -> Right $ V.Float s v
+  D.Double s v   -> Right $ V.Double s v
+  D.Bytes s v    -> Right $ V.Bytes s v
+  D.String s v   -> Right $ V.String s v
   D.Array vs     -> V.Array <$> traverse toStrictValue vs
   D.Map vs       -> V.Map <$> traverse toStrictValue vs
   D.Record f vs  -> V.Record f <$> traverse toStrictValue vs
@@ -30,12 +30,12 @@ fromStrictValue :: Value f -> LazyValue f
 fromStrictValue d = case d of
   V.Null         -> D.Null
   V.Boolean v    -> D.Boolean v
-  V.Int v        -> D.Int v
-  V.Long v       -> D.Long v
-  V.Float v      -> D.Float v
-  V.Double v     -> D.Double v
-  V.Bytes v      -> D.Bytes v
-  V.String v     -> D.String v
+  V.Int s v      -> D.Int s v
+  V.Long s v     -> D.Long s v
+  V.Float s v    -> D.Float s v
+  V.Double s v   -> D.Double s v
+  V.Bytes s v    -> D.Bytes s v
+  V.String s v   -> D.String s v
   V.Array vs     -> D.Array $ fromStrictValue <$> vs
   V.Map vs       -> D.Map $ fromStrictValue <$> vs
   V.Record f vs  -> D.Record f $ fromStrictValue <$> vs

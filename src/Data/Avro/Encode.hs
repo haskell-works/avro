@@ -1,8 +1,9 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE RecordWildCards      #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module Data.Avro.Encode
   ( -- * High level interface
@@ -39,7 +40,8 @@ import           Data.Ix                    (Ix)
 import           Data.List                  as DL
 import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NE
-import           Data.Maybe                 (catMaybes, mapMaybe, fromJust)
+import qualified Data.Map.Strict            as Map
+import           Data.Maybe                 (catMaybes, fromJust, mapMaybe)
 import           Data.Monoid
 import           Data.Proxy
 import qualified Data.Set                   as S
@@ -61,10 +63,10 @@ import           System.Random.TF.Instances (randoms)
 import Data.Avro.Codec
 import Data.Avro.EncodeRaw
 import Data.Avro.HasAvroSchema
+import Data.Avro.Internal.Time
 import Data.Avro.Schema        as S
 import Data.Avro.Types         as T
 import Data.Avro.Types.Decimal as D
-import Data.Avro.Types.Time
 import Data.Avro.Zag
 import Data.Avro.Zig
 
@@ -169,7 +171,7 @@ getSchema :: forall a. EncodeAvro a => a -> Schema
 getSchema = snd . runAvro . avro
 
 getType :: EncodeAvro a => Proxy a -> Schema
-getType = getSchema . (asProxyTypeOf undefined)
+getType = getSchema . asProxyTypeOf undefined
 -- N.B. ^^^ Local knowledge that 'fst' won't be used,
 -- so the bottom of 'undefined' will not escape so long as schema creation
 -- remains lazy in the argument.
@@ -188,6 +190,7 @@ avroLong n = AvroM (encodeRaw n, S.Long Nothing)
 -- Put a Haskell Int.
 putI :: Int -> Builder
 putI = encodeRaw
+{-# INLINE putI #-}
 
 instance EncodeAvro Int  where
   avro = avroInt
@@ -253,6 +256,7 @@ instance EncodeAvro Time.DiffTime where
 -- Terminating word for array and map types.
 long0 :: Builder
 long0 = encodeRaw (0 :: Word64)
+{-# INLINE long0 #-}
 
 instance EncodeAvro a => EncodeAvro [a] where
   avro a = AvroM ( if DL.null a then long0 else encodeRaw (F.length a) <> foldMap putAvro a <> long0
@@ -288,8 +292,15 @@ instance EncodeAvro a => EncodeAvro (HashMap Text a) where
 
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance EncodeAvro a => EncodeAvro (Maybe a) where
-  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null:|[S.Int']))
-  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null:|[S.Int']))
+  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null:|[getType (Proxy :: Proxy a)]))
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null:|[getType (Proxy :: Proxy a)]))
+
+instance (EncodeAvro a, EncodeAvro b) => EncodeAvro (Either a b) where
+  avro v =
+    let unionType = S.mkUnion (getType (Proxy :: Proxy a):|[getType (Proxy :: Proxy b)])
+    in case v of
+      Left a  -> AvroM (putI 0 <> putAvro a, unionType)
+      Right b -> AvroM (putI 1 <> putAvro b, unionType)
 
 instance EncodeAvro () where
   avro () = AvroM (mempty, S.Null)
@@ -303,23 +314,23 @@ instance EncodeAvro Bool where
 instance EncodeAvro (T.Value Schema) where
   avro v =
     case v of
-      T.Null      -> avro ()
-      T.Boolean b -> avro b
-      T.Int i     -> avro i
-      T.Long i    -> avro i
-      T.Float f   -> avro f
-      T.Double d  -> avro d
-      T.Bytes bs  -> avro bs
-      T.String t  -> avro t
-      T.Array vec -> avro vec
-      T.Map hm    -> avro hm
+      T.Null        -> avro ()
+      T.Boolean b   -> avro b
+      T.Int _ i     -> avro i
+      T.Long _ i    -> avro i
+      T.Float _ f   -> avro f
+      T.Double _ d  -> avro d
+      T.Bytes _ bs  -> avro bs
+      T.String _ t  -> avro t
+      T.Array vec   -> avro vec
+      T.Map hm      -> avro hm
       T.Record ty hm ->
         let bs = foldMap putAvro (mapMaybe (`HashMap.lookup` hm) fs)
             fs = P.map fldName (fields ty)
         in AvroM (bs, ty)
       T.Union opts sel val | F.length opts > 0 ->
         case V.elemIndex sel opts of
-          Just idx -> AvroM (putI idx <> putAvro val, S.Union opts)
+          Just idx -> AvroM (putI idx <> putAvro val, S.Union (Positional opts))
           Nothing  -> error "Union encoding specifies type not found in schema"
       T.Enum sch@S.Enum{..} ix t -> AvroM (putI ix, sch)
       T.Fixed ty bs  ->

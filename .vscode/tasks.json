@@ -5,7 +5,7 @@
       "label": "Build",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-build --enable-tests --enable-benchmarks && echo 'Done'"],
+      "args": ["-lc", "cabal v2-build --enable-tests --enable-benchmarks && echo 'Done'"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -37,7 +37,7 @@
       "label": "Test",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-test --enable-tests --enable-benchmarks --test-show-details=direct && echo 'Done'"],
+      "args": ["-lc", "cabal v2-test --enable-tests --enable-benchmarks --test-show-details=direct && echo 'Done'"],
       "group": {
         "kind": "test",
         "isDefault": true

@@ -8,13 +8,13 @@ module Data.Avro.FromAvro
 where
 
 import           Control.Arrow           (first)
-import           Control.Monad.Identity  (Identity(..))
+import           Control.Monad.Identity  (Identity (..))
 import qualified Data.Avro.Encode        as E
 import           Data.Avro.HasAvroSchema
+import           Data.Avro.Internal.Time
 import           Data.Avro.Schema        as S
 import           Data.Avro.Types         as T
 import           Data.Avro.Types.Decimal as D
-import           Data.Avro.Types.Time
 import qualified Data.ByteString         as B
 import           Data.ByteString.Lazy    (ByteString)
 import qualified Data.ByteString.Lazy    as BL
@@ -65,58 +65,62 @@ instance FromAvro Bool where
   fromAvro v             = badValue v "Bool"
 
 instance FromAvro B.ByteString where
-  fromAvro (T.Bytes b) = pure b
-  fromAvro v           = badValue v "ByteString"
+  fromAvro (T.Bytes _ b) = pure b
+  fromAvro v             = badValue v "ByteString"
 
 instance FromAvro BL.ByteString where
-  fromAvro (T.Bytes b) = pure (BL.fromStrict b)
-  fromAvro v           = badValue v "Lazy ByteString"
+  fromAvro (T.Bytes _ b) = pure (BL.fromStrict b)
+  fromAvro v             = badValue v "Lazy ByteString"
 
 instance FromAvro Int where
-  fromAvro (T.Int i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
+  fromAvro (T.Int _ i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
-  fromAvro (T.Long i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
+  fromAvro (T.Long _ i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
   fromAvro v          = badValue v "Int"
 
 instance FromAvro Int32 where
-  fromAvro (T.Int i) = pure (fromIntegral i)
-  fromAvro v         = badValue v "Int32"
+  fromAvro (T.Int _ i) = pure (fromIntegral i)
+  fromAvro v           = badValue v "Int32"
 
 instance FromAvro Int64 where
-  fromAvro (T.Long i) = pure i
-  fromAvro (T.Int i)  = pure (fromIntegral i)
-  fromAvro v          = badValue v "Int64"
+  fromAvro (T.Long _ i) = pure i
+  fromAvro (T.Int _ i)  = pure (fromIntegral i)
+  fromAvro v            = badValue v "Int64"
 
 instance FromAvro Double where
-  fromAvro (T.Double d) = pure d
-  fromAvro v            = badValue v "Double"
+  fromAvro (T.Double _ d) = pure d
+  fromAvro v              = badValue v "Double"
 
 instance FromAvro Float where
-  fromAvro (T.Float f) = pure f
-  fromAvro v           = badValue v "Float"
+  fromAvro (T.Float _ f) = pure f
+  fromAvro v             = badValue v "Float"
 
 instance (KnownNat p, KnownNat s) => FromAvro (D.Decimal p s) where
-  fromAvro (T.Long n) = pure $ D.fromUnderlyingValue $ fromIntegral n
-  fromAvro (T.Int  n) = pure $ D.fromUnderlyingValue $ fromIntegral n
-  fromAvro v          = badValue v "Decimal"
+  fromAvro (T.Long _ n) = pure $ D.fromUnderlyingValue $ fromIntegral n
+  fromAvro (T.Int  _ n) = pure $ D.fromUnderlyingValue $ fromIntegral n
+  fromAvro v            = badValue v "Decimal"
 
 instance FromAvro UUID.UUID where
-  fromAvro v@(T.String s)
+  fromAvro v@(T.String _ s)
     = case UUID.fromText s of
         Nothing -> badValue v "UUID"
         Just u  -> pure u
   fromAvro v = badValue v "UUID"
 
 instance FromAvro Time.Day where
-  fromAvro (T.Int  v) = pure $ fromDaysSinceEpoch (toInteger v)
-  fromAvro (T.Long v) = pure $ fromDaysSinceEpoch (toInteger v)
-  fromAvro v = badValue v "Date"
+  fromAvro (T.Int  _ v) = pure $ fromDaysSinceEpoch (toInteger v)
+  fromAvro (T.Long _ v) = pure $ fromDaysSinceEpoch (toInteger v)
+  fromAvro v            = badValue v "Date"
 
 instance FromAvro Time.DiffTime where
-  fromAvro (T.Int  v) = pure $ microsToDiffTime (toInteger v)
-  fromAvro (T.Long v) = pure $ microsToDiffTime (toInteger v)
-  fromAvro v = badValue v "TimeMicros"
+  fromAvro (T.Int  _ v) = pure $ microsToDiffTime (toInteger v)
+  fromAvro (T.Long _ v) = pure $ microsToDiffTime (toInteger v)
+  fromAvro v            = badValue v "TimeMicros"
+
+instance FromAvro Time.UTCTime where
+  fromAvro (T.Long _ v) = pure $ microsToUTCTime (toInteger v)
+  fromAvro v            = badValue v "TimeMicros"
 
 instance FromAvro a => FromAvro (Maybe a) where
   fromAvro (T.Union ts _ v) = case (V.toList ts, v) of
@@ -138,12 +142,12 @@ instance (U.Unbox a, FromAvro a) => FromAvro (U.Vector a) where
   fromAvro v             = badValue v "Unboxed Vector a"
 
 instance FromAvro Text where
-  fromAvro (T.String txt) = pure txt
-  fromAvro v              = badValue v "Text"
+  fromAvro (T.String _ txt) = pure txt
+  fromAvro v                = badValue v "Text"
 
 instance FromAvro TL.Text where
-  fromAvro (T.String txt) = pure (TL.fromStrict txt)
-  fromAvro v              = badValue v "Lazy Text"
+  fromAvro (T.String _ txt) = pure (TL.fromStrict txt)
+  fromAvro v                = badValue v "Lazy Text"
 
 instance (FromAvro a) => FromAvro (Map.Map Text a) where
   fromAvro (T.Record _ mp) = mapM fromAvro $ Map.fromList (HashMap.toList mp)

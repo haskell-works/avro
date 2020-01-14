@@ -37,9 +37,9 @@ encodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
   [ bench "bools" $
       nf encodeAvro $ Value.Array $ Value.Boolean <$> bools
   , bench "ints" $
-      nf encodeAvro $ Value.Array $ Value.Int <$> ints
+      nf encodeAvro $ Value.Array $ (Value.Int Schema.Int') <$> ints
   , bench "longs" $
-      nf encodeAvro $ Value.Array $ Value.Long <$> longs
+      nf encodeAvro $ Value.Array $ (Value.Long Schema.Long') <$> longs
   , bench "records" $
       nf encodeAvro $ Value.Array records
   ]
@@ -56,8 +56,8 @@ encodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
           Vector.zipWith3 record bools ints longs
         record bool int long = Value.Record recordSchema
           [ ("b", Value.Boolean bool)
-          , ("i", Value.Int int)
-          , ("l", Value.Long long)
+          , ("i", (Value.Int Schema.Int') int)
+          , ("l", (Value.Long Schema.Long') long)
           ]
         recordSchema = Schema.Record "Rec" [] Nothing Nothing
           [ Schema.Field "b" [] Nothing Nothing (Schema.AsIs 0) Schema.Boolean Nothing
@@ -90,8 +90,8 @@ decodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
           ints  <- array
           longs <- array
           pure ( encodeAvro $ Value.Array $ Value.Boolean <$> bools
-               , encodeAvro $ Value.Array $ Value.Int <$> ints
-               , encodeAvro $ Value.Array $ Value.Long <$> longs
+               , encodeAvro $ Value.Array $ Value.Int Schema.Int' <$> ints
+               , encodeAvro $ Value.Array $ Value.Long Schema.Long' <$> longs
                , encodeAvro $ Value.Array $ records bools ints longs
                )
 
@@ -102,8 +102,8 @@ decodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
           Vector.zipWith3 record bools ints longs
         record bool int long = Value.Record recordSchema
           [ ("b", Value.Boolean bool)
-          , ("i", Value.Int int)
-          , ("l", Value.Long long)
+          , ("i", Value.Int Schema.Int' int)
+          , ("l", Value.Long Schema.Long' long)
           ]
         recordSchema = Schema.Record "Rec" [] Nothing Nothing
           [ Schema.Field "b" [] Nothing Nothing (Schema.AsIs 0) Schema.Boolean Nothing

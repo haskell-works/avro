@@ -6,14 +6,14 @@ module Data.Avro.Decode.Lazy.FromLazyAvro
 
 where
 
-import           Control.Monad.Identity          (Identity(..))
 import           Control.Arrow                   (first)
+import           Control.Monad.Identity          (Identity (..))
 import           Data.Avro.Decode.Lazy.LazyValue as T
 import qualified Data.Avro.Encode                as E
 import           Data.Avro.HasAvroSchema
+import           Data.Avro.Internal.Time
 import           Data.Avro.Schema                as S
 import           Data.Avro.Types.Decimal         as D
-import           Data.Avro.Types.Time
 import qualified Data.ByteString                 as B
 import           Data.ByteString.Lazy            (ByteString)
 import qualified Data.ByteString.Lazy            as BL
@@ -71,58 +71,62 @@ instance FromLazyAvro Bool where
   fromLazyAvro v             = badValue v "Bool"
 
 instance FromLazyAvro B.ByteString where
-  fromLazyAvro (T.Bytes b) = pure b
-  fromLazyAvro v           = badValue v "ByteString"
+  fromLazyAvro (T.Bytes _ b) = pure b
+  fromLazyAvro v             = badValue v "ByteString"
 
 instance FromLazyAvro BL.ByteString where
-  fromLazyAvro (T.Bytes b) = pure (BL.fromStrict b)
-  fromLazyAvro v           = badValue v "Lazy ByteString"
+  fromLazyAvro (T.Bytes _ b) = pure (BL.fromStrict b)
+  fromLazyAvro v             = badValue v "Lazy ByteString"
 
 instance FromLazyAvro Int where
-  fromLazyAvro (T.Int i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
+  fromLazyAvro (T.Int _ i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
-  fromLazyAvro (T.Long i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
+  fromLazyAvro (T.Long _ i) | (fromIntegral i :: Integer) < fromIntegral (maxBound :: Int)
                       = pure (fromIntegral i)
   fromLazyAvro v          = badValue v "Int"
 
 instance FromLazyAvro Int32 where
-  fromLazyAvro (T.Int i) = pure (fromIntegral i)
-  fromLazyAvro v         = badValue v "Int32"
+  fromLazyAvro (T.Int _ i) = pure (fromIntegral i)
+  fromLazyAvro v           = badValue v "Int32"
 
 instance FromLazyAvro Int64 where
-  fromLazyAvro (T.Long i) = pure i
-  fromLazyAvro (T.Int i)  = pure (fromIntegral i)
-  fromLazyAvro v          = badValue v "Int64"
+  fromLazyAvro (T.Long _ i) = pure i
+  fromLazyAvro (T.Int _ i)  = pure (fromIntegral i)
+  fromLazyAvro v            = badValue v "Int64"
 
 instance FromLazyAvro Double where
-  fromLazyAvro (T.Double d) = pure d
-  fromLazyAvro v            = badValue v "Double"
+  fromLazyAvro (T.Double _ d) = pure d
+  fromLazyAvro v              = badValue v "Double"
 
 instance FromLazyAvro Float where
-  fromLazyAvro (T.Float f) = pure f
-  fromLazyAvro v           = badValue v "Float"
+  fromLazyAvro (T.Float _ f) = pure f
+  fromLazyAvro v             = badValue v "Float"
 
 instance (KnownNat p, KnownNat s) => FromLazyAvro (D.Decimal p s) where
-  fromLazyAvro (T.Long n) = pure $ D.fromUnderlyingValue $ fromIntegral n
-  fromLazyAvro (T.Int  n) = pure $ D.fromUnderlyingValue $ fromIntegral n
-  fromLazyAvro v          = badValue v "Decimal"
+  fromLazyAvro (T.Long _ n) = pure $ D.fromUnderlyingValue $ fromIntegral n
+  fromLazyAvro (T.Int  _ n) = pure $ D.fromUnderlyingValue $ fromIntegral n
+  fromLazyAvro v            = badValue v "Decimal"
 
 instance FromLazyAvro UUID.UUID where
-  fromLazyAvro v@(T.String s)
+  fromLazyAvro v@(T.String _ s)
     = case UUID.fromText s of
         Nothing -> badValue v "UUID"
         Just u  -> pure u
   fromLazyAvro v = badValue v "UUID"
 
 instance FromLazyAvro Time.Day where
-  fromLazyAvro (T.Int  v) = pure $ fromDaysSinceEpoch (toInteger v)
-  fromLazyAvro (T.Long v) = pure $ fromDaysSinceEpoch (toInteger v)
-  fromLazyAvro v = badValue v "Date"
+  fromLazyAvro (T.Int  _ v) = pure $ fromDaysSinceEpoch (toInteger v)
+  fromLazyAvro (T.Long _ v) = pure $ fromDaysSinceEpoch (toInteger v)
+  fromLazyAvro v            = badValue v "Date"
 
 instance FromLazyAvro Time.DiffTime where
-  fromLazyAvro (T.Int  v) = pure $ microsToDiffTime (toInteger v)
-  fromLazyAvro (T.Long v) = pure $ microsToDiffTime (toInteger v)
-  fromLazyAvro v = badValue v "TimeMicros"
+  fromLazyAvro (T.Int  _ v) = pure $ microsToDiffTime (toInteger v)
+  fromLazyAvro (T.Long _ v) = pure $ microsToDiffTime (toInteger v)
+  fromLazyAvro v            = badValue v "TimeMicros"
+
+instance FromLazyAvro Time.UTCTime where
+  fromLazyAvro (T.Long _ v) = pure $ microsToUTCTime (toInteger v)
+  fromLazyAvro v            = badValue v "TimeMicros"
 
 instance FromLazyAvro a => FromLazyAvro (Maybe a) where
   fromLazyAvro (T.Union ts _ v) = case (V.toList ts, v) of
@@ -144,12 +148,12 @@ instance (U.Unbox a, FromLazyAvro a) => FromLazyAvro (U.Vector a) where
   fromLazyAvro v             = badValue v "Unboxed Vector a"
 
 instance FromLazyAvro Text where
-  fromLazyAvro (T.String txt) = pure txt
-  fromLazyAvro v              = badValue v "Text"
+  fromLazyAvro (T.String _ txt) = pure txt
+  fromLazyAvro v                = badValue v "Text"
 
 instance FromLazyAvro TL.Text where
-  fromLazyAvro (T.String txt) = pure (TL.fromStrict txt)
-  fromLazyAvro v              = badValue v "Lazy Text"
+  fromLazyAvro (T.String _ txt) = pure (TL.fromStrict txt)
+  fromLazyAvro v                = badValue v "Lazy Text"
 
 instance (FromLazyAvro a) => FromLazyAvro (Map.Map Text a) where
   fromLazyAvro (T.Record _ mp) = mapM fromLazyAvro $ Map.fromList (HashMap.toList mp)

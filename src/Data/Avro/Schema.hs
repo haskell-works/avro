@@ -1,6 +1,9 @@
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveFoldable        #-}
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -52,6 +55,9 @@ module Data.Avro.Schema
   , overlay
   , subdefinition
   , expandNamedTypes
+
+  , IndexedVector(..), ivFindIndexed, ivLength, ivUnsafeIndex, ivElem, ivIndexedValue
+  , extractValues
   ) where
 
 import           Control.Applicative
@@ -92,6 +98,41 @@ import GHC.Generics (Generic)
 {-# DEPRECATED Type "Use Schema instead" #-}
 type Type = Schema
 
+data IndexedVector a
+  = Positional (V.Vector a)
+  | Indexed (V.Vector (Int, a))
+  deriving (Show, Eq, Ord, Generic, Functor, Foldable, Traversable, NFData)
+
+ivLength :: IndexedVector a -> Int
+ivLength (Positional v) = V.length v
+ivLength (Indexed v)    = V.length v
+
+ivHead :: IndexedVector a -> a
+ivHead (Positional v) = V.head v
+ivHead (Indexed v)    = snd (V.head v)
+
+ivElem :: IndexedVector a -> Int -> Maybe a
+ivElem (Positional v) i = v V.!? i
+ivElem (Indexed v) i    = snd <$> v V.!? i
+
+ivUnsafeIndex :: IndexedVector a -> Int -> a
+ivUnsafeIndex (Positional v) i = V.unsafeIndex v i
+ivUnsafeIndex (Indexed v) i    = snd (V.unsafeIndex v i)
+
+ivIndexedValue :: IndexedVector a -> Int -> Maybe (Int, a)
+ivIndexedValue (Positional v) i = (i,) <$> (v V.!? i)
+ivIndexedValue (Indexed v) i    = v V.!? i
+
+ivFindIndexed :: IndexedVector a -> (a -> Bool) -> Maybe (Int, a)
+ivFindIndexed (Positional v) f = (\i -> (i, V.unsafeIndex v i)) <$> V.findIndex f v
+ivFindIndexed (Indexed v) f    = V.find (f . snd) v
+
+extractValues :: IndexedVector a -> V.Vector a
+extractValues (Positional v) = v
+extractValues (Indexed v)    = V.map snd v
+
+
+
 -- | N.B. It is possible to create a Haskell value (of 'Schema' type) that is
 -- not a valid Avro schema by violating one of the above or one of the
 -- conditions called out in 'validateSchema'.
@@ -120,7 +161,7 @@ data Schema
              , doc     :: Maybe Text
              , symbols :: V.Vector Text
              }
-      | Union { options     :: V.Vector Schema
+      | Union { options     :: IndexedVector Schema
               }
       | Fixed { name         :: TypeName
               , aliases      :: [TypeName]
@@ -133,7 +174,7 @@ data Schema
       | LongFloatCoercion
       | LongDoubleCoercion
       | FloatDoubleCoercion
-      | FreeUnion { ty :: Type }
+      | FreeUnion { pos :: Int, ty :: Type }
     deriving (Ord, Show, Generic, NFData)
 
 pattern Int'    = Int    Nothing
@@ -193,7 +234,7 @@ instance Eq Schema where
   LongFloatCoercion   == LongFloatCoercion   = True
   LongDoubleCoercion  == LongDoubleCoercion  = True
   FloatDoubleCoercion == FloatDoubleCoercion = True
-  FreeUnion ty1 == FreeUnion ty2 = ty1 == ty2
+  FreeUnion _ ty1 == FreeUnion _ ty2 = ty1 == ty2
 
   _ == _ = False
 
@@ -213,7 +254,7 @@ mkEnum name aliases doc symbols = Enum name aliases doc (V.fromList symbols)
 -- invalid Avro to include another union or to have more than one of the same
 -- type as a direct member of the union.  No check is done for this condition!
 mkUnion :: NonEmpty Schema -> Schema
-mkUnion  = Union . V.fromList . NE.toList
+mkUnion  = Union . Positional . V.fromList . NE.toList
 
 -- | A named type in Avro has a name and, optionally, a namespace.
 --
@@ -356,7 +397,7 @@ typeName bt =
     Array _         -> "array"
     Map   _         -> "map"
     NamedType name  -> renderFullname name
-    Union ts        -> typeName (V.head ts)
+    Union ts        -> typeName (ivHead ts)
     Fixed _ _ _ (Just (DecimalF d))
                     -> decimalName d
     Fixed _ _ _ (Just Duration)
@@ -368,8 +409,8 @@ typeName bt =
 data FieldStatus
   = AsIs Int
   | Ignored
-  | Defaulted
-  deriving (Show, Ord, Eq, Generic, NFData)
+  | Defaulted Int (Ty.Value Schema)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 
 data Field = Field { fldName    :: Text
@@ -417,7 +458,7 @@ parseSchemaJSON context = \case
     somename           -> return $ NamedType $ mkTypeName context somename Nothing
   A.Array arr
     | V.length arr > 0 ->
-      Union <$> V.mapM (parseSchemaJSON context) arr
+      Union . Positional <$> V.mapM (parseSchemaJSON context) arr
     | otherwise        -> fail "Unions must have at least one type."
   A.Object o -> do
     logicalType :: Maybe Text <- o .:? "logicalType"
@@ -605,7 +646,7 @@ schemaToJSON context = \case
        , "aliases" .= (render (Just name) <$> aliases)
        , "symbols" .= symbols
        ]
-  Union  {..} -> toJSON $ schemaToJSON context <$> options
+  Union  {..} -> toJSON $ schemaToJSON context <$> extractValues options
   Fixed  {..} ->
     let basic =
            [ "type"    .= ("fixed" :: Text)
@@ -642,12 +683,12 @@ instance ToJSON (Ty.Value Schema) where
     case av of
       Ty.Null              -> A.Null
       Ty.Boolean b         -> A.Bool b
-      Ty.Int i             -> A.Number (fromIntegral i)
-      Ty.Long i            -> A.Number (fromIntegral i)
-      Ty.Float f           -> A.Number (realToFrac f)
-      Ty.Double d          -> A.Number (realToFrac d)
-      Ty.Bytes bs          -> A.String (serializeBytes bs)
-      Ty.String t          -> A.String t
+      Ty.Int _ i           -> A.Number (fromIntegral i)
+      Ty.Long _ i          -> A.Number (fromIntegral i)
+      Ty.Float _ f         -> A.Number (realToFrac f)
+      Ty.Double _ d        -> A.Number (realToFrac d)
+      Ty.Bytes _ bs        -> A.String (serializeBytes bs)
+      Ty.String _ t        -> A.String t
       Ty.Array vec         -> A.Array (V.map toJSON vec)
       Ty.Map mp            -> A.Object (HashMap.map toJSON mp)
       Ty.Record _ flds     -> A.Object (HashMap.map toJSON flds)
@@ -720,7 +761,7 @@ parseFieldDefault :: (TypeName -> Maybe Schema)
                      -- ^ JSON encoding of an Avro value.
                   -> Result (Ty.Value Schema)
 parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
-  where defaultUnion (Union ts) val = Ty.Union ts (V.head ts) <$> parseFieldDefault env (V.head ts) val
+  where defaultUnion (Union ts) val = Ty.Union (extractValues ts) (ivHead ts) <$> parseFieldDefault env (ivHead ts) val
         defaultUnion _ _            = error "Impossible: not Union."
 
 -- | Parse JSON-encoded avro data.
@@ -746,12 +787,12 @@ parseAvroJSON union env ty av                  =
     case av of
       A.String s      ->
         case ty of
-          String _    -> return $ Ty.String s
+          String _    -> return $ Ty.String ty s
           Enum {..}   ->
               case s `V.elemIndex` symbols of
                 Just i  -> pure $ Ty.Enum ty i s
                 Nothing -> fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
-          Bytes _     -> Ty.Bytes <$> parseBytes s
+          Bytes _     -> Ty.Bytes ty <$> parseBytes s
           Fixed {..}  -> do
             bytes <- parseBytes s
             let len = B.length bytes
@@ -765,10 +806,10 @@ parseAvroJSON union env ty av                  =
                           _       -> avroTypeMismatch ty "boolean"
       A.Number i     ->
         case ty of
-          Int _  -> return $ Ty.Int    (floor i)
-          Long _ -> return $ Ty.Long   (floor i)
-          Float  -> return $ Ty.Float  (realToFrac i)
-          Double -> return $ Ty.Double (realToFrac i)
+          Int _  -> return $ Ty.Int    ty (floor i)
+          Long _ -> return $ Ty.Long   ty (floor i)
+          Float  -> return $ Ty.Float  ty (realToFrac i)
+          Double -> return $ Ty.Double ty (realToFrac i)
           _      -> avroTypeMismatch ty "number"
       A.Array vec    ->
         case ty of
@@ -875,7 +916,7 @@ matches a@Record{} b@Record{}       =
       , and $ zipWith fieldMatches (fields a) (fields b)
       ]
   where fieldMatches = matches `on` fldType
-matches a@Union{} b@Union{}         = and $ V.zipWith matches (options a) (options b)
+matches a@Union{} b@Union{}         = and $ V.zipWith matches (extractValues $ options a) (extractValues $ options b)
 matches t1 t2                       = t1 == t2
 
 -- | @extractBindings schema@ traverses a schema and builds a map of all declared
@@ -889,7 +930,7 @@ extractBindings = \case
     let withRecord = HashMap.fromList $ (name : aliases) `zip` repeat t
     in HashMap.unions $ withRecord : (extractBindings . fldType <$> fields)
   e@Enum{..}   -> HashMap.fromList $ (name : aliases) `zip` repeat e
-  Union{..}    -> HashMap.unions $ V.toList $ extractBindings <$> options
+  Union{..}    -> HashMap.unions $ V.toList $ extractBindings <$> extractValues options
   f@Fixed{..}  -> HashMap.fromList $ (name : aliases) `zip` repeat f
   Array{..}    -> extractBindings item
   Map{..}      -> extractBindings values
@@ -928,7 +969,7 @@ overlay input supplement = overlayType input
     overlayType  a@Array{..}      = a { item    = overlayType item }
     overlayType  m@Map{..}        = m { values  = overlayType values }
     overlayType  r@Record{..}     = r { fields  = map overlayField fields }
-    overlayType  u@Union{..}      = Union (V.map overlayType options)
+    overlayType  u@Union{..}      = Union (fmap overlayType options)
     overlayType  nt@(NamedType _) = rebind nt
     overlayType  other            = other
 

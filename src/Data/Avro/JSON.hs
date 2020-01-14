@@ -63,6 +63,7 @@ import Data.Semigroup ((<>))
 
 import qualified Data.Aeson           as Aeson
 import           Data.ByteString.Lazy (ByteString)
+import qualified Data.Foldable        as Foldable
 import           Data.HashMap.Strict  ((!))
 import qualified Data.HashMap.Strict  as HashMap
 import           Data.List.NonEmpty   (NonEmpty (..))
@@ -88,7 +89,7 @@ decodeAvroJSON schema json =
 
     union (Schema.Union schemas) Aeson.Null
       | Schema.Null `elem` schemas =
-          pure $ Avro.Union schemas Schema.Null Avro.Null
+          pure $ Avro.Union (Schema.extractValues schemas) Schema.Null Avro.Null
       | otherwise                  =
           fail "Null not in union."
     union (Schema.Union schemas) (Aeson.Object obj)
@@ -104,11 +105,11 @@ decodeAvroJSON schema json =
             branch =
               head $ HashMap.keys obj
             names =
-              HashMap.fromList [(Schema.typeName t, t) | t <- V.toList schemas]
+              HashMap.fromList [(Schema.typeName t, t) | t <- Foldable.toList schemas]
           in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
               nested <- parseAvroJSON union env t (obj ! branch)
-              return (Avro.Union schemas t nested)
+              return (Avro.Union (Schema.extractValues schemas) t nested)
             Nothing -> fail ("Type '" <> Text.unpack branch <> "' not in union: " <> show schemas)
     union Schema.Union{} _ =
       Avro.Error "Invalid JSON representation for union: has to be a JSON object with exactly one field."

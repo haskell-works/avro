@@ -79,9 +79,9 @@ startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema re
     go a@S.Record {} b@S.Record {} val
         | name a == name b = deconflictRecord go a b val
     go (S.Union xs) (S.Union ys) (T.Union _ tyVal val) =
-        withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion go sch ys val
+        withSchemaIn tyVal xs $ \sch -> deconflictReaderUnion go sch (extractValues ys) val
     go nonUnion (S.Union ys) val =
-        deconflictReaderUnion go nonUnion ys val
+        deconflictReaderUnion go nonUnion (extractValues ys) val
     go (S.Union xs) nonUnion (T.Union _ tyVal val) =
         withSchemaIn tyVal xs $ \sch -> go sch nonUnion val
     go (S.NamedType t) bTy val =
@@ -91,14 +91,14 @@ startDeconflict shouldExpandNames writerSchema readerSchema = go writerSchema re
     go aTy bTy val | aTy == bTy = val
     go eTy dTy val =
       case val of
-        T.Int i32  | S.Long _ <- dTy   -> T.Long   (fromIntegral i32)
-                   | dTy == S.Float    -> T.Float  (fromIntegral i32)
-                   | dTy == S.Double   -> T.Double (fromIntegral i32)
-        T.Long i64 | dTy == S.Float    -> T.Float (fromIntegral i64)
-                   | dTy == S.Double   -> T.Double (fromIntegral i64)
-        T.Float f  | dTy == S.Double   -> T.Double (realToFrac f)
-        T.String s | S.Bytes _ <- dTy  -> T.Bytes (Text.encodeUtf8 s)
-        T.Bytes bs | S.String _ <- dTy -> T.String (Text.decodeUtf8 bs)
+        T.Int s v     | S.Long _ <- dTy   -> T.Long    s (fromIntegral v)
+                      | dTy == S.Float    -> T.Float   s (fromIntegral v)
+                      | dTy == S.Double   -> T.Double  s (fromIntegral v)
+        T.Long s v    | dTy == S.Float    -> T.Float   s (fromIntegral v)
+                      | dTy == S.Double   -> T.Double  s (fromIntegral v)
+        T.Float s v   | dTy == S.Double   -> T.Double  s (realToFrac v)
+        T.String s v  | S.Bytes _ <- dTy  -> T.Bytes   s (Text.encodeUtf8 v)
+        T.Bytes s v   | S.String _ <- dTy -> T.String  s (Text.decodeUtf8 v)
         _                              -> T.Error $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
 -- The writer's symbol must be present in the reader's enum
