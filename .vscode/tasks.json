@@ -5,7 +5,7 @@
       "label": "Build",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-build && echo 'Done'"],
+      "args": ["-lc", "./project.sh build && echo 'Done'"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -37,7 +37,7 @@
       "label": "Test",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "cabal new-test --enable-tests --enable-benchmarks --test-show-details=direct && echo 'Done'"],
+      "args": ["-lc", "./project.sh test && echo 'Done'"],
       "group": {
         "kind": "test",
         "isDefault": true

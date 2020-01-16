@@ -1,10 +1,10 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE TupleSections       #-}
 
 module Data.Avro.Decode.Lazy
@@ -30,47 +30,45 @@ module Data.Avro.Decode.Lazy
   , badValue
   ) where
 
-import           Control.Monad              (foldM, replicateM, when)
-import qualified Data.Aeson                 as A
-import qualified Data.Array                 as Array
-import           Data.Binary.Get            (Get, runGetOrFail)
-import qualified Data.Binary.Get            as G
-import           Data.Binary.IEEE754        as IEEE
-import           Data.Bits
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString.Lazy       as BL
-import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Either                (isRight)
-import qualified Data.HashMap.Strict        as HashMap
-import           Data.Int
-import           Data.List                  (foldl', unfoldr)
-import qualified Data.List.NonEmpty         as NE
-import qualified Data.Map                   as Map
-import           Data.Maybe
-import           Data.Monoid                ((<>))
-import qualified Data.Set                   as Set
-import           Data.Tagged                (Tagged, untag)
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import qualified Data.Text.Encoding         as Text
-import qualified Data.Vector                as V
-import           Prelude                    as P
-
-import           Data.Avro.Codec                 (Decompress)
-import qualified Data.Avro.Decode.Lazy.LazyValue as T
-import           Data.Avro.DecodeRaw
-import           Data.Avro.HasAvroSchema         (schema)
-import           Data.Avro.Schema                as S
-import qualified Data.Avro.Types                 as TypesStrict
-import           Data.Avro.Zag
-
-import qualified Data.Avro.Decode.Strict.Internal as DecodeStrict
-
+import Control.Monad                      (foldM, replicateM, when)
+import Data.Avro.Codec                    (Decompress)
 import Data.Avro.Decode.Get
 import Data.Avro.Decode.Lazy.Convert      (toStrictValue)
 import Data.Avro.Decode.Lazy.Deconflict   as C
 import Data.Avro.Decode.Lazy.FromLazyAvro
+import Data.Avro.DecodeRaw
 import Data.Avro.FromAvro
+import Data.Avro.HasAvroSchema            (schema)
+import Data.Avro.Schema                   as S
+import Data.Avro.Zag
+import Data.Binary.Get                    (Get, runGetOrFail)
+import Data.Binary.IEEE754                as IEEE
+import Data.Bits
+import Data.ByteString                    (ByteString)
+import Data.Either                        (isRight)
+import Data.Int
+import Data.List                          (foldl', unfoldr)
+import Data.Maybe
+import Data.Monoid                        ((<>))
+import Data.Tagged                        (Tagged, untag)
+import Data.Text                          (Text)
+import Prelude                            as P
+
+import qualified Data.Aeson                       as A
+import qualified Data.Array                       as Array
+import qualified Data.Avro.Decode.Lazy.LazyValue  as T
+import qualified Data.Avro.Decode.Strict.Internal as DecodeStrict
+import qualified Data.Avro.Types                  as TypesStrict
+import qualified Data.Binary.Get                  as G
+import qualified Data.ByteString.Lazy             as BL
+import qualified Data.ByteString.Lazy.Char8       as BL
+import qualified Data.HashMap.Strict              as HashMap
+import qualified Data.List.NonEmpty               as NE
+import qualified Data.Map                         as Map
+import qualified Data.Set                         as Set
+import qualified Data.Text                        as Text
+import qualified Data.Text.Encoding               as Text
+import qualified Data.Vector                      as V
 
 -- | Decodes the container as a lazy list of values of the requested type.
 --
