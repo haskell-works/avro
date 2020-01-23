@@ -25,8 +25,8 @@ workflows:
           cabal-test-extra: --test-show-details=direct
 
       - haskell/build-with-binary-cache:
-          name: GHC 8.8.1
-          executor: haskell/ghc-8_8_1
+          name: GHC 8.8.2
+          executor: haskell/ghc-8_8_2
           context: haskell-ci
           binary-cache-uri: ${BINARY_CACHE_URI-"http://hw-binary-cache-us-west-2-a.s3-website-us-west-2.amazonaws.com/archive"}
           cabal-build-extra: --write-ghc-environment-files=ghc8.4.4+
@@ -39,7 +39,7 @@ workflows:
           requires:
             - GHC 8.4.4
             - GHC 8.6.5
-            - GHC 8.8.1
+            - GHC 8.8.2
           filters:
             branches:
               only: master
