@@ -33,15 +33,16 @@ module Data.Avro.Deriving
 )
 where
 
-import           Control.Monad      (join)
-import           Data.Aeson         (eitherDecode)
-import qualified Data.Aeson         as J
-import           Data.Avro          hiding (decode, encode)
-import           Data.Avro.Schema   as S
-import qualified Data.Avro.Types    as AT
-import           Data.ByteString    (ByteString)
-import qualified Data.ByteString    as B
-import           Data.Char          (isAlphaNum)
+import           Control.Monad          (join)
+import           Control.Monad.Identity (Identity)
+import           Data.Aeson             (eitherDecode)
+import qualified Data.Aeson             as J
+import           Data.Avro              hiding (decode, encode)
+import           Data.Avro.Schema       as S
+import qualified Data.Avro.Types        as AT
+import           Data.ByteString        (ByteString)
+import qualified Data.ByteString        as B
+import           Data.Char              (isAlphaNum)
 import           Data.Int
 import           Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
@@ -515,14 +516,17 @@ mkFieldTypeName namespaceBehavior = \case
   t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior
         union = \case
+          []              ->
+            error "Empty union types are not supported"
+          [x]             -> [t| Identity $(go x) |]
           [Null, x]       -> [t| Maybe $(go x) |]
           [x, Null]       -> [t| Maybe $(go x) |]
           [x, y]          -> [t| Either $(go x) $(go y) |]
           [a, b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
           [a, b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
           [a, b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
-          _               ->
-            error "Unions with more than 5 elements are not yet supported"
+          ls              ->
+            error $ "Unions with more than 5 elements are not yet supported: Union has " <> (show . length) ls <> " elements"
 
 updateFirst :: (Text -> Text) -> Text -> Text
 updateFirst f t =

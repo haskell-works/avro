@@ -6,6 +6,7 @@ module Data.Avro.Decode.Lazy.FromLazyAvro
 
 where
 
+import           Control.Monad.Identity          (Identity(..))
 import           Control.Arrow                   (first)
 import           Data.Avro.Decode.Lazy.LazyValue as T
 import qualified Data.Avro.Encode                as E
@@ -43,6 +44,13 @@ class HasAvroSchema a => FromLazyAvro a where
   case HashMap.lookup key obj of
     Nothing -> fail $ "Requested field not available: " <> show key
     Just v  -> fromLazyAvro v
+
+instance (FromLazyAvro a) => FromLazyAvro (Identity a) where
+  fromLazyAvro e@(T.Union _ branch x)
+    | S.matches branch sch = Identity  <$> fromLazyAvro x
+    | otherwise            = badValue e "Identity"
+    where Tagged sch = schema :: Tagged a Schema
+  fromLazyAvro x = badValue x "Identity"
 
 instance (FromLazyAvro a, FromLazyAvro b) => FromLazyAvro (Either a b) where
   fromLazyAvro e@(T.Union _ branch x)

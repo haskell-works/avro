@@ -6,9 +6,10 @@ module Avro.JSONSpec where
 
 import Control.Monad (forM_)
 
-import qualified Data.Aeson           as Aeson
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.Map             as Map
+import           Control.Monad.Identity (Identity (..))
+import qualified Data.Aeson             as Aeson
+import qualified Data.ByteString.Lazy   as LBS
+import qualified Data.Map               as Map
 
 import Data.Avro.Deriving
 import Data.Avro.EitherN
@@ -75,6 +76,7 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
         , unionsRecords     = Left $ Foo { fooStuff = "stuff" }
         , unionsSameFields  = Left $ Foo { fooStuff = "foo stuff" }
         , unionsArrayAndMap = Left ["foo"]
+        , unionsOne         = Identity 42
         , unionsThree       = E3_1 37
         , unionsFour        = E4_2 "foo"
         , unionsFive        = E5_4 $ Foo { fooStuff = "foo stuff" }
@@ -87,6 +89,7 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
                                           }
         , unionsSameFields  = Right $ NotFoo { notFooStuff = "not foo stuff" }
         , unionsArrayAndMap = Right $ Map.fromList [("a", 5)]
+        , unionsOne         = Identity 42
         , unionsThree       = E3_3 37
         , unionsFour        = E4_4 $ Foo { fooStuff = "foo stuff" }
         , unionsFive        = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }

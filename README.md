@@ -26,6 +26,7 @@ This library provides the following conversions between Haskell types and Avro t
 | ByteString        | "bytes"                         |
 | Maybe a           | ["null", "a"]                   |
 | Either a b        | ["a", "b"]                      |
+| Identity a        | ["a"]                           |
 | Map Text a        | {"type": "map", "value": "a"}   |
 | Map String a      | {"type": "map", "value": "a"}   |
 | HashMap Text a    | {"type": "map", "value": "a"}   |

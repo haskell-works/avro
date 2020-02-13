@@ -16,6 +16,7 @@
   "arrayAndMap" : {
     "array" : ["foo"]
   },
+  "one": { "int": 42 },
   "three": { "int": 37 },
   "four": { "string": "foo" },
   "five": {
