@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Data.Avro.Types.Time where
 
 -- Utility functions to work with times
@@ -5,7 +6,11 @@ module Data.Avro.Types.Time where
 import Data.Maybe (fromJust)
 import Data.Time
 import Data.Time.Clock
+#if MIN_VERSION_time(1,9,0)
+import Data.Time.Format.Internal
+#else
 import Data.Time.Format
+#endif
 
 epochDate :: Day
 epochDate = fromJust $ buildTime defaultTimeLocale []
