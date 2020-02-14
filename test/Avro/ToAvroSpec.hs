@@ -33,10 +33,10 @@ tmSchema :: Schema
 tmSchema =
   let fld nm = Field nm [] Nothing Nothing
    in Record "avro.haskell.test.TypesTestMessage" [] Nothing Nothing
-        [ fld "id" Long Nothing
-        , fld "name" String Nothing
-        , fld "timestamp" (mkUnion (Null :| [Long])) Nothing
-        , fld "foreignId" (mkUnion (Null :| [Long])) Nothing
+        [ fld "id" Long' Nothing
+        , fld "name" String' Nothing
+        , fld "timestamp" (mkUnion (Null :| [Long'])) Nothing
+        , fld "foreignId" (mkUnion (Null :| [Long'])) Nothing
         , fld "competence" (mkUnion (Null :| [Double])) Nothing
         , fld "relevance" (mkUnion (Null :| [Float])) Nothing
         , fld "severity" Float Nothing
