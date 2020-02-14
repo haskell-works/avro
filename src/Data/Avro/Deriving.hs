@@ -49,6 +49,8 @@ import           Data.Map           (Map)
 import           Data.Maybe         (fromMaybe)
 import           Data.Semigroup     ((<>))
 import qualified Data.Text          as Text
+import           Data.Time          (Day, DiffTime)
+import           Data.UUID          (UUID)
 
 import GHC.Generics (Generic)
 
@@ -175,8 +177,8 @@ mkStrictPrimitiveField _ field =
       case S.fldType field of
         S.Null    -> True
         S.Boolean -> True
-        S.Int     -> True
-        S.Long    -> True
+        S.Int _   -> True
+        S.Long _  -> True
         S.Float   -> True
         S.Double  -> True
         _         -> False
@@ -346,7 +348,7 @@ genFromAvro namespaceBehavior (S.Record n _ _ _ fs) =
            $(genFromAvroFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
         fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
-genFromAvro namespaceBehavior (S.Fixed n _ s) =
+genFromAvro namespaceBehavior (S.Fixed n _ s _) =
   [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AT.Fixed _ v)
           | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
@@ -377,7 +379,7 @@ genFromLazyAvro namespaceBehavior (S.Record n _ _ _ fs) =
            $(genFromLazyAvroFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
         fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
-genFromLazyAvro namespaceBehavior (S.Fixed n _ s) =
+genFromLazyAvro namespaceBehavior (S.Fixed n _ s _) =
   [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromLazyAvro (LV.Fixed _ v)
           | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
@@ -448,7 +450,7 @@ genToAvro opts s@(S.Record n _ _ _ fs) =
                 )
             |]
 
-genToAvro opts s@(S.Fixed n _ size) =
+genToAvro opts s@(S.Fixed n _ size _) =
   toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     toAvroInstance sname =
@@ -483,7 +485,7 @@ genType opts (S.Record n _ _ _ fs) = do
 genType opts (S.Enum n _ _ vs) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> (V.toList vs))]
-genType opts (S.Fixed n _ s) = do
+genType opts (S.Fixed n _ s _) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genNewtype dname]
 genType _ _ = pure []
@@ -491,18 +493,24 @@ genType _ _ = pure []
 mkFieldTypeName :: NamespaceBehavior -> S.Schema -> Q TH.Type
 mkFieldTypeName namespaceBehavior = \case
   S.Boolean          -> [t| Bool |]
-  S.Long             -> [t| Int64 |]
-  S.Int              -> [t| Int32 |]
+  S.Long (Just (DecimalL (Decimal p s)))
+                     -> [t| Decimal $(litT $ numTyLit p) $(litT $ numTyLit s) |]
+  S.Long (Just TimeMicros)
+                     -> [t| DiffTime |]
+  S.Long _           -> [t| Int64 |]
+  S.Int (Just Date)  -> [t| Day |]
+  S.Int _            -> [t| Int32 |]
   S.Float            -> [t| Float |]
   S.Double           -> [t| Double |]
-  S.Bytes            -> [t| ByteString |]
-  S.String           -> [t| Text |]
+  S.Bytes _          -> [t| ByteString |]
+  S.String Nothing   -> [t| Text |]
+  S.String (Just UUID) -> [t| UUID |]
   S.Union branches   -> union (V.toList branches)
   S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
   S.Map x            -> [t| Map Text $(go x) |]
   S.Array x          -> [t| [$(go x)] |]
   S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Fixed n _ _      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
+  S.Fixed n _ _ _    -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   S.Enum n _ _ _     -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior

@@ -78,15 +78,15 @@ deconflictValue writerSchema readerSchema v
         withSchemaIn tyVal xs $ \sch -> deconflictValue sch nonUnion val
     go eTy dTy val =
       case val of
-        T.Int i32  | dTy == S.Long   -> T.Long   (fromIntegral i32)
-                   | dTy == S.Float  -> T.Float  (fromIntegral i32)
-                   | dTy == S.Double -> T.Double (fromIntegral i32)
-        T.Long i64 | dTy == S.Float  -> T.Float (fromIntegral i64)
-                   | dTy == S.Double -> T.Double (fromIntegral i64)
-        T.Float f  | dTy == S.Double -> T.Double (realToFrac f)
-        T.String s | dTy == S.Bytes  -> T.Bytes (Text.encodeUtf8 s)
-        T.Bytes bs | dTy == S.String -> T.String (Text.decodeUtf8 bs)
-        _                            -> T.Error $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
+        T.Int i32  | S.Long _ <- dTy   -> T.Long   (fromIntegral i32)
+                   | dTy == S.Float    -> T.Float  (fromIntegral i32)
+                   | dTy == S.Double   -> T.Double (fromIntegral i32)
+        T.Long i64 | dTy == S.Float    -> T.Float (fromIntegral i64)
+                   | dTy == S.Double   -> T.Double (fromIntegral i64)
+        T.Float f  | dTy == S.Double   -> T.Double (realToFrac f)
+        T.String s | S.Bytes _ <- dTy  -> T.Bytes (Text.encodeUtf8 s)
+        T.Bytes bs | S.String _ <- dTy -> T.String (Text.decodeUtf8 bs)
+        _                              -> T.Error $ "Can not resolve differing writer and reader schemas: " ++ show (eTy, dTy)
 
 -- The writer's symbol must be present in the reader's enum
 deconflictEnum :: Schema -> Schema -> T.LazyValue Schema -> T.LazyValue Schema

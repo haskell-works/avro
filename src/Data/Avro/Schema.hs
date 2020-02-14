@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
@@ -20,9 +21,13 @@
 module Data.Avro.Schema
   (
    -- * Schema description types
-    Schema(..), Type
+    Schema(.., Int', Long', Bytes', String'), Type
   , Field(..), Order(..)
   , TypeName(..)
+  , Decimal(..)
+  , LogicalTypeBytes(..), LogicalTypeFixed(..)
+  , LogicalTypeInt(..), LogicalTypeLong(..)
+  , LogicalTypeString(..)
   , renderFullname
   , parseFullname
   , mkEnum, mkUnion
@@ -94,11 +99,13 @@ data Schema
       -- Basic types
         Null
       | Boolean
-      | Int   | Long
+      | Int    { logicalTypeI :: Maybe LogicalTypeInt }
+      | Long   { logicalTypeL :: Maybe LogicalTypeLong }
       | Float | Double
-      | Bytes | String
-      | Array { item :: Schema }
-      | Map   { values :: Schema }
+      | Bytes  { logicalTypeB :: Maybe LogicalTypeBytes }
+      | String { logicalTypeS :: Maybe LogicalTypeString }
+      | Array  { item :: Schema }
+      | Map    { values :: Schema }
       | NamedType TypeName
       -- Declared types
       | Record { name    :: TypeName
@@ -114,21 +121,51 @@ data Schema
              }
       | Union { options     :: V.Vector Schema
               }
-      | Fixed { name    :: TypeName
-              , aliases :: [TypeName]
-              , size    :: Int
+      | Fixed { name         :: TypeName
+              , aliases      :: [TypeName]
+              , size         :: Int
+              , logicalTypeF :: Maybe LogicalTypeFixed
               }
     deriving (Show, Generic, NFData)
+
+pattern Int'    = Int    Nothing
+pattern Long'   = Long   Nothing
+pattern Bytes'  = Bytes  Nothing
+pattern String' = String Nothing
+
+data Decimal
+  = Decimal { precision :: Integer, scale :: Integer }
+  deriving (Eq, Show, Generic, NFData)
+
+newtype LogicalTypeBytes
+  = DecimalB Decimal
+  deriving (Eq, Show, Generic, NFData)
+
+data LogicalTypeFixed
+  = DecimalF Decimal | Duration
+  deriving (Eq, Show, Generic, NFData)
+
+data LogicalTypeInt
+  = DecimalI Decimal | Date | TimeMillis
+  deriving (Eq, Show, Generic, NFData)
+
+data LogicalTypeLong
+  = DecimalL Decimal | TimeMicros | TimestampMillis | TimestampMicros
+  deriving (Eq, Show, Generic, NFData)
+
+data LogicalTypeString
+  = UUID
+  deriving (Eq, Show, Generic, NFData)
 
 instance Eq Schema where
   Null == Null = True
   Boolean == Boolean = True
-  Int == Int = True
-  Long == Long = True
+  Int lt1 == Int lt2 = lt1 == lt2
+  Long lt1 == Long lt2 = lt1 == lt2
   Float == Float = True
   Double == Double = True
-  Bytes == Bytes = True
-  String == String = True
+  Bytes lt1 == Bytes lt2 = lt1 == lt2
+  String lt1 == String lt2 = lt1 == lt2
 
   Array ty == Array ty2 = ty == ty2
   Map ty == Map ty2 = ty == ty2
@@ -139,8 +176,8 @@ instance Eq Schema where
   Enum name1 _ _ s == Enum name2 _ _ s2 =
     and [name1 == name2, s == s2]
   Union a == Union b = a == b
-  Fixed name1 _ s == Fixed name2 _ s2 =
-    and [name1 == name2, s == s2]
+  Fixed name1 _ s lt1 == Fixed name2 _ s2 lt2 =
+    and [name1 == name2, s == s2, lt1 == lt2]
 
   _ == _ = False
 
@@ -275,19 +312,42 @@ instance Hashable TypeName where
 typeName :: Schema -> Text
 typeName bt =
   case bt of
-    Null           -> "null"
-    Boolean        -> "boolean"
-    Int            -> "int"
-    Long           -> "long"
-    Float          -> "float"
-    Double         -> "double"
-    Bytes          -> "bytes"
-    String         -> "string"
-    Array _        -> "array"
-    Map   _        -> "map"
-    NamedType name -> renderFullname name
-    Union ts       -> typeName (V.head ts)
-    _              -> renderFullname $ name bt
+    Null            -> "null"
+    Boolean         -> "boolean"
+    Int Nothing     -> "int"
+    Int (Just (DecimalI d))
+                    -> decimalName d
+    Int (Just Date) -> "date"
+    Int (Just TimeMillis)
+                    -> "time-millis"
+    Long Nothing    -> "long"
+    Long (Just (DecimalL d))
+                    -> decimalName d
+    Long (Just TimeMicros)
+                    -> "time-micros"
+    Long (Just TimestampMillis)
+                    -> "timestamp-millis"
+    Long (Just TimestampMicros)
+                    -> "timestamp-micros"
+    Float           -> "float"
+    Double          -> "double"
+    Bytes Nothing   -> "bytes"
+    Bytes (Just (DecimalB d))
+                    -> decimalName d
+    String Nothing  -> "string"
+    String (Just UUID)
+                    -> "uuid"
+    Array _         -> "array"
+    Map   _         -> "map"
+    NamedType name  -> renderFullname name
+    Union ts        -> typeName (V.head ts)
+    Fixed _ _ _ (Just (DecimalF d))
+                    -> decimalName d
+    Fixed _ _ _ (Just Duration)
+                    -> "duration"
+    _               -> renderFullname $ name bt
+  where
+    decimalName (Decimal prec sc) = "decimal(" <> T.pack (show prec) <> "," <> T.pack (show sc) <> ")"
 
 data Field = Field { fldName    :: Text
                    , fldAliases :: [Text]
@@ -318,12 +378,18 @@ parseSchemaJSON context = \case
   A.String s -> case s of
     "null"    -> return Null
     "boolean" -> return Boolean
-    "int"     -> return Int
-    "long"    -> return Long
+    "int"     -> return $ Int Nothing
+    "long"    -> return $ Long Nothing
     "float"   -> return Float
     "double"  -> return Double
-    "bytes"   -> return Bytes
-    "string"  -> return String
+    "bytes"   -> return $ Bytes Nothing
+    "string"  -> return $ String Nothing
+    "uuid"    -> return $ String (Just UUID)
+    "date"    -> return $ Int (Just Date)
+    "time-millis" -> return $ Int (Just TimeMillis)
+    "time-micros" -> return $ Long (Just TimeMicros)
+    "timestamp-millis" -> return $ Long (Just TimestampMillis)
+    "timestamp-micros" -> return $ Long (Just TimestampMicros)
     somename  -> return $ NamedType $ mkTypeName context somename Nothing
   A.Array arr
     | V.length arr > 0 ->
@@ -334,6 +400,37 @@ parseSchemaJSON context = \case
     ty                        <- o .: "type"
 
     case logicalType of
+      Just "decimal" -> do
+        prec <- o .: "precision"
+        sc   <- fromMaybe 0 <$> o .:? "scale"
+        let dec = Decimal prec sc
+        case ty of
+          "bytes" -> pure $ Bytes (Just (DecimalB dec))
+          "fixed" -> (\fx -> fx { logicalTypeF = Just (DecimalF dec) }) <$> parseFixed o
+          "int"   -> pure $ Int (Just (DecimalI dec))
+          "long"  -> pure $ Long (Just (DecimalL dec))
+          s       -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "uuid" -> case ty of
+          "string" -> pure $ String (Just UUID)
+          s        -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "date" -> case ty of
+          "int" -> pure $ Int (Just Date)
+          s     -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "time-millis" -> case ty of
+          "int" -> pure $ Int (Just TimeMillis)
+          s     -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "time-micros" -> case ty of
+          "long" -> pure $ Long (Just TimeMicros)
+          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "timestamp-millis" -> case ty of
+          "long" -> pure $ Long (Just TimestampMillis)
+          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "timestamp-micros" -> case ty of
+          "long" -> pure $ Long (Just TimestampMicros)
+          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "duration" -> case ty of
+          "fixed" -> (\fx -> fx { logicalTypeF = Just Duration }) <$> parseFixed o
+          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
       Just _  -> parseJSON (A.String ty)
       Nothing -> case ty of
         "map"    -> Map <$> (parseSchemaJSON context =<< o .: "values")
@@ -357,25 +454,28 @@ parseSchemaJSON context = \case
           doc     <- o .:? "doc"
           symbols <- o .: "symbols"
           pure $ mkEnum typeName aliases doc symbols
-        "fixed"  -> do
-          name      <- o .: "name"
-          namespace <- o .:? "namespace"
-          let typeName = mkTypeName context name namespace
-              mkAlias name = mkTypeName (Just typeName) name Nothing
-          aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-          size    <- o .: "size"
-          pure $ Fixed typeName aliases size
+        "fixed"   -> parseFixed o
         "null"    -> pure Null
         "boolean" -> pure Boolean
-        "int"     -> pure Int
-        "long"    -> pure Long
+        "int"     -> pure $ Int Nothing
+        "long"    -> pure $ Long Nothing
         "float"   -> pure Float
         "double"  -> pure Double
-        "bytes"   -> pure Bytes
-        "string"  -> pure String
+        "bytes"   -> pure $ Bytes Nothing
+        "string"  -> pure $ String Nothing
         s        -> fail $ "Unrecognized object type: " <> T.unpack s
 
   invalid    -> typeMismatch "Invalid JSON for Avro Schema" invalid
+
+  where
+    parseFixed o = do
+      name      <- o .: "name"
+      namespace <- o .:? "namespace"
+      let typeName = mkTypeName context name namespace
+          mkAlias name = mkTypeName (Just typeName) name Nothing
+      aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
+      size    <- o .: "size"
+      pure $ Fixed typeName aliases size Nothing
 
 -- | Parse aliases, inferring the namespace based on the type being aliases.
 mkAliases :: TypeName
@@ -428,20 +528,41 @@ schemaToJSON :: Maybe TypeName
                 -- ^ The schema to serialize to JSON.
              -> A.Value
 schemaToJSON context = \case
-  Null           -> A.String "null"
-  Boolean        -> A.String "boolean"
-  Int            -> A.String "int"
-  Long           -> A.String "long"
-  Float          -> A.String "float"
-  Double         -> A.String "double"
-  Bytes          -> A.String "bytes"
-  String         -> A.String "string"
-  Array tn       ->
+  Null            -> A.String "null"
+  Boolean         -> A.String "boolean"
+  Int Nothing     -> A.String "int"
+  Int (Just (DecimalI (Decimal prec sc))) ->
+    object [ "type" .= ("int" :: Text), "logicalType" .= ("decimal" :: Text)
+           , "precision" .= prec, "scale" .= sc ]
+  Int (Just Date) ->
+    object [ "type" .= ("int" :: Text), "logicalType" .= ("date" :: Text) ]
+  Int (Just TimeMillis) ->
+    object [ "type" .= ("int" :: Text), "logicalType" .= ("time-millis" :: Text) ]
+  Long Nothing    -> A.String "long"
+  Long (Just (DecimalL (Decimal prec sc))) ->
+    object [ "type" .= ("long" :: Text), "logicalType" .= ("decimal" :: Text)
+           , "precision" .= prec, "scale" .= sc ]
+  Long (Just TimeMicros) ->
+    object [ "type" .= ("long" :: Text), "logicalType" .= ("time-micros" :: Text) ]
+  Long (Just TimestampMillis) ->
+    object [ "type" .= ("long" :: Text), "logicalType" .= ("timestamp-millis" :: Text) ]
+  Long (Just TimestampMicros) ->
+    object [ "type" .= ("long" :: Text), "logicalType" .= ("timestamp-micros" :: Text) ]
+  Float           -> A.String "float"
+  Double          -> A.String "double"
+  Bytes Nothing   -> A.String "bytes"
+  Bytes (Just (DecimalB (Decimal prec sc))) ->
+    object [ "type" .= ("bytes" :: Text), "logicalType" .= ("decimal" :: Text)
+           , "precision" .= prec, "scale" .= sc ]
+  String Nothing  -> A.String "string"
+  String (Just UUID) -> 
+    object [ "type" .= ("string" :: Text), "logicalType" .= ("uuid" :: Text) ]
+  Array tn        ->
     object [ "type" .= ("array" :: Text), "items" .= schemaToJSON context tn ]
-  Map tn         ->
+  Map tn          ->
     object [ "type" .= ("map" :: Text), "values" .= schemaToJSON context tn ]
-  NamedType name -> toJSON $ render context name
-  Record {..}    ->
+  NamedType name  -> toJSON $ render context name
+  Record {..}     ->
     let opts = catMaybes
           [ ("order" .=) <$> order
           , ("doc" .=)   <$> doc
@@ -462,11 +583,19 @@ schemaToJSON context = \case
        ]
   Union  {..} -> toJSON $ schemaToJSON context <$> options
   Fixed  {..} ->
-    object [ "type"    .= ("fixed" :: Text)
+    let basic = 
+           [ "type"    .= ("fixed" :: Text)
            , "name"    .= render context name
            , "aliases" .= (render (Just name) <$> aliases)
            , "size"    .= size
            ]
+        extended = case logicalTypeF of
+          Nothing       -> []
+          Just Duration -> [ "logicalType" .= ("duration" :: Text) ]
+          Just (DecimalF (Decimal prec sc))
+                   -> [ "logicalType" .= ("decimal" :: Text)
+                      , "precision" .= prec, "scale" .= sc ]
+    in object (basic ++ extended)
   where render context typeName
           | Just ctx <- context
           , namespace ctx == namespace typeName = baseName typeName
@@ -593,12 +722,12 @@ parseAvroJSON union env ty av                  =
     case av of
       A.String s      ->
         case ty of
-          String      -> return $ Ty.String s
+          String _    -> return $ Ty.String s
           Enum {..}   ->
               case s `V.elemIndex` symbols of
                 Just i  -> pure $ Ty.Enum ty i s
                 Nothing -> fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
-          Bytes       -> Ty.Bytes <$> parseBytes s
+          Bytes _     -> Ty.Bytes <$> parseBytes s
           Fixed {..}  -> do
             bytes <- parseBytes s
             let len = B.length bytes
@@ -610,8 +739,8 @@ parseAvroJSON union env ty av                  =
                           _       -> avroTypeMismatch ty "boolean"
       A.Number i     ->
         case ty of
-          Int    -> return $ Ty.Int    (floor i)
-          Long   -> return $ Ty.Long   (floor i)
+          Int _  -> return $ Ty.Int    (floor i)
+          Long _ -> return $ Ty.Long   (floor i)
           Float  -> return $ Ty.Float  (realToFrac i)
           Double -> return $ Ty.Double (realToFrac i)
           _      -> avroTypeMismatch ty "number"

@@ -55,6 +55,7 @@ common array                    { build-depends: array                          
 common avro                     { build-depends: avro                                               }
 common base16-bytestring        { build-depends: base16-bytestring                                  }
 common bifunctors               { build-depends: bifunctors                                         }
+common big-decimal              { build-depends: HasBigDecimal                                      }
 common binary                   { build-depends: binary                                             }
 common bytestring               { build-depends: bytestring                                         }
 common containers               { build-depends: containers                                         }
@@ -78,9 +79,11 @@ common scientific               { build-depends: scientific                     
 common semigroups               { build-depends: semigroups                                         }
 common tagged                   { build-depends: tagged                                             }
 common text                     { build-depends: text                     >= 1.2.3      && < 1.3    }
+common time                     { build-depends: time                                               }
 common tf-random                { build-depends: tf-random                                          }
 common transformers             { build-depends: transformers                                       }
 common unordered-containers     { build-depends: unordered-containers                               }
+common uuid                     { build-depends: uuid                                               }
 common vector                   { build-depends: vector                                             }
 common zlib                     { build-depends: zlib                                               }
 
@@ -98,6 +101,7 @@ library
                       , array
                       , base16-bytestring
                       , bifunctors
+                      , big-decimal
                       , binary
                       , bytestring
                       , containers
@@ -111,8 +115,10 @@ library
                       , semigroups
                       , tagged
                       , text
+                      , time
                       , tf-random
                       , unordered-containers
+                      , uuid
                       , vector
                       , zlib
   exposed-modules:      Data.Avro
@@ -140,9 +146,11 @@ library
                         Data.Avro.Schema
                         Data.Avro.ToAvro
                         Data.Avro.Types
+                        Data.Avro.Types.Decimal
                         Data.Avro.Types.Value
                         Data.Avro.Zag
                         Data.Avro.Zig
+  other-modules:        Data.Avro.Types.Time
   hs-source-dirs:       src
   other-extensions:     OverloadedStrings
 
@@ -153,6 +161,7 @@ test-suite test
                       , avro
                       , base16-bytestring
                       , bifunctors
+                      , big-decimal
                       , binary
                       , bytestring
                       , containers
@@ -172,8 +181,10 @@ test-suite test
                       , tagged
                       , text
                       , tf-random
+                      , time
                       , transformers
                       , unordered-containers
+                      , uuid
                       , vector
   type:                 exitcode-stdio-1.0
   ghc-options:          -threaded

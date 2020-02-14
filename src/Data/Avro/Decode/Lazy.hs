@@ -294,16 +294,16 @@ getAvroOf ty0 bs = go ty0 bs
   go :: Schema -> BL.ByteString -> (BL.ByteString, T.LazyValue Schema)
   go ty bs =
     case ty of
-      Null    -> (bs, T.Null)
-      Boolean -> decodeGet T.Boolean  bs
-      Int     -> decodeGet T.Int      bs
-      Long    -> decodeGet T.Long     bs
-      Float   -> decodeGet T.Float    bs
-      Double  -> decodeGet T.Double   bs
-      Bytes   -> decodeGet T.Bytes    bs
-      String  -> decodeGet T.String   bs
-      Array t -> T.Array . V.fromList . mconcat <$> getElements bs (go t)
-      Map t   -> T.Map . HashMap.fromList . mconcat <$> getKVPairs bs (go t)
+      Null     -> (bs, T.Null)
+      Boolean  -> decodeGet T.Boolean  bs
+      Int _    -> decodeGet T.Int      bs
+      Long _   -> decodeGet T.Long     bs
+      Float    -> decodeGet T.Float    bs
+      Double   -> decodeGet T.Double   bs
+      Bytes _  -> decodeGet T.Bytes    bs
+      String _ -> decodeGet T.String   bs
+      Array t  -> T.Array . V.fromList . mconcat <$> getElements bs (go t)
+      Map t    -> T.Map . HashMap.fromList . mconcat <$> getKVPairs bs (go t)
       NamedType tn ->
         case runGetOrFail (env tn) bs of
           Left (bs', _, err) -> (bs', T.Error err)

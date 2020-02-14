@@ -34,4 +34,10 @@ deriving instance Lift f => Lift (Avro.Value f)
 deriving instance Lift Schema.Field
 deriving instance Lift Schema.Order
 deriving instance Lift Schema.TypeName
+deriving instance Lift Schema.Decimal
+deriving instance Lift Schema.LogicalTypeBytes
+deriving instance Lift Schema.LogicalTypeFixed
+deriving instance Lift Schema.LogicalTypeInt
+deriving instance Lift Schema.LogicalTypeLong
+deriving instance Lift Schema.LogicalTypeString
 deriving instance Lift Schema.Schema
