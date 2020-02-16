@@ -9,6 +9,8 @@ import           Control.Arrow           (first)
 import           Data.Avro.HasAvroSchema
 import           Data.Avro.Schema        as S
 import           Data.Avro.Types         as T
+import           Data.Avro.Types.Decimal as D
+import           Data.Avro.Types.Time
 import qualified Data.ByteString         as B
 import           Data.ByteString.Lazy    (ByteString)
 import qualified Data.ByteString.Lazy    as BL
@@ -16,13 +18,17 @@ import qualified Data.HashMap.Strict     as HashMap
 import           Data.Int
 import           Data.List.NonEmpty      (NonEmpty (..))
 import qualified Data.Map                as Map
+import           Data.Maybe              (fromJust)
 import           Data.Tagged
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as TL
+import qualified Data.Time               as Time
+import qualified Data.UUID               as UUID
 import qualified Data.Vector             as V
 import qualified Data.Vector.Unboxed     as U
 import           Data.Word
+import           GHC.TypeLits
 
 class HasAvroSchema a => ToAvro a where
   toAvro :: a -> T.Value Schema
@@ -62,6 +68,18 @@ instance ToAvro B.ByteString where
 
 instance ToAvro BL.ByteString where
   toAvro = T.Bytes . BL.toStrict
+
+instance (KnownNat p, KnownNat s) => ToAvro (D.Decimal p s) where
+  toAvro = T.Long . fromIntegral . fromJust . D.underlyingValue
+
+instance ToAvro UUID.UUID where
+  toAvro = T.String . UUID.toText
+
+instance ToAvro Time.Day where
+  toAvro = T.Long . fromIntegral . daysSinceEpoch
+
+instance ToAvro Time.DiffTime where
+  toAvro = T.Long . fromIntegral . diffTimeToMicros
 
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   toAvro e =

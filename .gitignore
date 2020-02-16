@@ -16,6 +16,7 @@ cabal.config
 .stack-work/
 .ghc.ennvironment*
 cabal.project.local
+stack.yaml.lock
 
 # Emacs files
 *~

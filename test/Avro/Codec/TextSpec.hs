@@ -22,7 +22,7 @@ onlyTextSchema :: Schema
 onlyTextSchema =
   let fld nm = Field nm [] Nothing Nothing
   in Record "test.contract.OnlyText" [] Nothing Nothing
-        [ fld "onlyTextValue" String Nothing
+        [ fld "onlyTextValue" String' Nothing
         ]
 
 instance HasAvroSchema OnlyText where

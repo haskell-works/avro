@@ -3,7 +3,6 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 module Data.Avro.Encode
   ( -- * High level interface
@@ -40,7 +39,7 @@ import           Data.Ix                    (Ix)
 import           Data.List                  as DL
 import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NE
-import           Data.Maybe                 (catMaybes, mapMaybe)
+import           Data.Maybe                 (catMaybes, mapMaybe, fromJust)
 import           Data.Monoid
 import           Data.Proxy
 import qualified Data.Set                   as S
@@ -49,9 +48,12 @@ import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
 import qualified Data.Text.Lazy             as TL
 import qualified Data.Text.Lazy.Encoding    as TL
+import qualified Data.Time                  as Time
+import qualified Data.UUID                  as UUID
 import qualified Data.Vector                as V
 import qualified Data.Vector.Unboxed        as U
 import           Data.Word
+import           GHC.TypeLits
 import           Prelude                    as P
 import           System.Random.TF.Init      (initTFGen)
 import           System.Random.TF.Instances (randoms)
@@ -61,6 +63,8 @@ import Data.Avro.EncodeRaw
 import Data.Avro.HasAvroSchema
 import Data.Avro.Schema        as S
 import Data.Avro.Types         as T
+import Data.Avro.Types.Decimal as D
+import Data.Avro.Types.Time
 import Data.Avro.Zag
 import Data.Avro.Zig
 
@@ -176,10 +180,10 @@ class EncodeAvro a where
   avro :: a -> AvroM
 
 avroInt :: forall a. (FiniteBits a, Integral a, EncodeRaw a) => a -> AvroM
-avroInt n = AvroM (encodeRaw n, S.Int)
+avroInt n = AvroM (encodeRaw n, S.Int Nothing)
 
 avroLong :: forall a. (FiniteBits a, Integral a, EncodeRaw a) => a -> AvroM
-avroLong n = AvroM (encodeRaw n, S.Long)
+avroLong n = AvroM (encodeRaw n, S.Long Nothing)
 
 -- Put a Haskell Int.
 putI :: Int -> Builder
@@ -206,17 +210,17 @@ instance EncodeAvro Word64 where
 instance EncodeAvro Text where
   avro t =
     let bs = T.encodeUtf8 t
-    in AvroM (encodeRaw (B.length bs) <> byteString bs, S.String)
+    in AvroM (encodeRaw (B.length bs) <> byteString bs, S.String')
 instance EncodeAvro TL.Text where
   avro t =
     let bs = TL.encodeUtf8 t
-    in AvroM (encodeRaw (BL.length bs) <> lazyByteString bs, S.String)
+    in AvroM (encodeRaw (BL.length bs) <> lazyByteString bs, S.String')
 
 instance EncodeAvro ByteString where
-  avro bs = AvroM (encodeRaw (BL.length bs) <> lazyByteString bs, S.Bytes)
+  avro bs = AvroM (encodeRaw (BL.length bs) <> lazyByteString bs, S.Bytes Nothing)
 
 instance EncodeAvro B.ByteString where
-  avro bs = AvroM (encodeRaw (B.length bs) <> byteString bs, S.Bytes)
+  avro bs = AvroM (encodeRaw (B.length bs) <> byteString bs, S.Bytes Nothing)
 
 instance EncodeAvro String where
   avro s = let t = T.pack s in avro t
@@ -226,6 +230,25 @@ instance EncodeAvro Double where
 
 instance EncodeAvro Float where
   avro d = AvroM (word32LE (IEEE.floatToWord d), S.Float)
+
+instance (KnownNat p, KnownNat s) => EncodeAvro (D.Decimal p s) where
+  avro d = AvroM (encodeRaw val, S.Long (Just (DecimalL (S.Decimal pp ss))))
+    where ss = natVal (Proxy :: Proxy s)
+          pp = natVal (Proxy :: Proxy p)
+          val :: Int = fromJust $ D.underlyingValue d
+
+instance EncodeAvro UUID.UUID where
+  avro d =
+    let bs = T.encodeUtf8 (UUID.toText d)
+    in AvroM (encodeRaw (B.length bs) <> byteString bs, S.String (Just UUID))
+
+instance EncodeAvro Time.Day where
+  avro d = AvroM ( encodeRaw (fromIntegral $ daysSinceEpoch d :: Int)
+                 , S.Int (Just Date) )
+
+instance EncodeAvro Time.DiffTime where
+  avro d = AvroM ( encodeRaw (fromIntegral $ diffTimeToMicros d :: Int)
+                 , S.Long (Just TimeMicros) )
 
 -- Terminating word for array and map types.
 long0 :: Builder
@@ -265,8 +288,8 @@ instance EncodeAvro a => EncodeAvro (HashMap Text a) where
 
 -- | Maybe is modeled as a sum type `{null, a}`.
 instance EncodeAvro a => EncodeAvro (Maybe a) where
-  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null:|[S.Int]))
-  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null:|[S.Int]))
+  avro Nothing  = AvroM (putI 0             , S.mkUnion (S.Null:|[S.Int']))
+  avro (Just x) = AvroM (putI 1 <> putAvro x, S.mkUnion (S.Null:|[S.Int']))
 
 instance EncodeAvro () where
   avro () = AvroM (mempty, S.Null)
@@ -301,7 +324,7 @@ instance EncodeAvro (T.Value Schema) where
       T.Enum sch@S.Enum{..} ix t -> AvroM (putI ix, sch)
       T.Fixed ty bs  ->
         if (B.length bs == size ty)
-          then AvroM (byteString bs, S.Bytes)
+          then AvroM (byteString bs, S.Bytes Nothing)
           else error $ "Fixed type "  <> show (name ty)
                       <> " has size " <> show (size ty)
                       <> " but the value has length " <> show (B.length bs)

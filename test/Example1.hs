@@ -23,11 +23,11 @@ msSchema  :: Schema
 msSchema =
   Record "MyStruct" [] Nothing Nothing
       [ fld "enumOrString" eOrS (Just $ Ty.String "The Default")
-      , fld "intvalue" Long Nothing
+      , fld "intvalue" Long' Nothing
       ]
      where
      fld nm ty def = Field nm [] Nothing Nothing ty def
-     eOrS = mkUnion (meSchema :| [String])
+     eOrS = mkUnion (meSchema :| [String'])
 
 -- Encoding data, via the ToAvro class, requires both the routine that encodes
 -- data as well as the schema under which it is encoded.  The encoding and

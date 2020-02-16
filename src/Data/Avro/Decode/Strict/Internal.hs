@@ -48,18 +48,18 @@ getAvroOf ty0 = go ty0
  go :: Schema -> Get (T.Value Schema)
  go ty =
   case ty of
-    Null    -> return T.Null
-    Boolean -> T.Boolean <$> getAvro
-    Int     -> T.Int     <$> getAvro
-    Long    -> T.Long    <$> getAvro
-    Float   -> T.Float   <$> getAvro
-    Double  -> T.Double  <$> getAvro
-    Bytes   -> T.Bytes   <$> getAvro
-    String  -> T.String  <$> getAvro
-    Array t ->
+    Null     -> return T.Null
+    Boolean  -> T.Boolean <$> getAvro
+    Int _    -> T.Int     <$> getAvro
+    Long _   -> T.Long    <$> getAvro
+    Float    -> T.Float   <$> getAvro
+    Double   -> T.Double  <$> getAvro
+    Bytes _  -> T.Bytes   <$> getAvro
+    String _ -> T.String  <$> getAvro
+    Array t  ->
       do vals <- getBlocksOf t
          return $ T.Array (V.fromList $ mconcat vals)
-    Map  t  ->
+    Map  t   ->
       do kvs <- getKVBlocks t
          return $ T.Map (HashMap.fromList $ mconcat kvs)
     NamedType tn -> env tn >>= go
