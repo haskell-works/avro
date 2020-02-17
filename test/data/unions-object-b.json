@@ -21,6 +21,7 @@
   "arrayAndMap" : {
     "map" : { "a" : 5 }
   },
+  "one": { "int": 42 },
   "three": { "long": 37 },
   "four": {
     "haskell.avro.example.Foo": { "stuff" : "foo stuff" }

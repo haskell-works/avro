@@ -8,6 +8,7 @@ module Data.Avro.FromAvro
 where
 
 import           Control.Arrow           (first)
+import           Control.Monad.Identity  (Identity(..))
 import qualified Data.Avro.Encode        as E
 import           Data.Avro.HasAvroSchema
 import           Data.Avro.Schema        as S
@@ -42,6 +43,13 @@ class HasAvroSchema a => FromAvro a where
   case HashMap.lookup key obj of
     Nothing -> fail $ "Requested field not available: " <> show key
     Just v  -> fromAvro v
+
+instance (FromAvro a) => FromAvro (Identity a) where
+  fromAvro e@(T.Union _ branch x)
+    | S.matches branch sch = Identity <$> fromAvro x
+    | otherwise            = badValue e "Identity"
+    where Tagged sch = schema :: Tagged a Schema
+  fromAvro x = badValue x "Identity"
 
 instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
   fromAvro e@(T.Union _ branch x)
@@ -146,4 +154,3 @@ instance (FromAvro a) => FromAvro (HashMap.HashMap Text a) where
   fromAvro (T.Record _ mp) = mapM fromAvro mp
   fromAvro (T.Map mp)      = mapM fromAvro mp
   fromAvro v               = badValue v "HashMap Text a"
-

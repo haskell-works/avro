@@ -5,6 +5,7 @@ module Data.Avro.ToAvro
 
 where
 
+import           Control.Monad.Identity  (Identity(..))
 import           Control.Arrow           (first)
 import           Data.Avro.HasAvroSchema
 import           Data.Avro.Schema        as S
@@ -80,6 +81,12 @@ instance ToAvro Time.Day where
 
 instance ToAvro Time.DiffTime where
   toAvro = T.Long . fromIntegral . diffTimeToMicros
+
+instance (ToAvro a) => ToAvro (Identity a) where
+  toAvro e@(Identity a) =
+    let sch = options (schemaOf e)
+    in
+      T.Union sch (schemaOf a) (toAvro a)
 
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   toAvro e =

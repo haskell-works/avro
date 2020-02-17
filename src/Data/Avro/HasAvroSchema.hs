@@ -3,21 +3,22 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 module Data.Avro.HasAvroSchema where
 
-import qualified Data.Array           as Ar
-import           Data.Avro.Schema     as S
-import           Data.Avro.Types      as T
+import           Control.Monad.Identity  (Identity)
+import qualified Data.Array              as Ar
+import           Data.Avro.Schema        as S
+import           Data.Avro.Types         as T
 import           Data.Avro.Types.Decimal as D
-import qualified Data.ByteString      as B
-import           Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.HashMap.Strict  as HashMap
+import qualified Data.ByteString         as B
+import           Data.ByteString.Lazy    (ByteString)
+import qualified Data.ByteString.Lazy    as BL
+import qualified Data.HashMap.Strict     as HashMap
 import           Data.Int
-import           Data.Ix              (Ix)
-import           Data.List.NonEmpty   (NonEmpty (..))
-import qualified Data.Map             as Map
-import           Data.Monoid          ((<>))
+import           Data.Ix                (Ix)
+import           Data.List.NonEmpty     (NonEmpty (..))
+import qualified Data.Map               as Map
+import           Data.Monoid            ((<>))
 import           Data.Proxy
-import qualified Data.Set             as S
+import qualified Data.Set               as S
 import           Data.Tagged
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
@@ -102,6 +103,9 @@ instance HasAvroSchema Time.DiffTime where
 
 instance HasAvroSchema Time.UTCTime where
   schema = Tagged $ S.Long (Just TimestampMicros)
+
+instance (HasAvroSchema a) => HasAvroSchema (Identity a) where
+  schema = Tagged $ S.Union $ V.fromListN 1 [untag (schema :: Tagged a Schema)]
 
 instance (HasAvroSchema a, HasAvroSchema b) => HasAvroSchema (Either a b) where
   schema = Tagged $ S.Union $ V.fromListN 2 [untag (schema :: Tagged a Schema), untag (schema :: Tagged b Schema)]

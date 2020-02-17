@@ -7,15 +7,17 @@ where
 
 import qualified Data.List.NonEmpty as NE
 
-import qualified Data.Aeson           as Aeson
+
+import           Control.Monad.Identity (Identity (..))
+import qualified Data.Aeson             as Aeson
 import           Data.Avro
 import           Data.Avro.Deriving
 import           Data.Avro.EitherN
-import qualified Data.Avro.Schema     as Schema
-import qualified Data.Avro.Types      as Avro
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.Map             as Map
-import qualified Data.Vector          as V
+import qualified Data.Avro.Schema       as Schema
+import qualified Data.Avro.Types        as Avro
+import qualified Data.ByteString.Lazy   as LBS
+import qualified Data.Map               as Map
+import qualified Data.Vector            as V
 
 import System.Directory (doesFileExist)
 
@@ -33,6 +35,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , unionsRecords     = Left $ Foo { fooStuff = "stuff" }
         , unionsSameFields  = Left $ Foo { fooStuff = "more stuff" }
         , unionsArrayAndMap = Left ["foo"]
+        , unionsOne         = Identity 42
         , unionsThree       = E3_1 37
         , unionsFour        = E4_2 "foo"
         , unionsFive        = E5_4 $ Foo { fooStuff = "foo stuff" }
@@ -45,6 +48,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
                                           }
         , unionsSameFields  = Right $ NotFoo { notFooStuff = "different from Foo" }
         , unionsArrayAndMap = Right $ Map.fromList [("a", 5)]
+        , unionsOne         = Identity 42
         , unionsThree       = E3_3 37
         , unionsFour        = E4_4 $ Foo { fooStuff = "foo stuff" }
         , unionsFive        = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
@@ -64,6 +68,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , field "sameFields"  (Schema.mkUnion (NE.fromList [foo, notFooSchema]))          Nothing
         , field "arrayAndMap" (Schema.mkUnion (NE.fromList [array, map]))                 Nothing
 
+        , field "one"   (Schema.mkUnion (NE.fromList [Schema.Int']))                                          Nothing
         , field "three" (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long']))              Nothing
         , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo]))         Nothing
         , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo])) Nothing
