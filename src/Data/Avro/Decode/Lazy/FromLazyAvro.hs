@@ -12,6 +12,8 @@ import           Data.Avro.Decode.Lazy.LazyValue as T
 import qualified Data.Avro.Encode                as E
 import           Data.Avro.HasAvroSchema
 import           Data.Avro.Schema                as S
+import           Data.Avro.Types.Decimal         as D
+import           Data.Avro.Types.Time
 import qualified Data.ByteString                 as B
 import           Data.ByteString.Lazy            (ByteString)
 import qualified Data.ByteString.Lazy            as BL
@@ -25,9 +27,12 @@ import           Data.Tagged
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Lazy                  as TL
+import qualified Data.Time                       as Time
+import qualified Data.UUID                       as UUID
 import qualified Data.Vector                     as V
 import qualified Data.Vector.Unboxed             as U
 import           Data.Word
+import           GHC.TypeLits
 
 -- |  'FromLazyAvro' is a clone of 'FromAvro' except that
 -- it works for lazy values ('LazyValue').
@@ -96,6 +101,28 @@ instance FromLazyAvro Double where
 instance FromLazyAvro Float where
   fromLazyAvro (T.Float f) = pure f
   fromLazyAvro v           = badValue v "Float"
+
+instance (KnownNat p, KnownNat s) => FromLazyAvro (D.Decimal p s) where
+  fromLazyAvro (T.Long n) = pure $ D.fromUnderlyingValue $ fromIntegral n
+  fromLazyAvro (T.Int  n) = pure $ D.fromUnderlyingValue $ fromIntegral n
+  fromLazyAvro v          = badValue v "Decimal"
+
+instance FromLazyAvro UUID.UUID where
+  fromLazyAvro v@(T.String s)
+    = case UUID.fromText s of
+        Nothing -> badValue v "UUID"
+        Just u  -> pure u
+  fromLazyAvro v = badValue v "UUID"
+
+instance FromLazyAvro Time.Day where
+  fromLazyAvro (T.Int  v) = pure $ fromDaysSinceEpoch (toInteger v)
+  fromLazyAvro (T.Long v) = pure $ fromDaysSinceEpoch (toInteger v)
+  fromLazyAvro v = badValue v "Date"
+
+instance FromLazyAvro Time.DiffTime where
+  fromLazyAvro (T.Int  v) = pure $ microsToDiffTime (toInteger v)
+  fromLazyAvro (T.Long v) = pure $ microsToDiffTime (toInteger v)
+  fromLazyAvro v = badValue v "TimeMicros"
 
 instance FromLazyAvro a => FromLazyAvro (Maybe a) where
   fromLazyAvro (T.Union ts _ v) = case (V.toList ts, v) of
