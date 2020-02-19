@@ -1,5 +1,8 @@
 # Native Haskell implementation of Avro
 
+[![CircleCI](https://circleci.com/gh/haskell-works/avro.svg?style=svg)](https://circleci.com/gh/haskell-works/avro)
+[![Hackage](https://img.shields.io/hackage/v/avro.svg?logo=haskell)](https://hackage.haskell.org/package/avro)
+
 This is a Haskell [Avro](https://avro.apache.org/) library useful for decoding
 and encoding Avro data structures.  Avro can be thought of as a serialization
 format and RPC specification which induces three separable tasks:
