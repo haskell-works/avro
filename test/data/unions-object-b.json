@@ -28,5 +28,15 @@
   },
   "five": {
     "haskell.avro.example.NotFoo": { "stuff": "not foo stuff" }
+  },
+  "six": { "float": 6.28 },
+  "seven": { "boolean": false },
+  "eight": { "double": 2.718 },
+  "nine": { "bytes": "FOOBAR" },
+  "ten": {
+    "haskell.avro.example.Bar": {
+      "stuff": "bar stuff",
+      "things": { "stuff": "things" }
+    }
   }
 }

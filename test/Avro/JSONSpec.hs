@@ -8,6 +8,7 @@ import Control.Monad (forM_)
 
 import           Control.Monad.Identity (Identity (..))
 import qualified Data.Aeson             as Aeson
+import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map               as Map
 
@@ -80,6 +81,11 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
         , unionsThree       = E3_1 37
         , unionsFour        = E4_2 "foo"
         , unionsFive        = E5_4 $ Foo { fooStuff = "foo stuff" }
+        , unionsSix        = E6_2 "foo"
+        , unionsSeven        = E7_6 6.28
+        , unionsEight        = E8_3 37
+        , unionsNine        = E9_1 37
+        , unionsTen        = E10_9 $ BS.pack [70, 79, 79, 66, 65, 82]
         }
       unionsExampleB = Unions
         { unionsScalars     = Right 37
@@ -93,6 +99,13 @@ spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
         , unionsThree       = E3_3 37
         , unionsFour        = E4_4 $ Foo { fooStuff = "foo stuff" }
         , unionsFive        = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
+        , unionsSix        = E6_6 6.28
+        , unionsSeven        = E7_7 False
+        , unionsEight        = E8_8 2.718
+        , unionsNine        = E9_9 $ BS.pack [70, 79, 79, 66, 65, 82]
+        , unionsTen        = E10_10 $ Bar { barStuff = "bar stuff",
+                                            barThings = Foo { fooStuff = "things" }
+                                          }
         }
   it "should roundtrip (unions)" $ do
     forM_ [unionsExampleA, unionsExampleB] $ \ msg ->

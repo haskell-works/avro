@@ -21,5 +21,10 @@
   "four": { "string": "foo" },
   "five": {
     "haskell.avro.example.Foo": { "stuff": "foo stuff" }
-  }
+  },
+  "six": { "string": "foo" },
+  "seven": { "float": 6.28 },
+  "eight": { "long": 37 },
+  "nine": { "int": 37 },
+  "ten": { "bytes": "FOOBAR" }
 }

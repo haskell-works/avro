@@ -15,6 +15,7 @@ import           Data.Avro.Deriving
 import           Data.Avro.EitherN
 import qualified Data.Avro.Schema       as Schema
 import qualified Data.Avro.Types        as Avro
+import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map               as Map
 import qualified Data.Vector            as V
@@ -39,6 +40,11 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , unionsThree       = E3_1 37
         , unionsFour        = E4_2 "foo"
         , unionsFive        = E5_4 $ Foo { fooStuff = "foo stuff" }
+        , unionsSix        = E6_2 "foo"
+        , unionsSeven        = E7_6 6.28
+        , unionsEight        = E8_3 37
+        , unionsNine        = E9_1 37
+        , unionsTen        = E10_9 $ BS.pack [70, 79, 79, 66, 65, 82]
         }
       objB = Unions
         { unionsScalars     = Right 42
@@ -52,6 +58,13 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , unionsThree       = E3_3 37
         , unionsFour        = E4_4 $ Foo { fooStuff = "foo stuff" }
         , unionsFive        = E5_5 $ NotFoo { notFooStuff = "not foo stuff" }
+        , unionsSix        = E6_6 6.28
+        , unionsSeven        = E7_7 False
+        , unionsEight        = E8_8 2.718
+        , unionsNine        = E9_9 $ BS.pack [70, 79, 79, 66, 65, 82]
+        , unionsTen        = E10_10 $ Bar { barStuff = "bar stuff",
+                                            barThings = Foo { fooStuff = "things" }
+                                          }
         }
 
       field name schema def = Schema.Field name [] Nothing (Just Schema.Ascending) schema def
@@ -61,6 +74,7 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
 
       foo    = named "haskell.avro.example.Foo"
       notFoo = named "haskell.avro.example.NotFoo"
+      bar = named "haskell.avro.example.Bar"
       expectedSchema = record "haskell.avro.example.Unions"
         [ field "scalars"     (Schema.mkUnion (NE.fromList [Schema.String', Schema.Long'])) scalarsDefault
         , field "nullable"    (Schema.mkUnion (NE.fromList [Schema.Null, Schema.Int']))    nullableDefault
@@ -72,6 +86,11 @@ spec = describe "Avro.THUnionSpec: Schema with unions." $ do
         , field "three" (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long']))              Nothing
         , field "four"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo]))         Nothing
         , field "five"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo])) Nothing
+        , field "six"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float])) Nothing
+        , field "seven"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean])) Nothing
+        , field "eight"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double])) Nothing
+        , field "nine"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes'])) Nothing
+        , field "ten"  (Schema.mkUnion (NE.fromList [Schema.Int', Schema.String', Schema.Long', foo, notFoo, Schema.Float, Schema.Boolean, Schema.Double, Schema.Bytes', bar])) Nothing
         ]
       scalarsDefault  = Just $ Avro.Union (V.fromList [Schema.String', Schema.Long']) Schema.String' (Avro.String "foo")
       nullableDefault = Just $ Avro.Union (V.fromList [Schema.Null, Schema.Int'])    Schema.Null   Avro.Null
