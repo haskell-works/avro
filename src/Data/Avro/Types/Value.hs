@@ -28,4 +28,4 @@ data Value f
       | Union (Vector f) f (Value f) -- ^ Set of union options, schema for selected option, and the actual value.
       | Fixed f {-# UNPACK #-} !ByteString
       | Enum f {-# UNPACK #-} !Int Text  -- ^ An enum is a set of the possible symbols (the schema) and the selected symbol
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData)

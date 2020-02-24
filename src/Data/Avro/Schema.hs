@@ -126,7 +126,7 @@ data Schema
               , size         :: Int
               , logicalTypeF :: Maybe LogicalTypeFixed
               }
-    deriving (Show, Generic, NFData)
+    deriving (Ord, Show, Generic, NFData)
 
 pattern Int'    = Int    Nothing
 pattern Long'   = Long   Nothing
@@ -135,27 +135,27 @@ pattern String' = String Nothing
 
 data Decimal
   = Decimal { precision :: Integer, scale :: Integer }
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Ord, Generic, NFData)
 
 newtype LogicalTypeBytes
   = DecimalB Decimal
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeFixed
   = DecimalF Decimal | Duration
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeInt
   = DecimalI Decimal | Date | TimeMillis
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeLong
   = DecimalL Decimal | TimeMicros | TimestampMillis | TimestampMicros
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeString
   = UUID
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Ord, Generic, NFData)
 
 instance Eq Schema where
   Null == Null = True
@@ -172,12 +172,12 @@ instance Eq Schema where
   NamedType t == NamedType t2 = t == t2
 
   Record name1 _ _ _ fs1 == Record name2 _ _ _ fs2 =
-    and [name1 == name2, fs1 == fs2]
+    (name1 == name2) && (fs1 == fs2)
   Enum name1 _ _ s == Enum name2 _ _ s2 =
-    and [name1 == name2, s == s2]
+    (name1 == name2) && (s == s2)
   Union a == Union b = a == b
   Fixed name1 _ s lt1 == Fixed name2 _ s2 lt2 =
-    and [name1 == name2, s == s2, lt1 == lt2]
+    (name1 == name2) && (s == s2) && (lt1 == lt2)
 
   _ == _ = False
 
@@ -293,7 +293,7 @@ mkTypeName context name ns
   | isFullName name = parseFullname name
   | otherwise       = case ns of
       Just ns -> TN name $ filter (/= "") (T.splitOn "." ns)
-      Nothing -> TN name $ fromMaybe [] $ namespace <$> context
+      Nothing -> TN name $ maybe [] namespace context
   where isFullName = isJust . T.find (== '.')
 
 -- | This lets us write 'TypeName's as string literals in a fully
@@ -356,7 +356,7 @@ data Field = Field { fldName    :: Text
                    , fldType    :: Schema
                    , fldDefault :: Maybe (Ty.Value Schema)
                    }
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 data Order = Ascending | Descending | Ignore
   deriving (Eq, Ord, Show, Generic, NFData)
@@ -717,7 +717,7 @@ parseAvroJSON union env (NamedType name) av =
   case env name of
     Nothing -> fail $ "Could not resolve type name for " <> T.unpack (renderFullname name)
     Just t  -> parseAvroJSON union env t av
-parseAvroJSON union _ u@Union{} av             = union u av
+parseAvroJSON union _ u@Union{} av             = u `union` av
 parseAvroJSON union env ty av                  =
     case av of
       A.String s      ->
