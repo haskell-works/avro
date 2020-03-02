@@ -97,6 +97,11 @@ data NamespaceBehavior =
     -- @Com'example'Foo@. If @Foo@ had a field called @bar@, the
     -- generated Haskell record would have the field
     -- @com'example'FooBar@.
+  | Custom (T.Text -> [T.Text] -> T.Text)
+    -- ^ Provide a custom mapping from the name of the Avro type and
+    -- its namespace that will be used to generate Haskell types and
+    -- fields.
+
 
 -- | Describes the strictness of a field for a derived
 -- data type. The field will be derived as if it were
@@ -575,6 +580,7 @@ renderName :: NamespaceBehavior
 renderName namespaceBehavior (TN name namespace) = case namespaceBehavior of
   HandleNamespaces -> Text.intercalate "'" $ namespace <> [name]
   IgnoreNamespaces -> name
+  Custom f -> f name namespace
 
 mkSchemaValueName :: NamespaceBehavior -> TypeName -> Name
 mkSchemaValueName namespaceBehavior typeName =
