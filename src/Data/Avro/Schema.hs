@@ -670,13 +670,18 @@ schemaToJSON context = \case
           let opts = catMaybes
                 [ ("order" .=)     <$> fldOrder
                 , ("doc" .=)       <$> fldDoc
-                , ("default" .=)   <$> fldDefault
+                , ("default" .=)   <$> fmap adjustDefaultValue fldDefault
                 ]
           in object $ opts ++
              [ "name"    .= fldName
              , "type"    .= schemaToJSON (Just context) fldType
              , "aliases" .= fldAliases
              ]
+
+        -- Default values for unions are encoded differently:
+        -- the default value always represents the first element of a union
+        adjustDefaultValue (Ty.Union _ _ val) = val
+        adjustDefaultValue ty                 = ty
 
 instance ToJSON (Ty.Value Schema) where
   toJSON av =
@@ -694,6 +699,7 @@ instance ToJSON (Ty.Value Schema) where
       Ty.Record _ flds     -> A.Object (HashMap.map toJSON flds)
       Ty.Union _ _ Ty.Null -> A.Null
       Ty.Union _ ty val    -> object [ typeName ty .= val ]
+      -- Ty.Union _ ty val    -> toJSON val
       Ty.Fixed _ bs        -> A.String (serializeBytes bs)
       Ty.Enum _ _ txt      -> A.String txt
 

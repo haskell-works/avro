@@ -5,10 +5,10 @@
 module Avro.THEnumSpec
 where
 
-import           Data.Avro
-import           Data.Avro.Deriving
+import Avro.TestUtils     (roundtrip)
+import Data.Avro.Deriving
 
-import           Test.Hspec
+import Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 deriveAvroWithOptions (defaultDeriveOptions { namespaceBehavior = HandleNamespaces }) "test/data/enums.avsc"
@@ -21,4 +21,4 @@ spec = describe "Avro.THEnumSpec: Schema with enums" $ do
               , haskell'avro'example'EnumWrapperName = "Text"
               , haskell'avro'example'EnumWrapperReason = Haskell'avro'example'EnumReasonBecause
               }
-    fromAvro (toAvro msg) `shouldBe` pure msg
+    roundtrip schema'haskell'avro'example'EnumWrapper msg `shouldBe` pure msg

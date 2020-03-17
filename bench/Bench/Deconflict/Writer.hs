@@ -17,8 +17,8 @@ module Bench.Deconflict.Writer
 where
 
 import Data.Avro.Deriving
-import Data.Avro.Encoding.FromEncoding (getValue)
-import Data.Avro.Encoding.Value        (FromValue (..), Value (..))
+import Data.Avro.Encoding.DecodeAvro (getValue)
+import Data.Avro.Encoding.Value      (DecodeAvro (..), Value (..))
 import Text.RawString.QQ
 
 import           Control.Monad       (replicateM, when)

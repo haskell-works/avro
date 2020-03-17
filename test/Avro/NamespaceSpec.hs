@@ -1,19 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Avro.NamespaceSpec where
 
-import           Control.Monad        (forM_)
+import Control.Monad (forM_)
 
 import qualified Data.Aeson           as Aeson
+import           Data.Avro.Schema
 import qualified Data.ByteString.Lazy as LBS
 
-import           System.Directory     (doesFileExist, getCurrentDirectory)
-import           System.Environment   (setEnv)
+import System.Directory   (doesFileExist, getCurrentDirectory)
+import System.Environment (setEnv)
 
-import           Test.Hspec
+import Paths_avro
+import Test.Hspec
 
-import           Paths_avro
 
-import           Data.Avro.Schema
+{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
 spec :: Spec
 spec = describe "NamespaceSpec.hs: namespace inference in Avro schemas" $ do

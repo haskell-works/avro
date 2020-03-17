@@ -21,10 +21,10 @@ import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Vector                 (Vector)
 import Text.RawString.QQ
 
-import           Data.Avro                       (decodeContainerWithSchema, encodeContainer)
-import qualified Data.Avro.Decode.Lazy           as Lazy
-import qualified Data.Avro.Encoding.Container    as Enc
-import           Data.Avro.Encoding.FromEncoding (decodeValueWithSchema)
+import           Data.Avro                     (decodeContainerWithSchema, encodeContainer)
+import qualified Data.Avro.Decode.Lazy         as Lazy
+import qualified Data.Avro.Encoding.Container  as Enc
+import           Data.Avro.Encoding.DecodeAvro (decodeValueWithSchema)
 
 import qualified Bench.Deconflict.Reader as R
 import qualified Bench.Deconflict.Writer as W

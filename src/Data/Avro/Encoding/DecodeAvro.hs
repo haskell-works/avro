@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module Data.Avro.Encoding.FromEncoding
+module Data.Avro.Encoding.DecodeAvro
 where
 
 import           Control.Monad               (forM, replicateM)
@@ -19,10 +19,10 @@ import           Data.Vector                 (Vector)
 import qualified Data.Vector                 as V
 import qualified Data.Vector.Mutable         as MV
 
-decodeValueWithSchema :: FromValue a => ReadSchema -> BL.ByteString -> Either String a
+decodeValueWithSchema :: DecodeAvro a => ReadSchema -> BL.ByteString -> Either String a
 decodeValueWithSchema schema = fmap snd . decodeValueWithSchema' schema
 
-decodeValueWithSchema' :: FromValue a => ReadSchema -> BL.ByteString -> Either String (BL.ByteString, a)
+decodeValueWithSchema' :: DecodeAvro a => ReadSchema -> BL.ByteString -> Either String (BL.ByteString, a)
 decodeValueWithSchema' schema payload =
   case runGetOrFail (getValue schema) payload of
     Right (bs, _, v) -> (bs,) <$> fromValue v

@@ -5,10 +5,10 @@
 module Avro.THReusedSpec
 where
 
-import           Data.Avro
-import           Data.Avro.Deriving
+import Avro.TestUtils     (roundtrip)
+import Data.Avro.Deriving
 
-import           Test.Hspec
+import Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
@@ -25,11 +25,13 @@ spec = describe "Avro.THReusedSpec: Schema with named types" $ do
                 , boo'ReusedWrapperInner = container
                 }
   it "wrapper should do roundtrip" $
-    fromAvro (toAvro wrapper) `shouldBe` pure wrapper
+    roundtrip schema'Boo'ReusedWrapper wrapper `shouldBe` pure wrapper
 
   it "child should do rundtrip" $
-    fromAvro (toAvro container) `shouldBe` pure container
+    roundtrip schema'Boo'ContainerChild container `shouldBe` pure container
 
   it "innermost element should do roundtrip" $
-    fromAvro (toAvro (Boo'ReusedChild 7)) `shouldBe` pure (Boo'ReusedChild 7)
+    let child = Boo'ReusedChild 7
+    in roundtrip schema'Boo'ReusedChild child `shouldBe` pure child
+
 

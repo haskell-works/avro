@@ -65,27 +65,27 @@ describeValue = \case
   Record vs     -> "Record (fieldsNum = " <> show (V.length vs) <> ")"
 
 --------------------------------------------------------------------------
-class FromValue a where
+class DecodeAvro a where
   fromValue :: Value -> Either String a
 
-instance FromValue Int where
+instance DecodeAvro Int where
   fromValue (Int _ x)  = Right (fromIntegral x)
   fromValue (Long _ x) = Right (fromIntegral x)
   fromValue x          = Left ("Unable decode Int from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Int32 where
+instance DecodeAvro Int32 where
   fromValue (Int _ x) = Right x
   fromValue x         = Left ("Unable decode Int32 from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Int64 where
+instance DecodeAvro Int64 where
   fromValue (Long _ x) = Right x
   fromValue (Int _ x)  = Right (fromIntegral x)
   fromValue x          = Left ("Unable decode Int64 from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Double where
+instance DecodeAvro Double where
   fromValue (Double _ x) = Right x
   fromValue (Float _ x)  = Right (realToFrac x)
   fromValue (Long _ x)   = Right (fromIntegral x)
@@ -93,19 +93,19 @@ instance FromValue Double where
   fromValue x            = Left ("Unable decode Double from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Float where
+instance DecodeAvro Float where
   fromValue (Float _ x) = Right x
   fromValue (Long _ x)  = Right (fromIntegral x)
   fromValue (Int _ x)   = Right (fromIntegral x)
   fromValue x           = Left ("Unable decode Double from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Bool where
+instance DecodeAvro Bool where
   fromValue (Boolean x) = Right x
   fromValue x           = Left ("Unable decode Bool from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Text where
+instance DecodeAvro Text where
   fromValue (String _ x) = Right x
   fromValue (Bytes _ x) = case Text.decodeUtf8' x of
     Left unicodeExc -> Left (show unicodeExc)
@@ -113,25 +113,25 @@ instance FromValue Text where
   fromValue x          = Left ("Unable decode Text from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue BS.ByteString where
+instance DecodeAvro BS.ByteString where
   fromValue (Bytes _ x)  = Right x
   fromValue (String _ x) = Right (Text.encodeUtf8 x)
   fromValue x            = Left ("Unable to decode Bytes from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue BL.ByteString where
+instance DecodeAvro BL.ByteString where
   fromValue (Bytes _ bs) = Right (BL.fromStrict bs)
   fromValue (String _ x) = Right (BL.fromStrict $ Text.encodeUtf8 x)
   fromValue x            = Left ("Unable decode Bytes from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance (KnownNat p, KnownNat s) => FromValue (D.Decimal p s) where
+instance (KnownNat p, KnownNat s) => DecodeAvro (D.Decimal p s) where
   fromValue (Long _ n) = Right $ D.fromUnderlyingValue $ fromIntegral n
   fromValue (Int _ n)  = Right $ D.fromUnderlyingValue $ fromIntegral n
   fromValue x          = Left ("Unable to decode Decimal from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue UUID.UUID where
+instance DecodeAvro UUID.UUID where
   fromValue (String _ x) =
     case UUID.fromText x of
       Nothing -> Left "Unable to UUID from a given String value"
@@ -139,12 +139,12 @@ instance FromValue UUID.UUID where
   fromValue x            = Left ("Unable to decode UUID from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Time.Day where
+instance DecodeAvro Time.Day where
   fromValue (Int (Schema.Int (Just Schema.Date)) n) = Right $ fromDaysSinceEpoch (toInteger n)
   fromValue x                                       = Left ("Unable to decode Day from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Time.DiffTime where
+instance DecodeAvro Time.DiffTime where
   fromValue (Int (Schema.Int (Just Schema.TimeMillis)) n)          = Right $ millisToDiffTime (toInteger n)
   fromValue (Long (Schema.Long _ (Just Schema.TimestampMillis)) n) = Right $ millisToDiffTime (toInteger n)
   fromValue (Long (Schema.Long _ (Just Schema.TimeMicros)) n)      = Right $ microsToDiffTime (toInteger n)
@@ -152,42 +152,42 @@ instance FromValue Time.DiffTime where
   fromValue x                                                      = Left ("Unable to decode TimeDiff from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue Time.UTCTime where
+instance DecodeAvro Time.UTCTime where
   fromValue (Long (Schema.Long _ (Just Schema.TimestampMicros)) n) = Right $ microsToUTCTime (toInteger n)
   fromValue (Long (Schema.Long _ (Just Schema.TimestampMillis)) n) = Right $ millisToUTCTime (toInteger n)
   fromValue x                                                      = Left ("Unable to decode UTCTime from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue a => FromValue [a] where
+instance DecodeAvro a => DecodeAvro [a] where
   fromValue (Array vec) = mapM fromValue $ V.toList vec
   fromValue x           = Left ("Unable to decode Array from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue a => FromValue (Identity a) where
+instance DecodeAvro a => DecodeAvro (Identity a) where
   fromValue (Union _ 0 v) = Identity <$> fromValue v
   fromValue (Union _ n _) = Left ("Unable to decode Identity value from value with a position #" <> show n)
   fromValue x             = Left ("Unable to decode Identity from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue a => FromValue (Maybe a) where
+instance DecodeAvro a => DecodeAvro (Maybe a) where
   fromValue (Union _ _ Null) = Right Nothing
   fromValue (Union _ _ v)    = Just <$> fromValue v
   fromValue x                = Left ("Unable to decode Maybe from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance (FromValue a, FromValue b) => FromValue (Either a b) where
+instance (DecodeAvro a, DecodeAvro b) => DecodeAvro (Either a b) where
   fromValue (Union _ 0 a) = Left <$> fromValue a
   fromValue (Union _ 1 b) = Right <$> fromValue b
   fromValue (Union _ n _) = Left ("Unable to decode union value with a position #" <> show n)
   fromValue x             = Left ("Unable to decode Either from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue a => FromValue (Map.Map Text a) where
+instance DecodeAvro a => DecodeAvro (Map.Map Text a) where
   fromValue (Map mp) = traverse fromValue (Map.fromList (HashMap.toList mp))
   fromValue x        = Left ("Unable to decode Map from: " <> show (describeValue x))
   {-# INLINE fromValue #-}
 
-instance FromValue a => FromValue (HashMap.HashMap Text a) where
+instance DecodeAvro a => DecodeAvro (HashMap.HashMap Text a) where
   fromValue (Map mp) = traverse fromValue mp
   fromValue x        = Left ("Unable to decode Map from: " <> show (describeValue x))
   {-# INLINE fromValue #-}

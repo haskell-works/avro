@@ -4,18 +4,18 @@
 module Avro.Encoding.DeconflictSpec
 where
 
-import qualified Avro.Data.Deconflict.Read       as Read
-import qualified Avro.Data.Deconflict.Write      as Write
+import qualified Avro.Data.Deconflict.Read     as Read
+import qualified Avro.Data.Deconflict.Write    as Write
 import           Control.Lens
-import           Data.Avro                       (decode, encode)
-import           Data.Avro.Encoding.FromEncoding (decodeValueWithSchema)
-import qualified Data.Avro.Encoding.ToEncoding   as Encode
-import           Data.Avro.Schema                (resultToEither)
-import           Data.Avro.Schema.Deconflict     (deconflict')
+import           Data.Avro                     (decode, encode)
+import           Data.Avro.Encoding.DecodeAvro (decodeValueWithSchema)
+import qualified Data.Avro.Encoding.EncodeAvro as Encode
+import           Data.Avro.Schema              (resultToEither)
+import           Data.Avro.Schema.Deconflict   (deconflict')
 import           Data.ByteString.Builder
 import           Data.ByteString.Lazy
-import           Data.Generics.Product           (field)
-import           Data.Time.Clock.POSIX           (posixSecondsToUTCTime)
+import           Data.Generics.Product         (field)
+import           Data.Time.Clock.POSIX         (posixSecondsToUTCTime)
 
 import HaskellWorks.Hspec.Hedgehog
 import Hedgehog
@@ -31,7 +31,7 @@ spec = describe "Avro.Encoding.DeconflictSpec" $ do
       x       <- forAll Write.genFoo
       schema  <- evalEither $ deconflict' Write.schema'Foo Read.schema'Foo
 
-      let bs  = toLazyByteString (Encode.toEncoding Write.schema'Foo x)
+      let bs  = Encode.encodeAvro Write.schema'Foo x
       x'      <- evalEither $ decodeValueWithSchema @Read.Foo schema bs
 
       let bar  = x  ^. field @"fooFooBar"

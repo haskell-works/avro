@@ -38,7 +38,7 @@ import           Control.Monad.Identity        (Identity)
 import           Data.Aeson                    (eitherDecode)
 import qualified Data.Aeson                    as J
 import           Data.Avro                     hiding (decode, encode)
-import           Data.Avro.Encoding.ToEncoding (ToEncoding (..), putI)
+import           Data.Avro.Encoding.EncodeAvro (EncodeAvro (..), putI)
 import           Data.Avro.Schema              as S
 import qualified Data.Avro.Types               as AT
 import           Data.ByteString               (ByteString)
@@ -249,8 +249,8 @@ deriveAvroWithOptions' o s = do
   fromLazyAvros <- traverse (genFromLazyAvro $ namespaceBehavior o) schemas
   fromValues <- traverse (genFromValue $ namespaceBehavior o) schemas
   toAvros   <- traverse (genToAvro o) schemas
-  toEncodings <- traverse (genToEncoding o) schemas
-  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros <> join toAvros <> join fromValues <> join toEncodings
+  encodeAvros <- traverse (genEncodeAvro o) schemas
+  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros <> join toAvros <> join fromValues <> join encodeAvros
 
 -- | Derives "read only" Avro from a given schema file. For a schema
 -- with a top-level definition @com.example.Foo@, this generates:
@@ -381,18 +381,18 @@ badValueNew v t = Left $ "Unexpected value for '" <> t <> "': " <> show v
 
 genFromValue :: NamespaceBehavior -> Schema -> Q [Dec]
 genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
-  [d| instance AV.FromValue $(conT $ mkDataTypeName namespaceBehavior n) where
+  [d| instance AV.DecodeAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromValue (AV.Enum _ i _) = $([| pure . toEnum|]) i
         fromValue value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromValue namespaceBehavior (S.Record n _ _ _ fs) =
-  [d| instance AV.FromValue $(conT $ mkDataTypeName namespaceBehavior n) where
+  [d| instance AV.DecodeAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromValue (AV.Record r) =
            $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
         fromValue value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromValue namespaceBehavior (S.Fixed n _ s _) =
-  [d| instance AV.FromValue $(conT $ mkDataTypeName namespaceBehavior n) where
+  [d| instance AV.DecodeAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromValue (AV.Fixed _ v)
           | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
         fromValue value = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
@@ -459,25 +459,25 @@ newNames :: String
          -> Q [Name]
 newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 
-------------------------- ToEncoding ------------------------------------------------
+------------------------- EncodeAvro ------------------------------------------------
 
-genToEncoding :: DeriveOptions -> Schema -> Q [Dec]
-genToEncoding opts s@(S.Enum n _ _ _) =
-  toEncodingInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genEncodeAvro :: DeriveOptions -> Schema -> Q [Dec]
+genEncodeAvro opts s@(S.Enum n _ _ _) =
+  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    toEncodingInstance sname =
-      [d| instance ToEncoding $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+    encodeAvroInstance sname =
+      [d| instance EncodeAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toEncoding = $([| \_ x -> putI (fromEnum x) |])
       |]
 
-genToEncoding opts s@(S.Record n _ _ _ fs) =
-  toEncodingInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genEncodeAvro opts s@(S.Record n _ _ _ fs) =
+  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    toEncodingInstance sname =
-      [d| instance ToEncoding $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
-            toEncoding = $(toEncodingFieldsExp sname)
+    encodeAvroInstance sname =
+      [d| instance EncodeAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toEncoding = $(encodeAvroFieldsExp sname)
       |]
-    toEncodingFieldsExp sname = do
+    encodeAvroFieldsExp sname = do
       names <- newNames "p_" (length fs)
       wn <- varP <$> newName "_"
       let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
@@ -487,17 +487,17 @@ genToEncoding opts s@(S.Record n _ _ _ fs) =
                         )
             |]
 
-genToEncoding opts s@(S.Fixed n _ _ _) =
-  toEncodingInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genEncodeAvro opts s@(S.Fixed n _ _ _) =
+  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    toEncodingInstance sname =
-      [d| instance ToEncoding $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+    encodeAvroInstance sname =
+      [d| instance EncodeAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toEncoding = $(do
               x <- newName "x"
               wc <- newName "_"
               lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toEncoding $(varE sname) $(varE x) |])
       |]
-genToEncoding _ _ = pure []
+genEncodeAvro _ _ = pure []
 
 ------------------------- ToAvro ----------------------------------------------
 

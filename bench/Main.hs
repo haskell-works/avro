@@ -20,5 +20,7 @@ main = defaultMain
   Deconflict.only
   , Deconflict.notOnly
   , Encoding.encodeToBS
+  , Encoding.encodeContainer
+  , Encoding.roundtripContainer
   , Deconflict.container
   ]

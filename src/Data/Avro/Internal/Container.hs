@@ -22,6 +22,8 @@ import           Data.Int                   (Int64)
 import           Data.List                  (foldl', unfoldr)
 import qualified Data.Map.Strict            as Map
 import           Data.Text                  (Text)
+import           System.Random.TF.Init      (initTFGen)
+import           System.Random.TF.Instances (randoms)
 
 import qualified Data.Avro.Internal.Get as AGet
 
@@ -33,6 +35,11 @@ data ContainerHeader = ContainerHeader
 
 nrSyncBytes :: Integral sb => sb
 nrSyncBytes = 16
+{-# INLINE nrSyncBytes #-}
+
+-- | Generates a new synchronization marker for encoding Avro containers
+newSyncBytes :: IO BL.ByteString
+newSyncBytes = BL.pack . take nrSyncBytes . randoms <$> initTFGen
 
 getContainerHeader :: Get ContainerHeader
 getContainerHeader = do

@@ -24,9 +24,9 @@ import qualified Avro.Deconflict.D.Writer      as DW
 import qualified Avro.Deconflict.Unions.Reader as UnionsR
 import qualified Avro.Deconflict.Unions.Writer as UnionsW
 
-import           Data.Avro.Encoding.FromEncoding (decodeValueWithSchema)
-import qualified Data.Avro.Encoding.ToEncoding   as Encode
-import qualified Data.Avro.Schema.Deconflict     as Schema
+import           Data.Avro.Encoding.DecodeAvro (decodeValueWithSchema)
+import qualified Data.Avro.Encoding.EncodeAvro as Encode
+import qualified Data.Avro.Schema.Deconflict   as Schema
 
 import HaskellWorks.Hspec.Hedgehog
 import Hedgehog
@@ -40,7 +40,7 @@ spec = describe "Avro.DeconflictSchemaSpec" $ do
     resSchema <- evalEither $ Schema.deconflict' UnionsW.schema'Record UnionsR.schema'Record
     x <- forAll UnionsW.recordGen
     let nameField = UnionsW.recordName x
-    let bs = toLazyByteString $ Encode.toEncoding UnionsW.schema'Record x
+    let bs = Encode.encodeAvro UnionsW.schema'Record x
     let result = decodeValueWithSchema @UnionsR.Record resSchema bs
 
     let expected = UnionsR.Record (Just nameField)

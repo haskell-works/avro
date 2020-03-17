@@ -57,25 +57,20 @@ import qualified Data.Vector.Unboxed        as U
 import           Data.Word
 import           GHC.TypeLits
 import           Prelude                    as P
-import           System.Random.TF.Init      (initTFGen)
-import           System.Random.TF.Instances (randoms)
 
 import Data.Avro.Codec
 import Data.Avro.EncodeRaw
 import Data.Avro.HasAvroSchema
+import Data.Avro.Internal.Container (newSyncBytes)
 import Data.Avro.Internal.Time
-import Data.Avro.Schema        as S
-import Data.Avro.Types         as T
-import Data.Avro.Types.Decimal as D
+import Data.Avro.Schema             as S
+import Data.Avro.Types              as T
+import Data.Avro.Types.Decimal      as D
 import Data.Avro.Zag
 import Data.Avro.Zig
 
 encodeAvro :: EncodeAvro a => a -> BL.ByteString
 encodeAvro = toLazyByteString . putAvro
-
--- | Generates a new synchronization marker for encoding Avro containers
-newSyncBytes :: IO BL.ByteString
-newSyncBytes = BL.pack . DL.take 16 . randoms <$> initTFGen
 
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers. Blocks are compressed (or not) according

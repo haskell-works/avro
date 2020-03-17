@@ -98,8 +98,7 @@ decodeArray = env randoms $ \ ~(bools, ints, longs, records) ->
         array :: (Bounded r, Random.Random r) => IO (Vector r)
         array = Vector.replicateM 1e5 (Random.randomRIO (minBound, maxBound))
 
-        records bools ints longs =
-          Vector.zipWith3 record bools ints longs
+        records = Vector.zipWith3 record
         record bool int long = Value.Record recordSchema
           [ ("b", Value.Boolean bool)
           , ("i", Value.Int Schema.Int' int)

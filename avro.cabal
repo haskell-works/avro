@@ -145,8 +145,8 @@ library
                         Data.Avro.EncodeRaw
                         Data.Avro.Encoding.Container
                         Data.Avro.Encoding.Convert
-                        Data.Avro.Encoding.FromEncoding
-                        Data.Avro.Encoding.ToEncoding
+                        Data.Avro.Encoding.DecodeAvro
+                        Data.Avro.Encoding.EncodeAvro
                         Data.Avro.Encoding.Value
                         Data.Avro.FromAvro
                         Data.Avro.HasAvroSchema
@@ -224,6 +224,7 @@ test-suite test
                         Avro.Data.FixedTypes
                         Avro.Data.Karma
                         Avro.Data.Logical
+                        Avro.Data.Maybe
                         Avro.Data.Reused
                         Avro.Data.Endpoint
                         Avro.Data.Unions
@@ -245,6 +246,7 @@ test-suite test
                         Avro.DeconflictSpec
                         Avro.DefaultsSpec
                         Avro.EncodeRawSpec
+                        Avro.Encoding.ContainerSpec
                         Avro.Encoding.DeconflictSpec
                         Avro.Encoding.LogicalTypesSpec
                         Avro.JSONSpec
@@ -252,14 +254,11 @@ test-suite test
                         Avro.NormSchemaSpec
                         Avro.ReuseFixedSpec
                         Avro.SchemaSpec
-                        Avro.THEncodeContainerSpec
+                        Avro.TestUtils
                         Avro.THEnumSpec
-                        Avro.THLogicalTypeSpec
                         Avro.THReusedSpec
                         Avro.THSimpleSpec
-                        Avro.THUnionSpec
-                        Avro.ToAvroSpec
-                        Avro.ToEncodingSpec
+                        Avro.EncodeAvroSpec
                         DecodeContainer
                         Example1
                         Paths_avro

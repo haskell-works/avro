@@ -70,9 +70,9 @@ endpointGen :: MonadGen m => m Endpoint
 endpointGen = do
   opq <- opaqueGen
   cor <- opaqueGen
-  tag <- Gen.choice [Left <$> Gen.int32 Range.linearBounded, Right <$> Gen.text (Range.linear 0 512) Gen.alphaNum]
-  ips <- Gen.list (Range.linear 0 512) ipGen
-  pts <- Gen.list (Range.linear 0 128) portRangeGen
+  tag <- Gen.choice [Left <$> Gen.int32 Range.linearBounded, Right <$> Gen.text (Range.linear 0 64) Gen.alphaNum]
+  ips <- Gen.list (Range.linear 0 20) ipGen
+  pts <- Gen.list (Range.linear 0 8) portRangeGen
   pure $ Endpoint opq cor tag ips pts
 
 portRangeGen :: MonadGen m => m PortRange
