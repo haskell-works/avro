@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -373,6 +374,14 @@ parseSchemaJSON context = \case
           aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
           size    <- o .: "size"
           pure $ Fixed typeName aliases size
+        "null"    -> pure Null
+        "boolean" -> pure Boolean
+        "int"     -> pure Int
+        "long"    -> pure Long
+        "float"   -> pure Float
+        "double"  -> pure Double
+        "bytes"   -> pure Bytes
+        "string"  -> pure String
         s        -> fail $ "Unrecognized object type: " <> T.unpack s
 
   invalid    -> typeMismatch "Invalid JSON for Avro Schema" invalid
@@ -399,7 +408,7 @@ parseField record = \case
     name  <- o .: "name"
     doc   <- o .:? "doc"
     ty    <- parseSchemaJSON (Just record) =<< o .: "type"
-    let err = fail "Haskell Avro bindings does not support default for aliased or recursive types at this time."
+    let err = error "Haskell Avro bindings does not support default for aliased or recursive types at this time."
     defM  <- o .:! "default"
     def   <- case parseFieldDefault err ty <$> defM of
       Just (Success x) -> return (Just x)
@@ -520,7 +529,9 @@ instance Monad Result where
   return = pure
   Success a >>= k = k a
   Error e >>= _ = Error e
+#if !MIN_VERSION_base(4,13,0)
   fail = MF.fail
+#endif
 instance Functor Result where
   fmap f (Success x) = Success (f x)
   fmap _ (Error e)   = Error e
@@ -757,6 +768,10 @@ expandNamedTypes =
         let r' = r { fields = fields' }
         modify' (HashMap.insert name r')
         pure r'
+
+      r@Enum{name} -> do
+        modify' (HashMap.insert name r)
+        pure r
 
       other -> pure other
 

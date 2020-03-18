@@ -33,9 +33,9 @@ import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 import           Prelude                    as P
 
-import           Data.Avro.Codec
-import           Data.Avro.DecodeRaw
-import           Data.Avro.Schema           as S
+import Data.Avro.Codec
+import Data.Avro.DecodeRaw
+import Data.Avro.Schema    as S
 
 class GetAvro a where
   getAvro :: Get a
@@ -119,7 +119,7 @@ instance GetAvro ContainerHeader where
 getCodec :: Monad m => Maybe BL.ByteString -> m Codec
 getCodec (Just "null")    = pure nullCodec
 getCodec (Just "deflate") = pure deflateCodec
-getCodec (Just x)         = fail $ "Unrecognized codec: " <> BC.unpack x
+getCodec (Just x)         = error $ "Unrecognized codec: " <> BC.unpack x
 getCodec Nothing          = pure nullCodec
 
 
@@ -230,6 +230,6 @@ decodeBlocks element = do
 sFromIntegral :: forall a b m. (Monad m, Bounded a, Bounded b, Integral a, Integral b) => a -> m b
 sFromIntegral a
   | aI > fromIntegral (maxBound :: b) ||
-    aI < fromIntegral (minBound :: b)   = fail "Integral overflow."
+    aI < fromIntegral (minBound :: b)   = error "Integral overflow."
   | otherwise                           = return (fromIntegral a)
  where aI = fromIntegral a :: Integer
