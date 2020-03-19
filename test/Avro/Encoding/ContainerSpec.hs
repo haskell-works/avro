@@ -4,15 +4,9 @@
 module Avro.Encoding.ContainerSpec
 where
 
-import           Control.Lens
-import           Control.Monad                 (join)
-import           Control.Monad.IO.Class        (MonadIO)
-import           Data.Aeson                    (eitherDecode, encode)
-import           Data.Avro.Codec               (nullCodec)
-import qualified Data.Avro.Encoding.Container  as Encoding
-import           Data.Avro.Encoding.EncodeAvro (EncodeAvro)
-import           Data.Avro.Encoding.Value      (DecodeAvro)
-import           Data.Avro.Schema              (Schema)
+import Data.Aeson              (eitherDecode, encode)
+import Data.Avro.Codec         (nullCodec)
+import Data.Avro.Schema.Schema (Schema)
 
 import           Avro.TestUtils              (roundtripContainerGen)
 import           HaskellWorks.Hspec.Hedgehog

@@ -3,9 +3,9 @@ module Avro.NamespaceSpec where
 
 import Control.Monad (forM_)
 
-import qualified Data.Aeson           as Aeson
-import           Data.Avro.Schema
-import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Aeson              as Aeson
+import           Data.Avro.Schema.Schema
+import qualified Data.ByteString.Lazy    as LBS
 
 import System.Directory   (doesFileExist, getCurrentDirectory)
 import System.Environment (setEnv)
@@ -41,17 +41,17 @@ expected = Record
   , aliases = ["com.example.FooBar", "com.example.not.Bar"]
   , doc     = Just "An example schema to test namespace handling."
   , order   = Just Ascending
-  , fields  = [field 0 "bar" bar, field 1 "baz" $ NamedType "com.example.baz.Baz"]
+  , fields  = [field "bar" bar, field "baz" $ NamedType "com.example.baz.Baz"]
   }
-  where field ix name schema = Field name [] Nothing (Just Ascending) (AsIs ix) schema Nothing
+  where field name schema = Field name [] Nothing (Just Ascending) schema Nothing
 
         bar = Record
           { name    = "com.example.Bar"
           , aliases = ["com.example.Bar2", "com.example.not.Foo"]
           , doc     = Nothing
           , order   = Just Ascending
-          , fields  = [ field 0 "baz" baz
-                      , field 1 "bazzy" $ NamedType "com.example.Bazzy"
+          , fields  = [ field "baz" baz
+                      , field "bazzy" $ NamedType "com.example.Bazzy"
                       ]
           }
 
@@ -60,8 +60,8 @@ expected = Record
           , aliases = ["com.example.Bazzy"]
           , doc     = Nothing
           , order   = Just Ascending
-          , fields  = [ field 0 "baz"   $ NamedType "com.example.baz.Baz"
-                      , field 1 "bazzy" $ NamedType "com.example.Bazzy"
+          , fields  = [ field "baz"   $ NamedType "com.example.baz.Baz"
+                      , field "bazzy" $ NamedType "com.example.Bazzy"
                       ]
           }
 
@@ -72,9 +72,9 @@ expectedNullNamespace = Record
   , aliases = []
   , doc     = Just "An example schema to test null namespace handling."
   , order   = Just Ascending
-  , fields  = [field 0 "bar" $ NamedType "Bar", field 1 "baz" $ NamedType "com.example.Baz"]
+  , fields  = [field "bar" $ NamedType "Bar", field "baz" $ NamedType "com.example.Baz"]
   }
-  where field ix name schema = Field name [] Nothing (Just Ascending) (AsIs ix) schema Nothing
+  where field name schema = Field name [] Nothing (Just Ascending) schema Nothing
 
 
 getFileName :: FilePath -> IO FilePath

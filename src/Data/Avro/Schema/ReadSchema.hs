@@ -14,24 +14,21 @@ module Data.Avro.Schema.ReadSchema
 , S.LogicalTypeBytes(..), S.LogicalTypeFixed(..)
 , S.LogicalTypeInt(..), S.LogicalTypeLong(..)
 , S.LogicalTypeString(..)
-, S.FieldStatus(..)
-
-, S.ivIndexedValue, S.extractValues
-
+, FieldStatus(..)
 )
 where
 
-import           Control.DeepSeq     (NFData)
-import           Data.Avro.Schema    (LogicalTypeBytes, LogicalTypeFixed, LogicalTypeInt, LogicalTypeLong, LogicalTypeString, Order, TypeName)
-import qualified Data.Avro.Schema    as S
-import           Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
-import           Data.Text           (Text)
-import qualified Data.Text           as T
-import qualified Data.Vector         as V
-import           GHC.Generics        (Generic)
+import           Control.DeepSeq         (NFData)
+import           Data.Avro.Schema.Schema (LogicalTypeBytes, LogicalTypeFixed, LogicalTypeInt, LogicalTypeLong, LogicalTypeString, Order, TypeName)
+import qualified Data.Avro.Schema.Schema as S
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as HashMap
+import           Data.Text               (Text)
+import qualified Data.Text               as T
+import qualified Data.Vector             as V
+import           GHC.Generics            (Generic)
 
-import qualified Data.Avro.Types as Ty
+import qualified Data.Avro.Schema.Value as Ty
 
 data ReadLong
   = LongFromInt
@@ -80,7 +77,7 @@ data ReadSchema
              , doc     :: Maybe Text
              , symbols :: V.Vector Text
              }
-      | Union { options     :: S.IndexedVector ReadSchema
+      | Union { options      :: V.Vector (Int, ReadSchema)
               }
       | Fixed { name         :: TypeName
               , aliases      :: [TypeName]
@@ -90,12 +87,19 @@ data ReadSchema
       | FreeUnion { pos :: Int, ty :: ReadSchema }
     deriving (Eq, Show, Generic, NFData)
 
+data FieldStatus
+  = AsIs Int
+  | Ignored
+  | Defaulted Int (Ty.Value S.Schema)
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+
 data ReadField = ReadField
   { fldName    :: Text
   , fldAliases :: [Text]
   , fldDoc     :: Maybe Text
   , fldOrder   :: Maybe Order
-  , fldStatus  :: S.FieldStatus
+  , fldStatus  :: FieldStatus
   , fldType    :: ReadSchema
   , fldDefault :: Maybe (Ty.Value S.Schema)
   }
@@ -119,7 +123,7 @@ fromSchema = \case
     , aliases = S.aliases v
     , doc     = S.doc v
     , order   = S.order v
-    , fields  = fromField <$> S.fields v
+    , fields  = (\(i, x) -> fromField (AsIs i) x) <$> zip [0..] (S.fields v)
     }
   v@S.Enum{} -> Enum
     { name    = S.name v
@@ -127,7 +131,7 @@ fromSchema = \case
     , doc     = S.doc v
     , symbols = S.symbols v
     }
-  S.Union vs  -> Union $ fromSchema <$> vs
+  S.Union vs  -> Union . V.indexed $ fromSchema <$> vs
   v@S.Fixed{} -> Fixed
     { name          = S.name v
     , aliases       = S.aliases v
@@ -135,13 +139,13 @@ fromSchema = \case
     , logicalTypeF  = S.logicalTypeF v
     }
 
-fromField :: S.Field -> ReadField
-fromField v = ReadField
+fromField :: FieldStatus -> S.Field -> ReadField
+fromField s v = ReadField
   { fldName     = S.fldName v
   , fldAliases  = S.fldAliases v
   , fldDoc      = S.fldDoc v
   , fldOrder    = S.fldOrder v
-  , fldStatus   = S.fldStatus v
+  , fldStatus   = s
   , fldType     = fromSchema (S.fldType v)
   , fldDefault  = S.fldDefault v
   }
@@ -157,7 +161,7 @@ extractBindings = \case
     let withRecord = HashMap.fromList $ (name : aliases) `zip` repeat t
     in HashMap.unions $ withRecord : (extractBindings . fldType <$> fields)
   e@Enum{..}   -> HashMap.fromList $ (name : aliases) `zip` repeat e
-  Union{..}    -> HashMap.unions $ V.toList $ extractBindings <$> S.extractValues options
+  Union{..}    -> HashMap.unions $ V.toList $ extractBindings <$> snd <$> options
   f@Fixed{..}  -> HashMap.fromList $ (name : aliases) `zip` repeat f
   Array{..}    -> extractBindings item
   Map{..}      -> extractBindings values

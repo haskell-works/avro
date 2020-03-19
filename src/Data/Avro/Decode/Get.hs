@@ -33,9 +33,8 @@ import qualified Data.Vector                as V
 import           Prelude                    as P
 
 import Data.Avro.Codec
-import Data.Avro.DecodeRaw
 import Data.Avro.Internal.Get
-import Data.Avro.Schema       as S
+import Data.Avro.Schema.Schema as S
 
 class GetAvro a where
   getAvro :: Get a

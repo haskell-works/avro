@@ -7,12 +7,10 @@
 module Data.Avro.EitherN where
 
 import           Data.Avro
-import           Data.Avro.Decode.Lazy         as AL
+import           Data.Avro.Encoding.DecodeAvro (DecodeAvro (..))
+import qualified Data.Avro.Encoding.DecodeAvro as AV
 import           Data.Avro.Encoding.EncodeAvro (EncodeAvro (..), putI)
-import           Data.Avro.Encoding.Value      (DecodeAvro (..))
-import qualified Data.Avro.Encoding.Value      as AV
-import           Data.Avro.Schema              as S
-import qualified Data.Avro.Types               as T
+import           Data.Avro.Schema.Schema       as S
 import           Data.Bifoldable               (Bifoldable (..))
 import           Data.Bifunctor                (Bifunctor (..))
 import           Data.Bitraversable            (Bitraversable (..))
@@ -439,387 +437,6 @@ instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, Ha
                                untag (schema :: Tagged j Schema)
                               ])
 
-
-instance (FromAvro a, FromAvro b, FromAvro c) => FromAvro (Either3 a b c) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E3_1 <$> fromAvro x
-    | matches branch schemaB = E3_2 <$> fromAvro x
-    | matches branch schemaC = E3_3 <$> fromAvro x
-    | otherwise              = badValue e "Either3"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-  fromAvro x = badValue x "Either3"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d) => FromAvro (Either4 a b c d) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E4_1 <$> fromAvro x
-    | matches branch schemaB = E4_2 <$> fromAvro x
-    | matches branch schemaC = E4_3 <$> fromAvro x
-    | matches branch schemaD = E4_4 <$> fromAvro x
-    | otherwise              = badValue e "Either4"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-  fromAvro x = badValue x "Either4"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e) => FromAvro (Either5 a b c d e) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E5_1 <$> fromAvro x
-    | matches branch schemaB = E5_2 <$> fromAvro x
-    | matches branch schemaC = E5_3 <$> fromAvro x
-    | matches branch schemaD = E5_4 <$> fromAvro x
-    | matches branch schemaE = E5_5 <$> fromAvro x
-    | otherwise              = badValue e "Either5"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-  fromAvro x = badValue x "Either5"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f) => FromAvro (Either6 a b c d e f) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E6_1 <$> fromAvro x
-    | matches branch schemaB = E6_2 <$> fromAvro x
-    | matches branch schemaC = E6_3 <$> fromAvro x
-    | matches branch schemaD = E6_4 <$> fromAvro x
-    | matches branch schemaE = E6_5 <$> fromAvro x
-    | matches branch schemaF = E6_6 <$> fromAvro x
-    | otherwise              = badValue e "Either6"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-  fromAvro x = badValue x "Either6"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g) => FromAvro (Either7 a b c d e f g) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E7_1 <$> fromAvro x
-    | matches branch schemaB = E7_2 <$> fromAvro x
-    | matches branch schemaC = E7_3 <$> fromAvro x
-    | matches branch schemaD = E7_4 <$> fromAvro x
-    | matches branch schemaE = E7_5 <$> fromAvro x
-    | matches branch schemaF = E7_6 <$> fromAvro x
-    | matches branch schemaG = E7_7 <$> fromAvro x
-      | otherwise              = badValue e "Either7"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-  fromAvro x = badValue x "Either7"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h) => FromAvro (Either8 a b c d e f g h) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E8_1 <$> fromAvro x
-    | matches branch schemaB = E8_2 <$> fromAvro x
-    | matches branch schemaC = E8_3 <$> fromAvro x
-    | matches branch schemaD = E8_4 <$> fromAvro x
-    | matches branch schemaE = E8_5 <$> fromAvro x
-    | matches branch schemaF = E8_6 <$> fromAvro x
-    | matches branch schemaG = E8_7 <$> fromAvro x
-    | matches branch schemaH = E8_8 <$> fromAvro x
-    | otherwise              = badValue e "Either8"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-          Tagged schemaH = schema :: Tagged h Schema
-  fromAvro x = badValue x "Either8"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h, FromAvro i) => FromAvro (Either9 a b c d e f g h i) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E9_1 <$> fromAvro x
-    | matches branch schemaB = E9_2 <$> fromAvro x
-    | matches branch schemaC = E9_3 <$> fromAvro x
-    | matches branch schemaD = E9_4 <$> fromAvro x
-    | matches branch schemaE = E9_5 <$> fromAvro x
-    | matches branch schemaF = E9_6 <$> fromAvro x
-    | matches branch schemaG = E9_7 <$> fromAvro x
-    | matches branch schemaH = E9_8 <$> fromAvro x
-    | matches branch schemaI = E9_9 <$> fromAvro x
-    | otherwise              = badValue e "Either9"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-          Tagged schemaH = schema :: Tagged h Schema
-          Tagged schemaI = schema :: Tagged i Schema
-  fromAvro x = badValue x "Either9"
-
-instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h, FromAvro i, FromAvro j) => FromAvro (Either10 a b c d e f g h i j) where
-  fromAvro e@(T.Union _ branch x)
-    | matches branch schemaA = E10_1 <$> fromAvro x
-    | matches branch schemaB = E10_2 <$> fromAvro x
-    | matches branch schemaC = E10_3 <$> fromAvro x
-    | matches branch schemaD = E10_4 <$> fromAvro x
-    | matches branch schemaE = E10_5 <$> fromAvro x
-    | matches branch schemaF = E10_6 <$> fromAvro x
-    | matches branch schemaG = E10_7 <$> fromAvro x
-    | matches branch schemaH = E10_8 <$> fromAvro x
-    | matches branch schemaI = E10_9 <$> fromAvro x
-    | matches branch schemaJ = E10_10 <$> fromAvro x
-    | otherwise              = badValue e "Either10"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-          Tagged schemaH = schema :: Tagged h Schema
-          Tagged schemaI = schema :: Tagged i Schema
-          Tagged schemaJ = schema :: Tagged j Schema
-  fromAvro x = badValue x "Either10"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c) => FromLazyAvro (Either3 a b c) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E3_1 <$> fromLazyAvro x
-    | matches branch schemaB = E3_2 <$> fromLazyAvro x
-    | matches branch schemaC = E3_3 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either3"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-  fromLazyAvro x = badValue x "Either3"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d) => FromLazyAvro (Either4 a b c d) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E4_1 <$> fromLazyAvro x
-    | matches branch schemaB = E4_2 <$> fromLazyAvro x
-    | matches branch schemaC = E4_3 <$> fromLazyAvro x
-    | matches branch schemaD = E4_4 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either4"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-  fromLazyAvro x = badValue x "Either4"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e) => FromLazyAvro (Either5 a b c d e) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E5_1 <$> fromLazyAvro x
-    | matches branch schemaB = E5_2 <$> fromLazyAvro x
-    | matches branch schemaC = E5_3 <$> fromLazyAvro x
-    | matches branch schemaD = E5_4 <$> fromLazyAvro x
-    | matches branch schemaE = E5_5 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either5"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-  fromLazyAvro x = badValue x "Either5"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e, FromLazyAvro f) => FromLazyAvro (Either6 a b c d e f) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E6_1 <$> fromLazyAvro x
-    | matches branch schemaB = E6_2 <$> fromLazyAvro x
-    | matches branch schemaC = E6_3 <$> fromLazyAvro x
-    | matches branch schemaD = E6_4 <$> fromLazyAvro x
-    | matches branch schemaE = E6_5 <$> fromLazyAvro x
-    | matches branch schemaF = E6_6 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either6"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-  fromLazyAvro x = badValue x "Either6"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e, FromLazyAvro f, FromLazyAvro g) => FromLazyAvro (Either7 a b c d e f g) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E7_1 <$> fromLazyAvro x
-    | matches branch schemaB = E7_2 <$> fromLazyAvro x
-    | matches branch schemaC = E7_3 <$> fromLazyAvro x
-    | matches branch schemaD = E7_4 <$> fromLazyAvro x
-    | matches branch schemaE = E7_5 <$> fromLazyAvro x
-    | matches branch schemaF = E7_6 <$> fromLazyAvro x
-    | matches branch schemaG = E7_7 <$> fromLazyAvro x
-      | otherwise              = badValue e "Either7"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-  fromLazyAvro x = badValue x "Either7"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e, FromLazyAvro f, FromLazyAvro g, FromLazyAvro h) => FromLazyAvro (Either8 a b c d e f g h) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E8_1 <$> fromLazyAvro x
-    | matches branch schemaB = E8_2 <$> fromLazyAvro x
-    | matches branch schemaC = E8_3 <$> fromLazyAvro x
-    | matches branch schemaD = E8_4 <$> fromLazyAvro x
-    | matches branch schemaE = E8_5 <$> fromLazyAvro x
-    | matches branch schemaF = E8_6 <$> fromLazyAvro x
-    | matches branch schemaG = E8_7 <$> fromLazyAvro x
-    | matches branch schemaH = E8_8 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either8"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-          Tagged schemaH = schema :: Tagged h Schema
-  fromLazyAvro x = badValue x "Either8"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e, FromLazyAvro f, FromLazyAvro g, FromLazyAvro h, FromLazyAvro i) => FromLazyAvro (Either9 a b c d e f g h i) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E9_1 <$> fromLazyAvro x
-    | matches branch schemaB = E9_2 <$> fromLazyAvro x
-    | matches branch schemaC = E9_3 <$> fromLazyAvro x
-    | matches branch schemaD = E9_4 <$> fromLazyAvro x
-    | matches branch schemaE = E9_5 <$> fromLazyAvro x
-    | matches branch schemaF = E9_6 <$> fromLazyAvro x
-    | matches branch schemaG = E9_7 <$> fromLazyAvro x
-    | matches branch schemaH = E9_8 <$> fromLazyAvro x
-    | matches branch schemaI = E9_9 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either9"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-          Tagged schemaH = schema :: Tagged h Schema
-          Tagged schemaI = schema :: Tagged i Schema
-  fromLazyAvro x = badValue x "Either9"
-
-instance (FromLazyAvro a, FromLazyAvro b, FromLazyAvro c, FromLazyAvro d, FromLazyAvro e, FromLazyAvro f, FromLazyAvro g, FromLazyAvro h, FromLazyAvro i, FromLazyAvro j) => FromLazyAvro (Either10 a b c d e f g h i j) where
-  fromLazyAvro e@(AL.Union _ branch x)
-    | matches branch schemaA = E10_1 <$> fromLazyAvro x
-    | matches branch schemaB = E10_2 <$> fromLazyAvro x
-    | matches branch schemaC = E10_3 <$> fromLazyAvro x
-    | matches branch schemaD = E10_4 <$> fromLazyAvro x
-    | matches branch schemaE = E10_5 <$> fromLazyAvro x
-    | matches branch schemaF = E10_6 <$> fromLazyAvro x
-    | matches branch schemaG = E10_7 <$> fromLazyAvro x
-    | matches branch schemaH = E10_8 <$> fromLazyAvro x
-    | matches branch schemaI = E10_9 <$> fromLazyAvro x
-    | matches branch schemaJ = E10_10 <$> fromLazyAvro x
-    | otherwise              = badValue e "Either10"
-    where Tagged schemaA = schema :: Tagged a Schema
-          Tagged schemaB = schema :: Tagged b Schema
-          Tagged schemaC = schema :: Tagged c Schema
-          Tagged schemaD = schema :: Tagged d Schema
-          Tagged schemaE = schema :: Tagged e Schema
-          Tagged schemaF = schema :: Tagged f Schema
-          Tagged schemaG = schema :: Tagged g Schema
-          Tagged schemaH = schema :: Tagged h Schema
-          Tagged schemaI = schema :: Tagged i Schema
-          Tagged schemaJ = schema :: Tagged j Schema
-  fromLazyAvro x = badValue x "Either10"
-
-instance (ToAvro a, ToAvro b, ToAvro c) => ToAvro (Either3 a b c) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E3_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E3_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E3_3 c -> T.Union sch (schemaOf c) (toAvro c)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d) => ToAvro (Either4 a b c d) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E4_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E4_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E4_3 c -> T.Union sch (schemaOf c) (toAvro c)
-      E4_4 d -> T.Union sch (schemaOf d) (toAvro d)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e) => ToAvro (Either5 a b c d e) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E5_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E5_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E5_3 c -> T.Union sch (schemaOf c) (toAvro c)
-      E5_4 d -> T.Union sch (schemaOf d) (toAvro d)
-      E5_5 e -> T.Union sch (schemaOf e) (toAvro e)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f) => ToAvro (Either6 a b c d e f) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E6_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E6_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E6_3 c -> T.Union sch (schemaOf c) (toAvro c)
-      E6_4 d -> T.Union sch (schemaOf d) (toAvro d)
-      E6_5 e -> T.Union sch (schemaOf e) (toAvro e)
-      E6_6 f -> T.Union sch (schemaOf f) (toAvro f)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g) => ToAvro (Either7 a b c d e f g) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E7_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E7_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E7_3 c -> T.Union sch (schemaOf c) (toAvro c)
-      E7_4 d -> T.Union sch (schemaOf d) (toAvro d)
-      E7_5 e -> T.Union sch (schemaOf e) (toAvro e)
-      E7_6 f -> T.Union sch (schemaOf f) (toAvro f)
-      E7_7 g -> T.Union sch (schemaOf g) (toAvro g)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g, ToAvro h) => ToAvro (Either8 a b c d e f g h) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E8_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E8_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E8_3 c -> T.Union sch (schemaOf c) (toAvro c)
-      E8_4 d -> T.Union sch (schemaOf d) (toAvro d)
-      E8_5 e -> T.Union sch (schemaOf e) (toAvro e)
-      E8_6 f -> T.Union sch (schemaOf f) (toAvro f)
-      E8_7 g -> T.Union sch (schemaOf g) (toAvro g)
-      E8_8 h -> T.Union sch (schemaOf h) (toAvro h)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g, ToAvro h, ToAvro i) => ToAvro (Either9 a b c d e f g h i) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E9_1 a -> T.Union sch (schemaOf a) (toAvro a)
-      E9_2 b -> T.Union sch (schemaOf b) (toAvro b)
-      E9_3 c -> T.Union sch (schemaOf c) (toAvro c)
-      E9_4 d -> T.Union sch (schemaOf d) (toAvro d)
-      E9_5 e -> T.Union sch (schemaOf e) (toAvro e)
-      E9_6 f -> T.Union sch (schemaOf f) (toAvro f)
-      E9_7 g -> T.Union sch (schemaOf g) (toAvro g)
-      E9_8 h -> T.Union sch (schemaOf h) (toAvro h)
-      E9_9 i -> T.Union sch (schemaOf i) (toAvro i)
-
-instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g, ToAvro h, ToAvro i, ToAvro j) => ToAvro (Either10 a b c d e f g h i j) where
-  toAvro e =
-    let sch = extractValues $ options (schemaOf e)
-    in case e of
-      E10_1 a  -> T.Union sch (schemaOf a) (toAvro a)
-      E10_2 b  -> T.Union sch (schemaOf b) (toAvro b)
-      E10_3 c  -> T.Union sch (schemaOf c) (toAvro c)
-      E10_4 d  -> T.Union sch (schemaOf d) (toAvro d)
-      E10_5 e  -> T.Union sch (schemaOf e) (toAvro e)
-      E10_6 f  -> T.Union sch (schemaOf f) (toAvro f)
-      E10_7 g  -> T.Union sch (schemaOf g) (toAvro g)
-      E10_8 h  -> T.Union sch (schemaOf h) (toAvro h)
-      E10_9 i  -> T.Union sch (schemaOf i) (toAvro i)
-      E10_10 j -> T.Union sch (schemaOf j) (toAvro j)
-
 ------------ DATA.AVRO.VALUE --------------------------------
 instance (DecodeAvro a, DecodeAvro b, DecodeAvro c) => DecodeAvro (Either3 a b c) where
   fromValue (AV.Union _ 0 a) = E3_1 <$> fromValue a
@@ -897,13 +514,13 @@ instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e, 
   fromValue (AV.Union _ 9 j) = E10_10 <$> fromValue j
   fromValue (AV.Union _ n _) = Left ("Unable to decode Either10 from a position #" <> show n)
 
-putIndexedValue :: EncodeAvro a => Int -> IndexedVector Schema -> a -> Builder
-putIndexedValue i opts x = putI i <> toEncoding (ivUnsafeIndex opts i) x
+putIndexedValue :: EncodeAvro a => Int -> V.Vector Schema -> a -> Builder
+putIndexedValue i opts x = putI i <> toEncoding (V.unsafeIndex opts i) x
 {-# INLINE putIndexedValue #-}
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c) => EncodeAvro (Either3 a b c) where
   toEncoding (S.Union opts) v =
-    if (ivLength opts == 3)
+    if V.length opts == 3
       then case v of
         E3_1 x -> putIndexedValue 0 opts x
         E3_2 x -> putIndexedValue 1 opts x
@@ -913,7 +530,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c) => EncodeAvro (Either3 a b c
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d) => EncodeAvro (Either4 a b c d) where
   toEncoding (S.Union opts) v =
-    if (ivLength opts == 4)
+    if V.length opts == 4
       then case v of
         E4_1 x -> putIndexedValue 0 opts x
         E4_2 x -> putIndexedValue 1 opts x
@@ -924,7 +541,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d) => EncodeAvro 
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e) => EncodeAvro (Either5 a b c d e) where
   toEncoding (S.Union opts) v =
-    if ivLength opts == 5
+    if V.length opts == 5
       then case v of
         E5_1 x -> putIndexedValue 0 opts x
         E5_2 x -> putIndexedValue 1 opts x
@@ -936,7 +553,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e) 
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f) => EncodeAvro (Either6 a b c d e f) where
   toEncoding (S.Union opts) v =
-    if (ivLength opts == 6)
+    if V.length opts == 6
       then case v of
         E6_1 x -> putIndexedValue 0 opts x
         E6_2 x -> putIndexedValue 1 opts x
@@ -949,7 +566,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g) => EncodeAvro (Either7 a b c d e f g) where
   toEncoding (S.Union opts) v =
-    if ivLength opts == 7
+    if V.length opts == 7
       then case v of
         E7_1 x -> putIndexedValue 0 opts x
         E7_2 x -> putIndexedValue 1 opts x
@@ -963,7 +580,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g, EncodeAvro h) => EncodeAvro (Either8 a b c d e f g h) where
   toEncoding (S.Union opts) v =
-    if ivLength opts == 8
+    if V.length opts == 8
       then case v of
         E8_1 x -> putIndexedValue 0 opts x
         E8_2 x -> putIndexedValue 1 opts x
@@ -978,7 +595,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g, EncodeAvro h, EncodeAvro i) => EncodeAvro (Either9 a b c d e f g h i) where
   toEncoding (S.Union opts) v =
-    if ivLength opts == 9
+    if V.length opts == 9
       then case v of
         E9_1 x -> putIndexedValue 0 opts x
         E9_2 x -> putIndexedValue 1 opts x
@@ -994,7 +611,7 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
 
 instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g, EncodeAvro h, EncodeAvro i, EncodeAvro j) => EncodeAvro (Either10 a b c d e f g h i j) where
   toEncoding (S.Union opts) v =
-    if ivLength opts == 10
+    if V.length opts == 10
       then case v of
         E10_1 x  -> putIndexedValue 0 opts x
         E10_2 x  -> putIndexedValue 1 opts x

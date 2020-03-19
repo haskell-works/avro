@@ -17,25 +17,23 @@ module Bench.Deconflict.Writer
 where
 
 import Data.Avro.Deriving
-import Data.Avro.Encoding.DecodeAvro (getValue)
-import Data.Avro.Encoding.Value      (DecodeAvro (..), Value (..))
-import Text.RawString.QQ
+import Data.Avro.Encoding.DecodeAvro (DecodeAvro (..), Value (..))
 
-import           Control.Monad       (replicateM, when)
-import           Data.Avro.Schema    (Field, Schema, TypeName)
+import           Control.Monad           (replicateM, when)
+import           Data.Avro.Schema.Schema (Field, Schema, TypeName)
 import           Data.Binary.Get
-import           Data.ByteString     (ByteString)
+import           Data.ByteString         (ByteString)
 import           Data.Foldable
-import           Data.Text           (Text)
+import           Data.Text               (Text)
 import           Data.Traversable
-import           Data.Vector         (Vector)
-import qualified Data.Vector         as V
-import qualified Data.Vector.Mutable as MV
-import           GHC.Int             (Int32, Int64)
+import           Data.Vector             (Vector)
+import qualified Data.Vector             as V
+import qualified Data.Vector.Mutable     as MV
+import           GHC.Int                 (Int32, Int64)
 
-import qualified Data.Avro.Decode.Get as Get
-import qualified Data.Avro.Schema     as S
-import qualified Data.Binary.Get      as Get
+import qualified Data.Avro.Decode.Get    as Get
+import qualified Data.Avro.Schema.Schema as S
+import qualified Data.Binary.Get         as Get
 
 import qualified Data.ByteString.Lazy as LBS
 import           Data.HashMap.Strict  (HashMap)

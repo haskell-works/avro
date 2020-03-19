@@ -1,60 +1,51 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS_GHC -Wno-overflowed-literals #-}
 
 module Avro.Codec.FloatSpec (spec) where
 
-import Data.Avro
-import Data.Avro.Schema
-import Data.Tagged
-import Test.Hspec
+import           Avro.TestUtils
+import           HaskellWorks.Hspec.Hedgehog
+import           Hedgehog
+import qualified Hedgehog.Gen                as Gen
+import qualified Hedgehog.Range              as Range
+import           Test.Hspec
 
-import qualified Data.Avro.Types      as AT
-import qualified Data.ByteString.Lazy as BL
-import qualified Test.QuickCheck      as Q
+import           Data.Avro               (encodeValue)
+import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
+import qualified Data.Avro.Schema.Schema as Schema
+import qualified Data.ByteString.Lazy    as BL
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
-newtype OnlyFloat = OnlyFloat
-  { onlyFloatValue :: Float
-  } deriving (Show, Eq)
-
-onlyFloatSchema :: Schema
-onlyFloatSchema =
-  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
-  in Record "test.contract.OnlyFloat" [] Nothing Nothing
-        [ fld 0 "onlyFloatValue" Float Nothing
-        ]
-
-instance HasAvroSchema OnlyFloat where
-  schema = pure onlyFloatSchema
-
-instance ToAvro OnlyFloat where
-  toAvro sa = record onlyFloatSchema
-    [ "onlyFloatValue" .= onlyFloatValue sa ]
-
-instance FromAvro OnlyFloat where
-  fromAvro (AT.Record _ r) =
-    OnlyFloat <$> r .: "onlyFloatValue"
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "OnlyFloat",
+  "namespace": "test.contract",
+  "fields": [ {"name": "onlyFloatValue", "type": "float"} ]
+}
+|]
 
 spec :: Spec
 spec = describe "Avro.Codec.FloatSpec" $ do
-  it "Can decode 0.89" $ do
+  it "Can decode 0.89" $ require $ withTests 1 $ property $ do
     let expectedBuffer = BL.pack [10, -41, 99, 63]
     let value = OnlyFloat 0.89
-    encode value `shouldBe` expectedBuffer
+    encodeValue schema'OnlyFloat value === expectedBuffer
 
-  it "Can decode -2.0" $ do
+  it "Can decode -2.0" $ require $ withTests 1 $ property $ do
     let expectedBuffer = BL.pack [0, 0, 0, -64]
     let value = OnlyFloat (-2.0)
-    encode value `shouldBe` expectedBuffer
+    encodeValue schema'OnlyFloat value === expectedBuffer
 
-  it "Can decode 1.0" $ do
-    let expectedBuffer = [0, 0, 128, 63]
+  it "Can decode 1.0" $ require $ withTests 1 $ property $ do
+    let expectedBuffer = BL.pack [0, 0, 128, 63]
     let value = OnlyFloat 1.0
-    BL.unpack (encode value) `shouldBe` expectedBuffer
+    encodeValue schema'OnlyFloat value === expectedBuffer
 
-  it "Can decode encoded Float values" $ do
-    Q.property $ \(d :: Float) ->
-        decode (encode (OnlyFloat d)) == Success (OnlyFloat d)
+  it "Can decode encoded Float values" $ require $ property $ do
+    roundtripGen schema'OnlyFloat (OnlyFloat <$> Gen.float (Range.linearFrac (-27000.0) 27000.0))

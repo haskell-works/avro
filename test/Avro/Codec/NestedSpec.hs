@@ -1,76 +1,51 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Avro.Codec.NestedSpec (spec) where
 
-import           Data.Avro
-import           Data.Avro.Schema
-import qualified Data.Avro.Types      as AT
-import qualified Data.ByteString.Lazy as BL
+import           Avro.TestUtils
+import           HaskellWorks.Hspec.Hedgehog
+import           Hedgehog
+import qualified Hedgehog.Gen                as Gen
+import qualified Hedgehog.Range              as Range
 import           Test.Hspec
+
+import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
+import qualified Data.Avro.Schema.Schema as Schema
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
-data ChildType = ChildType
-  { childValue1 :: Int
-  , childValue2 :: Int
-  } deriving (Show, Eq)
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "ParentType",
+  "namespace": "test.contract",
+  "fields": [
+    {"name": "parentValue1", "type": "int" },
+    {"name": "parentValue2", "type":
+      {"type": "array",
+       "items": {"type": "record", "name": "ChildType", "fields": [
+         {"name": "childValue1", "type": "int"},
+         {"name": "childValue2", "type": "int"}
+       ]}
+      }
+    }
+  ]
+}
+|]
 
-data ParentType = ParentType
-  { parentValue1 :: Int
-  , parentValue2 :: [ChildType]
-  } deriving (Show, Eq)
+childTypeGen :: MonadGen m => m ChildType
+childTypeGen = ChildType <$> Gen.int32 Range.linearBounded <*> Gen.int32 Range.linearBounded
 
-childTypeSchema :: Schema
-childTypeSchema =
-  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
-  in Record "test.contract.ChildType" [] Nothing Nothing
-        [ fld 0 "childValue1" Long' Nothing
-        , fld 1 "childValue2" Long' Nothing
-        ]
-
-parentTypeSchema :: Schema
-parentTypeSchema =
-  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
-  in Record "test.contract.ParentType" [] Nothing Nothing
-        [ fld 0 "parentValue1" Long'             Nothing
-        , fld 1 "parentValue2" (Array childTypeSchema)  Nothing]
-
-instance HasAvroSchema ParentType where
-  schema = pure parentTypeSchema
-
-instance HasAvroSchema ChildType where
-  schema = pure childTypeSchema
-
-instance ToAvro ChildType where
-  toAvro sa = record childTypeSchema
-    [ "childValue1" .= childValue1 sa
-    , "childValue2" .= childValue2 sa
-    ]
-
-instance FromAvro ChildType where
-  fromAvro (AT.Record _ r) =
-    ChildType <$> r .: "childValue1"
-              <*> r .: "childValue2"
-  fromAvro v = badValue v "ChildType"
-
-instance ToAvro ParentType where
-  toAvro sa = record parentTypeSchema
-    [ "parentValue1" .= parentValue1 sa
-    , "parentValue2" .= parentValue2 sa
-    ]
-
-instance FromAvro ParentType where
-  fromAvro (AT.Record _ r) =
-    ParentType <$> r .: "parentValue1"
-               <*> r .: "parentValue2"
-  fromAvro v = badValue v "ParentType"
+parentTypeGen :: MonadGen m => m ParentType
+parentTypeGen = ParentType
+  <$> Gen.int32 Range.linearBounded
+  <*> Gen.list (Range.linear 0 100) childTypeGen
 
 spec :: Spec
 spec = describe "Avro.Codec.NestedSpec" $ do
-  it "Can encode/decode nested structures" $ do
-    let parent = ParentType 0 [ChildType 1 2, ChildType 3 4]
-    let parentEncoded = encode parent
+  it "Can encode/decode nested structures" $ require $ property $ do
+    roundtripGen schema'ParentType parentTypeGen
 
-    let parentDecoded = decode parentEncoded
-    parentDecoded `shouldBe` Success parent

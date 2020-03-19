@@ -1,8 +1,8 @@
-module Data.Avro.DecodeRaw
+module Data.Avro.Internal.DecodeRaw
   ( DecodeRaw(..)
   ) where
 
-import Data.Avro.Zag
+import Data.Avro.Internal.Zag
 import Data.Binary.Get
 import Data.Bits
 import Data.Int

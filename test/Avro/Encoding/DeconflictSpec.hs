@@ -4,18 +4,15 @@
 module Avro.Encoding.DeconflictSpec
 where
 
-import qualified Avro.Data.Deconflict.Read     as Read
-import qualified Avro.Data.Deconflict.Write    as Write
+import qualified Avro.Data.Deconflict.Read   as Read
+import qualified Avro.Data.Deconflict.Write  as Write
 import           Control.Lens
-import           Data.Avro                     (decode, encode)
-import           Data.Avro.Encoding.DecodeAvro (decodeValueWithSchema)
-import qualified Data.Avro.Encoding.EncodeAvro as Encode
-import           Data.Avro.Schema              (resultToEither)
-import           Data.Avro.Schema.Deconflict   (deconflict')
+import           Data.Avro                   (decodeValueWithSchema, encodeValue)
+import           Data.Avro.Schema.Deconflict (deconflict)
 import           Data.ByteString.Builder
 import           Data.ByteString.Lazy
-import           Data.Generics.Product         (field)
-import           Data.Time.Clock.POSIX         (posixSecondsToUTCTime)
+import           Data.Generics.Product       (field)
+import           Data.Time.Clock.POSIX       (posixSecondsToUTCTime)
 
 import HaskellWorks.Hspec.Hedgehog
 import Hedgehog
@@ -29,9 +26,9 @@ spec = describe "Avro.Encoding.DeconflictSpec" $ do
   describe "Deconflict between reader and writer" $ do
     it "should deconfict base scenario" $ require $ property $ do
       x       <- forAll Write.genFoo
-      schema  <- evalEither $ deconflict' Write.schema'Foo Read.schema'Foo
+      schema  <- evalEither $ deconflict Write.schema'Foo Read.schema'Foo
 
-      let bs  = Encode.encodeAvro Write.schema'Foo x
+      let bs  = encodeValue Write.schema'Foo x
       x'      <- evalEither $ decodeValueWithSchema @Read.Foo schema bs
 
       let bar  = x  ^. field @"fooFooBar"
@@ -42,6 +39,8 @@ spec = describe "Avro.Encoding.DeconflictSpec" $ do
       bar' ^. field @"barBarLong"     === posixSecondsToUTCTime (realToFrac (bar ^. field @"barBarLong") / 1000000)
       bar' ^. field @"barBarString"   === bar ^. field @"barBarString"
       bar' ^. field @"barBarMissing"  === 42.2
+
+      bar' ^. field @"barBarMooMissing" === Read.Moo 42 2
 
       -- Default values are only considered if the writer doesn't have that field
       x ^. field @"fooFooOption" === x' ^. field @"fooFooOption"

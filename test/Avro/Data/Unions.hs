@@ -16,10 +16,9 @@
 module Avro.Data.Unions
 where
 
-import Data.Avro.Deriving    (deriveAvroFromByteString)
+import Data.Avro.Deriving    (deriveAvroFromByteString, r)
 import Data.Avro.EitherN
 import Data.Functor.Identity
-import Text.RawString.QQ
 
 import           Hedgehog       (Gen, MonadGen)
 import qualified Hedgehog.Gen   as Gen

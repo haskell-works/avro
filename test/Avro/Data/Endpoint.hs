@@ -16,16 +16,29 @@
 module Avro.Data.Endpoint
 where
 
-import           Data.Avro.Deriving (deriveAvroFromByteString)
+import           Data.Avro.Deriving (deriveAvroFromByteString, r)
 import           Data.Text          (Text (..))
 import qualified Data.Text          as Text
-import           Text.RawString.QQ
 
 import           Hedgehog       (Gen, MonadGen)
 import qualified Hedgehog.Gen   as Gen
 import           Hedgehog.Range (Range)
 import qualified Hedgehog.Range as Range
 
+deriveAvroFromByteString [r|
+{
+  "name": "Person",
+  "type": "record",
+  "fields": [
+    { "name": "fullName", "type": "string" },
+    { "name": "age", "type": "int" },
+    { "name": "gender",
+      "type": { "name": "Gender", "type": "enum", "symbols": ["Male", "Female"] }
+    },
+    { "name": "ssn", "type": ["null", "string"] }
+  ]
+}
+|]
 
 deriveAvroFromByteString [r|
 {

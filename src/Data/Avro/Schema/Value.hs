@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric  #-}
-module Data.Avro.Types.Value where
+module Data.Avro.Schema.Value where
 
 import Control.DeepSeq (NFData)
 

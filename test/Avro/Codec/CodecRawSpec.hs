@@ -2,14 +2,14 @@
 
 module Avro.Codec.CodecRawSpec (spec) where
 
-import Data.Avro.DecodeRaw
-import Data.Avro.EncodeRaw
-import Data.Binary.Get
-import Data.ByteString.Builder
-import Data.Int
-import Data.Word
-import Test.Hspec
-import qualified Test.QuickCheck as Q
+import           Data.Avro.Internal.DecodeRaw
+import           Data.Avro.Internal.EncodeRaw
+import           Data.Binary.Get
+import           Data.ByteString.Builder
+import           Data.Int
+import           Data.Word
+import           Test.Hspec
+import qualified Test.QuickCheck              as Q
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 

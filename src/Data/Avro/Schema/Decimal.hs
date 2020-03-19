@@ -3,7 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-module Data.Avro.Types.Decimal where
+module Data.Avro.Schema.Decimal where
 
 import qualified Data.BigDecimal as D
 import           Data.Proxy

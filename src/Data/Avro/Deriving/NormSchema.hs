@@ -1,11 +1,10 @@
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Avro.Deriving.NormSchema
 where
 
 import           Control.Monad.State.Strict
-import           Data.Avro.Schema
+import           Data.Avro.Schema.Schema
 import qualified Data.Foldable              as Foldable
 import qualified Data.List                  as L
 import           Data.List.NonEmpty         (NonEmpty ((:|)))

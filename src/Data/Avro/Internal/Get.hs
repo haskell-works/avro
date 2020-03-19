@@ -31,7 +31,7 @@ import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as V
 import           Prelude                    as P
 
-import Data.Avro.DecodeRaw
+import Data.Avro.Internal.DecodeRaw
 
 getBoolean :: Get Bool
 getBoolean =

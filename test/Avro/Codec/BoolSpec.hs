@@ -1,59 +1,42 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Avro.Codec.BoolSpec (spec) where
 
-import Test.Hspec
-import qualified Test.QuickCheck as Q
+import           Avro.TestUtils
+import qualified Data.Avro.Schema.Schema     as Schema
+import           HaskellWorks.Hspec.Hedgehog
+import           Hedgehog
+import qualified Hedgehog.Gen                as Gen
+import           Test.Hspec
 
-import           Data.List.NonEmpty (NonEmpty(..))
-import           Data.Tagged
-import           Data.Text
 import qualified Data.ByteString.Lazy as BL
 
-import           Data.Avro
-import           Data.Avro.Schema
-import qualified Data.Avro.Types as AT
+import Data.Avro          (encodeValue)
+import Data.Avro.Deriving (deriveAvroFromByteString, r)
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
--- Avro definition for Bool
-
-newtype OnlyBool = OnlyBool
-  { onlyBoolValue :: Bool
-  } deriving (Show, Eq)
-
-onlyBoolSchema :: Schema
-onlyBoolSchema =
-  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
-   in Record "test.contract.OnlyBool" [] Nothing Nothing
-        [ fld 0 "onlyBoolValue" Boolean Nothing
-        ]
-
-instance HasAvroSchema OnlyBool where
-  schema = pure onlyBoolSchema
-
-instance ToAvro OnlyBool where
-  toAvro sa = record onlyBoolSchema
-    [ "onlyBoolValue" .= onlyBoolValue sa
-    ]
-
-instance FromAvro OnlyBool where
-  fromAvro (AT.Record _ r) =
-    OnlyBool <$> r .: "onlyBoolValue"
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "OnlyBool",
+  "namespace": "test.contract",
+  "fields": [ {"name": "onlyBoolValue", "type": "boolean"} ]
+}
+|]
 
 spec :: Spec
 spec = describe "Avro.Codec.BoolSpec" $ do
-  it "should encode True correctly" $ do
+  it "should encode True correctly" $ require $ withTests 1 $ property $ do
     let trueEncoding = BL.singleton 0x01
-    encode (OnlyBool True) `shouldBe` trueEncoding
+    encodeValue Schema.Boolean (OnlyBool True) === trueEncoding
 
-  it "should encode False correctly" $ do
+  it "should encode False correctly" $ require $ withTests 1 $ property $ do
     let falseEncoding = BL.singleton 0x00
-    encode (OnlyBool False) `shouldBe` falseEncoding
+    encodeValue Schema.Boolean (OnlyBool False) === falseEncoding
 
-  it "should encode then decode True correctly" $ do
-    decode (encode $ OnlyBool True) `shouldBe` Success (OnlyBool True)
-
-  it "should encode then decode False correctly" $ do
-    decode (encode $ OnlyBool False) `shouldBe` Success (OnlyBool False)
+  it "should encode then decode True correctly" $ require $ withTests 10 $ property $ do
+    roundtripGen Schema.Boolean Gen.bool

@@ -6,7 +6,6 @@
 module Avro.Data.Deconflict.Read where
 
 import Data.Avro.Deriving
-import Text.RawString.QQ
 
 deriveAvroFromByteString [r|
 [
@@ -22,7 +21,18 @@ deriveAvroFromByteString [r|
           { "name": "barTime",    "type": { "logicalType": "timestamp-millis", "type": "long" } },
           { "name": "barLong",    "type": { "logicalType": "timestamp-micros", "type": "long" } },
           { "name": "barString",  "type": "string" },
-          { "name": "barMissing", "type": "double", "default": 42.2}
+          { "name": "barMissing", "type": "double", "default": 42.2},
+          { "name": "barMooMissing",
+            "type": {
+              "type": "record",
+              "name": "Moo",
+              "fields": [
+                { "name": "mooInt", "type": "int"},
+                { "name": "mooLong", "type": "long"}
+              ]
+            },
+            "default": { "mooLong": 2, "mooInt": 42 }
+          }
         ]
       }
     },
@@ -32,5 +42,3 @@ deriveAvroFromByteString [r|
 }
 ]
 |]
-
---           { "name": "barLong",    "type": { "logicalType": "timestamp-micros", "type": "long" } },

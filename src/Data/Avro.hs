@@ -1,7 +1,9 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 -- | Avro encoding and decoding routines.
 --
 -- This library provides a high level interface for encoding (and decoding)
@@ -33,167 +35,141 @@
 --     encoder schema to the (potentially different) decoder's schema.
 module Data.Avro
   ( -- * Schema
-    Schema
+    Schema(..)
+  , Schema.Field(..), Schema.Order(..)
+  , Schema.TypeName(..)
+  , Schema.Decimal(..)
+  , Schema.LogicalTypeBytes(..), Schema.LogicalTypeFixed(..)
+  , Schema.LogicalTypeInt(..), Schema.LogicalTypeLong(..)
+  , Schema.LogicalTypeString(..)
 
-    -- * Encoding and decoding
-  , Result(..), badValue
-  , encode
-  , decode
+  -- * Deconflicting schemas
+  , ReadSchema
+  , deconflict
+  , readSchemaFromSchema
 
-  , (.:)
-  , (.=), record, fixed
+  -- * Individual values
+  , encodeValue
+  , decodeValueWithSchema
 
-    -- * Working with containers
-    -- ** Decoding containers
-  , decodeWithSchema
-  , decodeContainer
-  , decodeContainerWithSchema
-  , decodeContainerBytes
-
-    -- ** Encoding containers
+  -- * Working with containers
+  -- ** Decoding containers
+  , decodeContainerWithEmbeddedSchema
+  , decodeContainerWithReaderSchema
   , encodeContainer
-  , encodeContainer'
   , encodeContainerWithSync
-  , encodeContainerWithSync'
+  , Container.newSyncBytes
 
-  -- * Classes and instances
-  , FromAvro(..)
-  , ToAvro(..)
+  -- ** Extracting containers' data
+  , extractContainerValuesBytes
+  , decodeContainerValuesBytes
+
+  -- * Classes
+  , EncodeAvro
+  , DecodeAvro
+
+  -- * Compression
+  , Codec, nullCodec, deflateCodec
+
   , HasAvroSchema(..)
   , schemaOf
 
-  -- * Misc
-  , Avro
   ) where
 
-import           Control.Arrow         (first)
-import qualified Data.Avro.Decode      as D
-import qualified Data.Avro.Decode.Lazy as DL
-import           Data.Avro.Schema.Deconflict
-import qualified Data.Avro.Encode      as E
-import           Data.Avro.Schema      as S
-import           Data.Avro.Types       as T
-import qualified Data.Binary.Get       as G
-import qualified Data.Binary.Put       as P
-import qualified Data.ByteString       as B
-import           Data.ByteString.Lazy  (ByteString)
-import qualified Data.ByteString.Lazy  as BL
-import           Data.Foldable         (toList)
-import qualified Data.HashMap.Strict   as HashMap
-import           Data.Int
-import           Data.List.NonEmpty    (NonEmpty (..))
-import qualified Data.Map              as Map
-import           Data.Maybe            (fromMaybe)
-import           Data.Monoid           ((<>))
-import           Data.Tagged
-import           Data.Text             (Text)
-import qualified Data.Text             as Text
-import qualified Data.Text.Lazy        as TL
-import qualified Data.Vector           as V
-import           Data.Word
-import           Prelude               as P
+import           Control.Monad                 ((>=>))
+import           Data.Avro.Codec               (Codec, deflateCodec, nullCodec)
+import           Data.Avro.Encoding.DecodeAvro
+import           Data.Avro.Encoding.EncodeAvro
+import           Data.Avro.HasAvroSchema
+import qualified Data.Avro.Internal.Container  as Container
+import           Data.Avro.Schema.Deconflict   (deconflict)
+import           Data.Avro.Schema.ReadSchema   (ReadSchema, fromSchema)
+import           Data.Avro.Schema.Schema       (Schema)
+import qualified Data.Avro.Schema.Schema       as Schema
+import           Data.Binary.Get               (runGetOrFail)
+import           Data.ByteString.Builder       (toLazyByteString)
+import qualified Data.ByteString.Lazy          as BL
 
-import Data.Avro.Codec         (Codec, deflateCodec, nullCodec)
-import Data.Avro.FromAvro
-import Data.Avro.HasAvroSchema
-import Data.Avro.ToAvro
+-- | Converts 'Schema' into 'ReadSchema'. This function may be useful when it is known
+-- that the writer and the reader schemas are the same.
+readSchemaFromSchema :: Schema -> ReadSchema
+readSchemaFromSchema = fromSchema
+{-# INLINE readSchemaFromSchema #-}
 
-type Avro a = (FromAvro a, ToAvro a)
+-- | Serialises an individual value into Avro.
+encodeValue :: EncodeAvro a => Schema -> a -> BL.ByteString
+encodeValue s = toLazyByteString . toEncoding s
+{-# INLINE encodeValue #-}
 
--- | Decode a lazy bytestring using a 'Schema' of the return type.
-decode :: forall a. FromAvro a => ByteString -> Result a
-decode bytes =
-  case D.decodeAvro (untag (schema :: Tagged a Schema)) bytes of
-      Right val -> fromAvro val
-      Left err  -> Error err
+-- | Deserialises an individual value from Avro.
+decodeValueWithSchema :: DecodeAvro a => ReadSchema -> BL.ByteString -> Either String a
+decodeValueWithSchema schema payload =
+  case runGetOrFail (getValue schema) payload of
+    Right (bs, _, v) -> fromValue v
+    Left (_, _, e)   -> Left e
 
--- | Decode a lazy bytestring using a provided schema
-decodeWithSchema :: FromAvro a => Schema -> ByteString -> Result a
-decodeWithSchema sch bytes =
-  case D.decodeAvro sch bytes of
-    Right val -> fromAvro val
-    Left err  -> Error err
+-- | Decodes the container as a lazy list of values of the requested type.
+--
+-- Errors are reported as a part of the list and the list will stop at first
+-- error. This means that the consumer will get all the "good" content from
+-- the container until the error is detected, then this error and then the list
+-- is finished.
+decodeContainerWithEmbeddedSchema :: forall a. DecodeAvro a => BL.ByteString -> [Either String a]
+decodeContainerWithEmbeddedSchema payload =
+  case Container.extractContainerValues (pure . fromSchema) (getValue >=> (either fail pure . fromValue)) payload of
+    Left err          -> [Left err]
+    Right (_, values) -> values
 
--- | Decode a container and de-conflict the writer schema with
--- a reader schema for a return type.
--- Like in 'decodeContainerWithSchema'
--- exceptions are thrown instead of a 'Result' type to
--- allow this function to be read lazy (to be done in some later version).
-decodeContainer :: forall a. FromAvro a => ByteString -> [[a]]
-decodeContainer bs =
-  let readerSchema = untag (schema :: Tagged a Schema)
-  in decodeContainerWithSchema readerSchema bs
+-- | Decodes the container as a lazy list of values of the requested type.
+--
+-- The provided reader schema will be de-conflicted with the schema
+-- embedded with the container.
+--
+-- Errors are reported as a part of the list and the list will stop at first
+-- error. This means that the consumer will get all the "good" content from
+-- the container until the error is detected, then this error and then the list
+-- is finished.
+decodeContainerWithReaderSchema :: forall a. DecodeAvro a => Schema -> BL.ByteString -> [Either String a]
+decodeContainerWithReaderSchema readerSchema payload =
+  case Container.extractContainerValues (flip deconflict readerSchema) (getValue >=> (either fail pure . fromValue)) payload of
+    Left err          -> [Left err]
+    Right (_, values) -> values
 
--- |Decode a container and de-conflict the writer schema with a given
--- reader-schema.  Exceptions are thrown instead of a 'Result' type to
--- allow this function to be read lazy (to be done in some later version).
-decodeContainerWithSchema :: FromAvro a => Schema -> ByteString -> [[a]]
-decodeContainerWithSchema readerSchema bs =
-  case D.decodeContainerWith (either fail D.getAvroOf . flip deconflict readerSchema) bs of
-    Right (_, val) ->
-      let
-        from v = case fromAvro v of
-          Success x -> x
-          Error e   -> error e
-      in P.map (P.map from) val
-    Left err -> error err
-
--- | Encodes a value to a lazy ByteString
-encode :: ToAvro a => a -> BL.ByteString
-encode = E.encodeAvro . toAvro
-
--- | Encode chunks of objects into a container, using 16 random bytes for
--- the synchronization markers.
-encodeContainer :: forall a. ToAvro a => [[a]] -> IO BL.ByteString
-encodeContainer = encodeContainer' nullCodec
-
-encodeContainer' :: forall a. ToAvro a => Codec -> [[a]] -> IO BL.ByteString
-encodeContainer' codec =
-  let sch = untag (schema :: Tagged a Schema)
-  in E.encodeContainer codec sch . map (map toAvro)
-
--- | Encode chunks of objects into a container, using the provided
--- ByteString as the synchronization markers.
-encodeContainerWithSync :: forall a. ToAvro a => (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
-encodeContainerWithSync = encodeContainerWithSync' nullCodec
-
--- | Encode chunks of objects into a container, using the provided
--- ByteString as the synchronization markers.
-encodeContainerWithSync' :: forall a. ToAvro a => Codec -> (Word64,Word64,Word64,Word64) -> [[a]] -> BL.ByteString
-encodeContainerWithSync' codec (a,b,c,d) =
-  let
-    sch = untag (schema :: Tagged a Schema)
-    syncBytes = P.runPut $ mapM_ P.putWord64le [a,b,c,d]
-  in E.encodeContainerWithSync codec sch syncBytes . map (map toAvro)
-
--- |Like 'decodeContainer' but returns the avro-encoded bytes for each
--- object in the container instead of the Haskell type.
+-- | Splits container into a list of individual avro-encoded values.
 --
 -- This is particularly useful when slicing up containers into one or more
 -- smaller files.  By extracting the original bytestring it is possible to
 -- avoid re-encoding data.
-decodeContainerBytes :: ByteString -> [[ByteString]]
-decodeContainerBytes bs =
-  case D.decodeContainerWith schemaBytes bs of
-    Right (writerSchema, val) -> val
-    Left e                    -> error $ "Could not decode container: " <> e
-  where
-  schemaBytes sch =
-    do start <- G.bytesRead
-       end   <- G.lookAhead $ do _ <- D.getAvroOf sch
-                                 G.bytesRead
-       G.getLazyByteString (end-start)
+extractContainerValuesBytes :: BL.ByteString -> Either String (Schema, [Either String BL.ByteString])
+extractContainerValuesBytes =
+  (fmap . fmap . fmap . fmap) snd . Container.extractContainerValuesBytes (pure . fromSchema) getValue
+{-# INLINE extractContainerValuesBytes #-}
 
-record :: Foldable f => Schema -> f (Text,T.Value Schema) -> T.Value Schema
-record ty = T.Record ty . HashMap.fromList . toList
+-- | Splits container into a list of individual avro-encoded values.
+-- This version provides both encoded and decoded values.
+--
+-- This is particularly useful when slicing up containers into one or more
+-- smaller files.  By extracting the original bytestring it is possible to
+-- avoid re-encoding data.
+decodeContainerValuesBytes :: forall a. DecodeAvro a
+  => Schema
+  -> BL.ByteString
+  -> Either String (Schema, [Either String (a, BL.ByteString)])
+decodeContainerValuesBytes readerSchema =
+  Container.extractContainerValuesBytes (flip deconflict readerSchema) (getValue >=> (either fail pure . fromValue))
+{-# INLINE decodeContainerValuesBytes #-}
 
-fixed :: Schema -> B.ByteString -> T.Value Schema
-fixed = T.Fixed
--- @enumToAvro val@ will generate an Avro encoded value of enum suitable
--- for serialization ('encode').
--- enumToAvro :: (Show a, Enum a, Bounded a, Generic a) => a -> T.Value Schema
--- enumToAvro e = T.Enum ty (show e)
---  where
---   ty = S.Enum nm Nothing [] Nothing (map (Text.pack . show) [minBound..maxBound])
---   nm = datatypeName g
---   g  = from e -- GHC generics
+
+-- |Encode chunks of objects into a container, using 16 random bytes for
+-- the synchronization markers. Blocks are compressed (or not) according
+-- to the given `Codec` (`nullCodec` or `deflateCodec`).
+encodeContainer :: EncodeAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
+encodeContainer codec sch xss =
+  do sync <- Container.newSyncBytes
+     return $ encodeContainerWithSync codec sch sync xss
+
+-- |Encode chunks of objects into a container, using the provided
+-- ByteString as the synchronization markers.
+encodeContainerWithSync :: EncodeAvro a => Codec -> Schema -> BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync = Container.packContainerValuesWithSync' toEncoding
+{-# INLINE encodeContainerWithSync #-}

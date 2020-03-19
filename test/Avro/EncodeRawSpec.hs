@@ -1,12 +1,12 @@
 module Avro.EncodeRawSpec (spec) where
 
-import           Data.Avro.EncodeRaw
+import           Data.Avro.Internal.EncodeRaw
 import           Data.Bits
 import           Data.ByteString.Builder
+import qualified Data.ByteString.Lazy         as BL
 import           Data.List.Extra
 import           Data.Word
 import           Test.Hspec
-import qualified Data.ByteString.Lazy as BL
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
@@ -18,9 +18,9 @@ bitStringToWord8s = reverse . map (toWord . reverse) . chunksOf 8 . reverse . to
         toBinary (_  :xs) = toBinary xs
         toBinary       [] = []
         toWord' :: Word8 -> [Bool] -> Word8
-        toWord' n (True :bs)  = toWord' ((n `shiftL` 1) .|. 1) bs
-        toWord' n (False:bs)  = toWord' ((n `shiftL` 1) .|. 0) bs
-        toWord' n _           = n
+        toWord' n (True :bs) = toWord' ((n `shiftL` 1) .|. 1) bs
+        toWord' n (False:bs) = toWord' ((n `shiftL` 1) .|. 0) bs
+        toWord' n _          = n
         toWord = toWord' 0
 
 spec :: Spec

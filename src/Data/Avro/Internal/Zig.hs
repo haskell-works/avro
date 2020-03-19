@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeFamilies #-}
 
-module Data.Avro.Zig
+module Data.Avro.Internal.Zig
   ( Zig(..)
   ) where
 

@@ -6,14 +6,14 @@
 module Avro.SchemaSpec
 where
 
-import qualified Data.HashMap.Lazy  as HashMap
-import qualified Data.HashSet       as HashSet
+import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.HashSet      as HashSet
 
-import           Data.Avro
-import           Data.Avro.Deriving (makeSchema)
-import           Data.Avro.Schema   (extractBindings, matches, overlay)
+import Data.Avro
+import Data.Avro.Deriving      (makeSchema)
+import Data.Avro.Schema.Schema (extractBindings, matches, overlay)
 
-import           Test.Hspec
+import Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 

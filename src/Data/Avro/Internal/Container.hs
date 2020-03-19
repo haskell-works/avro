@@ -4,26 +4,33 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StrictData          #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
 module Data.Avro.Internal.Container
 where
 
-import           Control.Monad              (when)
-import qualified Data.Aeson                 as Aeson
-import           Data.Avro.Codec            (Codec, Decompress)
-import qualified Data.Avro.Codec            as Codec
-import           Data.Avro.Schema           (Schema)
-import           Data.Binary.Get            (Get)
-import qualified Data.Binary.Get            as Get
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString.Lazy       as BL
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import           Data.Either                (isRight)
-import           Data.Int                   (Int64)
-import           Data.List                  (foldl', unfoldr)
-import qualified Data.Map.Strict            as Map
-import           Data.Text                  (Text)
-import           System.Random.TF.Init      (initTFGen)
-import           System.Random.TF.Instances (randoms)
+import           Control.Monad                 (when)
+import qualified Data.Aeson                    as Aeson
+import           Data.Avro.Codec               (Codec (..), Decompress)
+import qualified Data.Avro.Codec               as Codec
+import           Data.Avro.Encoding.EncodeAvro (toEncoding)
+import           Data.Avro.Internal.EncodeRaw  (encodeRaw)
+import           Data.Avro.Schema.Schema       (Schema)
+import qualified Data.Avro.Schema.Schema       as Schema
+import           Data.Binary.Get               (Get)
+import qualified Data.Binary.Get               as Get
+import           Data.ByteString               (ByteString)
+import           Data.ByteString.Builder       (Builder, lazyByteString, toLazyByteString)
+import qualified Data.ByteString.Lazy          as BL
+import qualified Data.ByteString.Lazy.Char8    as BLC
+import           Data.Either                   (isRight)
+import           Data.HashMap.Strict           (HashMap)
+import qualified Data.HashMap.Strict           as HashMap
+import           Data.Int                      (Int32, Int64)
+import           Data.List                     (foldl', unfoldr)
+import qualified Data.Map.Strict               as Map
+import           Data.Text                     (Text)
+import           System.Random.TF.Init         (initTFGen)
+import           System.Random.TF.Instances    (randoms)
 
 import qualified Data.Avro.Internal.Get as AGet
 
@@ -169,6 +176,81 @@ extractContainerValues deconflict f bs = do
         Left (bs', _, err)  -> (bs', Left err)
         Right (bs', _, res) -> (bs', Right res)
 
+-- | Packs a container from a given list of already encoded Avro values
+-- Each bytestring should represent exactly one one value serialised to Avro.
+packContainerValues :: Codec -> Schema -> [[BL.ByteString]] -> IO BL.ByteString
+packContainerValues codec sch values = do
+  sync <- newSyncBytes
+  pure $ packContainerValuesWithSync codec sch sync values
+
+-- | Packs a container from a given list of already encoded Avro values
+-- Each bytestring should represent exactly one one value serialised to Avro.
+packContainerValuesWithSync :: Codec -> Schema -> BL.ByteString -> [[BL.ByteString]] -> BL.ByteString
+packContainerValuesWithSync = packContainerValuesWithSync' (\_ a -> lazyByteString a)
+{-# INLINABLE packContainerValuesWithSync #-}
+-- | Packs a container from a given list of already encoded Avro values
+-- Each bytestring should represent exactly one one value serialised to Avro.
+packContainerValuesWithSync' ::
+     (Schema -> a -> Builder)
+  -> Codec
+  -> Schema
+  -> BL.ByteString
+  -> [[a]]
+  -> BL.ByteString
+packContainerValuesWithSync' encode codec sch syncBytes values =
+  toLazyByteString $ containerHeaderWithSync codec sch syncBytes <> foldMap putBlock values
+  where
+    putBlock ys =
+      let nrObj = length ys
+          nrBytes = BL.length theBytes
+          theBytes = codecCompress codec $ toLazyByteString $ foldMap (encode sch) ys
+      in encodeRaw @Int32 (fromIntegral nrObj) <>
+         encodeRaw nrBytes <>
+         lazyByteString theBytes <>
+         lazyByteString syncBytes
+
+-- | Packs a new container from a list of already encoded Avro blocks.
+-- Each block is denoted as a pair of a number of objects within that block and the block content.
+packContainerBlocks :: Codec -> Schema -> [(Int, BL.ByteString)] -> IO BL.ByteString
+packContainerBlocks codec sch blocks = do
+  sync <- newSyncBytes
+  pure $ packContainerBlocksWithSync codec sch sync blocks
+
+-- | Packs a new container from a list of already encoded Avro blocks.
+-- Each block is denoted as a pair of a number of objects within that block and the block content.
+packContainerBlocksWithSync :: Codec -> Schema -> BL.ByteString -> [(Int, BL.ByteString)] -> BL.ByteString
+packContainerBlocksWithSync codec sch syncBytes blocks =
+  toLazyByteString $
+    containerHeaderWithSync codec sch syncBytes <>
+    foldMap putBlock blocks
+  where
+    putBlock (nrObj, bytes) =
+      let compressed = codecCompress codec bytes in
+        encodeRaw @Int32 (fromIntegral nrObj) <>
+        encodeRaw (BL.length compressed) <>
+        lazyByteString compressed <>
+        lazyByteString syncBytes
+
+
+-- | Creates an Avro container header for a given schema.
+containerHeaderWithSync :: Codec -> Schema -> BL.ByteString -> Builder
+containerHeaderWithSync codec sch syncBytes =
+  lazyByteString avroMagicBytes
+    <> toEncoding (Schema.Map Schema.Bytes') headers
+    <> lazyByteString syncBytes
+  where
+    avroMagicBytes :: BL.ByteString
+    avroMagicBytes = "Obj" <> BL.pack [1]
+
+    headers :: HashMap Text BL.ByteString
+    headers =
+      HashMap.fromList
+        [
+          ("avro.schema", Aeson.encode sch)
+        , ("avro.codec", BL.fromStrict (codecName codec))
+        ]
+
+-----------------------------------------------------------------
 
 consumeN :: Int64 -> (a -> (a, b)) -> a -> (a, [b])
 consumeN n f a =

@@ -6,7 +6,6 @@
 module Avro.Deconflict.Unions.Writer where
 
 import Data.Avro.Deriving
-import Text.RawString.QQ
 
 import Hedgehog
 import Hedgehog.Gen   as Gen

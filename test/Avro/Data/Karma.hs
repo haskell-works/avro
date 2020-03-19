@@ -16,8 +16,7 @@
 module Avro.Data.Karma
 where
 
-import Data.Avro.Deriving (deriveAvroFromByteString)
-import Text.RawString.QQ
+import Data.Avro.Deriving (deriveAvroFromByteString, r)
 
 import Hedgehog
 import Hedgehog.Gen   as Gen

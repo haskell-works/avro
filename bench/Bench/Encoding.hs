@@ -17,19 +17,15 @@ module Bench.Encoding
 where
 
 import           Control.DeepSeq
-import           Data.Avro                     (encode)
-import qualified Data.Avro                     as Avro
-import           Data.Avro.Codec               (nullCodec)
-import           Data.Avro.Deriving            (deriveAvroFromByteString)
-import qualified Data.Avro.Encoding.Container  as Encoding
-import           Data.Avro.Encoding.EncodeAvro (encodeAvro)
-import           Data.ByteString               (ByteString)
+import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValue, nullCodec)
+import qualified Data.Avro               as Avro
+import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
+import           Data.ByteString         (ByteString)
 import           Data.ByteString.Builder
-import qualified Data.ByteString.Lazy          as BL
-import           Data.List                     (unfoldr)
-import qualified Data.Vector                   as Vector
-import qualified System.Random                 as Random
-import           Text.RawString.QQ
+import qualified Data.ByteString.Lazy    as BL
+import           Data.List               (unfoldr)
+import qualified Data.Vector             as Vector
+import qualified System.Random           as Random
 
 import Gauge
 
@@ -68,27 +64,20 @@ encodeToBS :: Benchmark
 encodeToBS = env (many 1e5 newOuter) $ \ values ->
   bgroup "Encode to ByteString"
     [ bgroup "Simple type"
-        [ bench "Encode via ToAvro"     $ nf (fmap (BL.toStrict . encode)) values
-        , bench "Encode via EncodeAvro" $ nf (fmap (BL.toStrict . encodeAvro schema'Outer)) values
+        [ bench "Encode via EncodeAvro" $ nf (fmap (BL.toStrict . encodeValue schema'Outer)) values
         ]
-    -- , bgroup "deconflict"
-    --     [ bench "plain"     $ nf (fmap (deconflict          W.schema'Outer R.schema'Outer)) $ values
-    --     , bench "noResolve" $ nf (fmap (deconflictNoResolve W.schema'Outer R.schema'Outer)) $ values
-    --     ]
     ]
 
 encodeContainer :: Benchmark
 encodeContainer = env (chunksOf 100 . Vector.toList <$> many 1e5 newOuter) $ \values ->
   bgroup "Encode container"
-    [ bench "Via ToAvro" $ nfIO $ Avro.encodeContainer values
-    , bench "Via EncodeAvro" $ nfIO $ Encoding.encodeContainer nullCodec schema'Outer values
+    [ bench "Via EncodeAvro" $ nfIO $ Avro.encodeContainer nullCodec schema'Outer values
     ]
 
 roundtripContainer :: Benchmark
 roundtripContainer = env (chunksOf 100 . Vector.toList <$> many 1e5 newOuter) $ \values ->
   bgroup "Roundtrip container"
-    [ bench "Via ToAvro/FromAvro" $ nfIO $ Avro.decodeContainer @Outer <$> Avro.encodeContainer values
-    , bench "Via EncodeAvro/DecodeAvro" $ nfIO $ Encoding.decodeContainerWithEmbeddedSchema @Outer <$> Encoding.encodeContainer nullCodec schema'Outer values
+    [ bench "Via EncodeAvro/DecodeAvro" $ nfIO $ decodeContainerWithEmbeddedSchema @Outer <$> Avro.encodeContainer nullCodec schema'Outer values
     ]
 
 chunksOf :: Int -> [a] -> [[a]]

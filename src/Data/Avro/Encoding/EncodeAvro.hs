@@ -7,40 +7,35 @@
 module Data.Avro.Encoding.EncodeAvro
 where
 
-import           Control.Monad.Identity  (Identity (..))
-import qualified Data.Array              as Ar
-import           Data.Avro.EncodeRaw
+import           Control.Monad.Identity       (Identity (..))
+import qualified Data.Array                   as Ar
+import           Data.Avro.Internal.EncodeRaw
 import           Data.Avro.Internal.Time
-import           Data.Avro.Schema        as S
-import           Data.Avro.Types         as T
-import           Data.Avro.Types.Decimal as D
-import qualified Data.Binary.IEEE754     as IEEE
-import qualified Data.ByteString         as B
+import           Data.Avro.Schema.Decimal     as D
+import           Data.Avro.Schema.Schema      as S
+import qualified Data.Binary.IEEE754          as IEEE
+import qualified Data.ByteString              as B
 import           Data.ByteString.Builder
-import           Data.ByteString.Lazy    as BL
-import qualified Data.Foldable           as F
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as HashMap
+import           Data.ByteString.Lazy         as BL
+import qualified Data.Foldable                as F
+import           Data.HashMap.Strict          (HashMap)
+import qualified Data.HashMap.Strict          as HashMap
 import           Data.Int
-import           Data.Ix                 (Ix)
-import           Data.List               as DL
-import qualified Data.Map.Strict         as Map
-import           Data.Maybe              (fromJust)
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import qualified Data.Text.Encoding      as T
-import qualified Data.Text.Lazy          as TL
-import qualified Data.Text.Lazy.Encoding as TL
-import qualified Data.Time               as Time
-import qualified Data.UUID               as UUID
-import qualified Data.Vector             as V
-import qualified Data.Vector.Unboxed     as U
+import           Data.Ix                      (Ix)
+import           Data.List                    as DL
+import qualified Data.Map.Strict              as Map
+import           Data.Maybe                   (fromJust)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import qualified Data.Text.Encoding           as T
+import qualified Data.Text.Lazy               as TL
+import qualified Data.Text.Lazy.Encoding      as TL
+import qualified Data.Time                    as Time
+import qualified Data.UUID                    as UUID
+import qualified Data.Vector                  as V
+import qualified Data.Vector.Unboxed          as U
 import           Data.Word
 import           GHC.TypeLits
-
-encodeAvro :: EncodeAvro a => Schema -> a -> BL.ByteString
-encodeAvro s = toLazyByteString . toEncoding s
-{-# INLINE encodeAvro #-}
 
 class EncodeAvro a where
   toEncoding :: Schema -> a -> Builder
@@ -191,17 +186,17 @@ instance EncodeAvro a => EncodeAvro (Maybe a) where
 
 instance (EncodeAvro a) => EncodeAvro (Identity a) where
   toEncoding (S.Union opts) e@(Identity a) =
-    if (ivLength opts == 1)
-      then putI 0 <> toEncoding (ivUnsafeIndex opts 0) a
+    if (V.length opts == 1)
+      then putI 0 <> toEncoding (V.unsafeIndex opts 0) a
       else error ("Unable to encode Identity as a single-value union: " <> show opts)
   toEncoding s _ = error ("Unable to encode Identity value as " <> show s)
 
 instance (EncodeAvro a, EncodeAvro b) => EncodeAvro (Either a b) where
   toEncoding (S.Union opts) v =
-    if (ivLength opts == 2)
+    if (V.length opts == 2)
       then case v of
-        Left a  -> putI 0 <> toEncoding (ivUnsafeIndex opts 0) a
-        Right b -> putI 1 <> toEncoding (ivUnsafeIndex opts 1) b
+        Left a  -> putI 0 <> toEncoding (V.unsafeIndex opts 0) a
+        Right b -> putI 1 <> toEncoding (V.unsafeIndex opts 1) b
       else error ("Unable to encode Either as " <> show opts)
   toEncoding s _ = error ("Unable to encode Either as " <> show s)
 

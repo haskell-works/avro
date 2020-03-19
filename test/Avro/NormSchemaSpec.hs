@@ -3,9 +3,9 @@
 module Avro.NormSchemaSpec
 where
 
-import           Data.Avro.Schema   (Schema (..), fields, fldType, mkUnion)
-import           Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.Set           as S
+import           Data.Avro.Schema.Schema (Schema (..), fields, fldType, mkUnion)
+import           Data.List.NonEmpty      (NonEmpty (..))
+import qualified Data.Set                as S
 
 import Avro.Data.Karma
 import Avro.Data.Reused

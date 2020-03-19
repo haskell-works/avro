@@ -1,18 +1,14 @@
-{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 module Avro.DefaultsSpec
 where
 
-import qualified Data.Aeson          as J
-import           Data.Avro
-import           Data.Avro.Deriving
-import           Data.Avro.Schema
-import qualified Data.Avro.Types     as Ty
-import qualified Data.HashMap.Strict as M
-import           Data.List.NonEmpty  (NonEmpty (..))
-import qualified Data.Vector         as V
+import qualified Data.Aeson              as J
+import           Data.Avro.Schema.Schema
+import qualified Data.Avro.Schema.Value  as Ty
+import qualified Data.HashMap.Strict     as M
+import           Data.List.NonEmpty      (NonEmpty (..))
+import qualified Data.Vector             as V
 
 import Avro.Data.Maybe
 

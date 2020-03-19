@@ -1,10 +1,10 @@
-{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module Data.Avro.EncodeRaw
+module Data.Avro.Internal.EncodeRaw
   ( EncodeRaw(..)
   ) where
 
-import Data.Avro.Zig
+import Data.Avro.Internal.Zig
 import Data.Bits
 import Data.ByteString.Builder
 import Data.Int

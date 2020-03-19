@@ -9,7 +9,6 @@ where
 
 import Control.DeepSeq
 import Data.Avro.Deriving
-import Text.RawString.QQ
 
 deriveAvroFromByteString [r|
 {

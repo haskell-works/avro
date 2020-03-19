@@ -17,7 +17,6 @@ module Avro.Data.Deconflict.Write where
 
 import Data.Avro.Deriving
 import Data.Avro.EitherN
-import Text.RawString.QQ
 
 import           Hedgehog       (Gen, MonadGen)
 import qualified Hedgehog.Gen   as Gen

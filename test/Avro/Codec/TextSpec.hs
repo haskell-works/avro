@@ -1,56 +1,50 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 module Avro.Codec.TextSpec (spec) where
 
-import           Data.Avro
-import           Data.Avro.Schema
-import qualified Data.Avro.Types      as AT
-import qualified Data.ByteString.Lazy as BSL
-import           Data.Tagged
-import           Data.Text
+import           Avro.TestUtils
+import           Data.ByteString.Lazy        (fromStrict)
+import           Data.Text                   (Text)
+import           HaskellWorks.Hspec.Hedgehog
+import           Hedgehog
+import qualified Hedgehog.Gen                as Gen
+import qualified Hedgehog.Range              as Range
 import           Test.Hspec
-import qualified Test.QuickCheck      as Q
+
+import           Data.Avro                   (decodeValueWithSchema, encodeValue)
+import           Data.Avro.Deriving          (deriveAvroFromByteString, r)
+import           Data.Avro.Schema.ReadSchema (fromSchema)
+import qualified Data.Avro.Schema.Schema     as Schema
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
-newtype OnlyText = OnlyText
-  {onlyTextValue :: Text
-  } deriving (Show, Eq)
-
-onlyTextSchema :: Schema
-onlyTextSchema =
-  let fld ix nm = Field nm [] Nothing Nothing (AsIs ix)
-  in Record "test.contract.OnlyText" [] Nothing Nothing
-        [ fld 0 "onlyTextValue" String' Nothing
-        ]
-
-instance HasAvroSchema OnlyText where
-  schema = pure onlyTextSchema
-
-instance ToAvro OnlyText where
-  toAvro sa = record onlyTextSchema
-    [ "onlyTextValue" .= onlyTextValue sa ]
-
-instance FromAvro OnlyText where
-  fromAvro (AT.Record _ r) =
-    OnlyText <$> r .: "onlyTextValue"
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "OnlyText",
+  "namespace": "test.contract",
+  "fields": [ {"name": "onlyTextValue", "type": "string"} ]
+}
+|]
 
 spec :: Spec
 spec = describe "Avro.Codec.TextSpec" $ do
-  it "Can decode \"This is an unit test\"" $ do
+  let schema = schema'OnlyText
+  let readSchema = fromSchema schema
+  it "Can decode \"This is an unit test\"" $ require $ withTests 1 $ property $ do
     -- The '(' here is the length (ASCII value) of the string
     let expectedBuffer = "(This is an unit test"
     let value = OnlyText "This is an unit test"
-    encode value `shouldBe` expectedBuffer
+    encodeValue schema value === expectedBuffer
 
-  it "Can decode encoded Text values" $ do
-    Q.property $ \(t :: String) ->
-      decode (encode (OnlyText (pack t))) == Success (OnlyText (pack t))
+  it "Can decode encoded Text values" $ require $ property $ do
+    roundtripGen schema (OnlyText <$> Gen.text (Range.linear 0 128) Gen.alphaNum)
 
-  it "Can process corrupted Text values without crashing" $ do
-    Q.property $ \bytes ->
-      let result                   = decode (BSL.pack bytes) :: Result Text
-          isSafeResult (Success _) = True
-          isSafeResult (Error _)   = True
-      in result `shouldSatisfy` isSafeResult
+  it "Can process corrupted Text values without crashing" $ require $ property $ do
+    bytes <- forAll $ Gen.bytes (Range.linear 0 511)
+    eval $ decodeValueWithSchema @OnlyText readSchema (fromStrict bytes)
+    success
