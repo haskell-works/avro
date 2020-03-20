@@ -5,7 +5,6 @@ where
 
 import qualified Data.Aeson              as J
 import           Data.Avro.Schema.Schema
-import qualified Data.Avro.Schema.Value  as Ty
 import qualified Data.HashMap.Strict     as M
 import           Data.List.NonEmpty      (NonEmpty (..))
 import qualified Data.Vector             as V
@@ -28,9 +27,9 @@ spec = describe "Avro.DefaultsSpec: Schema with named types" $ do
       msgSchema = schema'MaybeTest
       fixedSchema = schema'FixedTag
       defaults = fldDefault <$> fields msgSchema
-    in defaults `shouldBe` [ Just $ Ty.Union (V.fromList [Null, String']) Null Ty.Null
-                           , Just $ Ty.Fixed fixedSchema "\0\42\255"
-                           , Just $ (Ty.Bytes Bytes') "\0\37\255"
+    in defaults `shouldBe` [ Just $ DUnion (V.fromList [Null, String']) Null DNull
+                           , Just $ DFixed fixedSchema "\0\42\255"
+                           , Just $ (DBytes Bytes') "\0\37\255"
                            ]
 
   it "should encode schema with default" $

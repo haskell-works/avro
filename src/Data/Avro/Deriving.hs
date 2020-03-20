@@ -41,7 +41,6 @@ import qualified Data.Aeson                    as J
 import           Data.Avro                     hiding (decode, encode)
 import           Data.Avro.Encoding.EncodeAvro (EncodeAvro (..), putI)
 import           Data.Avro.Schema.Schema       as S
-import qualified Data.Avro.Schema.Value        as AT
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
 import           Data.Char                     (isAlphaNum)

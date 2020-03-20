@@ -5,7 +5,6 @@ module Data.Avro.Schema.Deconflict
 
 import           Control.Applicative     ((<|>))
 import           Data.Avro.Schema.Schema as S
-import           Data.Avro.Schema.Value  as T
 import qualified Data.Foldable           as Foldable
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap

@@ -140,7 +140,6 @@ library
                         Data.Avro.Schema.Deconflict
                         Data.Avro.Schema.ReadSchema
                         Data.Avro.Schema.Schema
-                        Data.Avro.Schema.Value
   other-modules:
   hs-source-dirs:       src
   other-extensions:     OverloadedStrings

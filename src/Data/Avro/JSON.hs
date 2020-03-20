@@ -72,12 +72,11 @@ import           Data.Tagged
 import qualified Data.Text            as Text
 
 import qualified Data.Avro.HasAvroSchema as Schema
-import           Data.Avro.Schema.Schema (Result (..), Schema, parseAvroJSON)
+import           Data.Avro.Schema.Schema (DefaultValue (..), Result (..), Schema, parseAvroJSON)
 import qualified Data.Avro.Schema.Schema as Schema
-import qualified Data.Avro.Schema.Value  as Avro
 import qualified Data.Vector             as V
 
-decodeAvroJSON :: Schema -> Aeson.Value -> Result (Avro.Value Schema)
+decodeAvroJSON :: Schema -> Aeson.Value -> Result DefaultValue
 decodeAvroJSON schema json =
   parseAvroJSON union env schema json
   where
@@ -88,7 +87,7 @@ decodeAvroJSON schema json =
 
     union (Schema.Union schemas) Aeson.Null
       | Schema.Null `elem` schemas =
-          pure $ Avro.Union schemas Schema.Null Avro.Null
+          pure $ Schema.DUnion schemas Schema.Null Schema.DNull
       | otherwise                  =
           fail "Null not in union."
     union (Schema.Union schemas) (Aeson.Object obj)
@@ -108,7 +107,7 @@ decodeAvroJSON schema json =
           in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
               nested <- parseAvroJSON union env t (obj ! branch)
-              return (Avro.Union schemas t nested)
+              return (Schema.DUnion schemas t nested)
             Nothing -> fail ("Type '" <> Text.unpack branch <> "' not in union: " <> show schemas)
     union Schema.Union{} _ =
       Schema.Error "Invalid JSON representation for union: has to be a JSON object with exactly one field."

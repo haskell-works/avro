@@ -17,7 +17,6 @@ import           Data.Avro.Schema.Decimal    as D
 import           Data.Avro.Schema.ReadSchema (ReadSchema)
 import qualified Data.Avro.Schema.ReadSchema as ReadSchema
 import qualified Data.Avro.Schema.Schema     as Schema
-import qualified Data.Avro.Schema.Value      as SV
 import           Data.Binary.Get             (Get, getByteString, runGetOrFail)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString             as B
@@ -310,25 +309,25 @@ getRecord env fs = do
     return vals
 
 -- | This function will be unnecessary when we fully migrate to 'Value'
-convertValue :: SV.Value Schema.Schema -> Value
+convertValue :: Schema.DefaultValue -> Value
 convertValue = \case
-  SV.Null -> Null
-  SV.Boolean v       -> Boolean v
-  SV.Int s v         -> Int (ReadSchema.fromSchema s) v
-  SV.Long s v        -> Long (ReadSchema.fromSchema s) v
-  SV.Float s v       -> Float (ReadSchema.fromSchema s) v
-  SV.Double s v      -> Double (ReadSchema.fromSchema s) v
-  SV.Bytes s v       -> Bytes (ReadSchema.fromSchema s) v
-  SV.String s v      -> String (ReadSchema.fromSchema s) v
-  SV.Array v         -> Array $ fmap convertValue v
-  SV.Map v           -> Map $ fmap convertValue v
-  SV.Fixed s v       -> Fixed (ReadSchema.fromSchema s) v
-  SV.Enum s i v      -> Enum (ReadSchema.fromSchema s) i v
-  SV.Union vs sch v  ->
+  Schema.DNull -> Null
+  Schema.DBoolean v       -> Boolean v
+  Schema.DInt s v         -> Int (ReadSchema.fromSchema s) v
+  Schema.DLong s v        -> Long (ReadSchema.fromSchema s) v
+  Schema.DFloat s v       -> Float (ReadSchema.fromSchema s) v
+  Schema.DDouble s v      -> Double (ReadSchema.fromSchema s) v
+  Schema.DBytes s v       -> Bytes (ReadSchema.fromSchema s) v
+  Schema.DString s v      -> String (ReadSchema.fromSchema s) v
+  Schema.DArray v         -> Array $ fmap convertValue v
+  Schema.DMap v           -> Map $ fmap convertValue v
+  Schema.DFixed s v       -> Fixed (ReadSchema.fromSchema s) v
+  Schema.DEnum s i v      -> Enum (ReadSchema.fromSchema s) i v
+  Schema.DUnion vs sch v  ->
     case V.elemIndex sch vs of
       Just ix -> Union (ReadSchema.fromSchema sch) ix (convertValue v)
       Nothing -> error "Union contains a value of an unknown schema"
-  SV.Record sch vs   ->
+  Schema.DRecord sch vs   ->
     let
       fldNames = Schema.fldName <$> Schema.fields sch
       values = fmap (\n -> convertValue $ vs HashMap.! n) fldNames

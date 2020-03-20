@@ -12,6 +12,7 @@
 {-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE StrictData            #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ViewPatterns          #-}
 -- {-# LANGUAGE StrictData            #-}
@@ -25,7 +26,8 @@
 module Data.Avro.Schema.Schema
   (
    -- * Schema description types
-    Schema(.., Int', Long', Bytes', String'), Type
+    Schema(.., Int', Long', Bytes', String')
+  , DefaultValue(..)
   , Field(..), Order(..)
   , TypeName(..)
   , Decimal(..)
@@ -66,7 +68,6 @@ import           Control.Monad.State.Strict
 import           Data.Aeson             (FromJSON (..), ToJSON (..), object, (.!=), (.:), (.:!), (.:?), (.=))
 import qualified Data.Aeson             as A
 import           Data.Aeson.Types       (Parser, typeMismatch)
-import qualified Data.Avro.Schema.Value as Ty
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.Char              as Char
@@ -92,8 +93,22 @@ import           Prelude                as P
 
 import GHC.Generics (Generic)
 
-{-# DEPRECATED Type "Use Schema instead" #-}
-type Type = Schema
+data DefaultValue
+      = DNull
+      | DBoolean !Bool
+      | DInt Schema {-# UNPACK #-} Int32
+      | DLong Schema {-# UNPACK #-} Int64
+      | DFloat Schema {-# UNPACK #-} Float
+      | DDouble Schema {-# UNPACK #-} Double
+      | DBytes Schema {-# UNPACK #-} B.ByteString
+      | DString Schema {-# UNPACK #-} Text
+      | DArray (V.Vector DefaultValue)                   -- ^ Dynamically enforced monomorphic type.
+      | DMap (HashMap Text DefaultValue)               -- ^ Dynamically enforced monomorphic type
+      | DRecord Schema (HashMap Text DefaultValue) -- Order and a map
+      | DUnion (V.Vector Schema) Schema DefaultValue -- ^ Set of union options, schema for selected option, and the actual value.
+      | DFixed Schema {-# UNPACK #-} !B.ByteString
+      | DEnum Schema {-# UNPACK #-} Int Text  -- ^ An enum is a set of the possible symbols (the schema) and the selected symbol
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- | N.B. It is possible to create a Haskell value (of 'Schema' type) that is
 -- not a valid Avro schema by violating one of the above or one of the
@@ -136,6 +151,18 @@ pattern Int'    = Int    Nothing
 pattern Long'   = Long   Nothing
 pattern Bytes'  = Bytes  Nothing
 pattern String' = String Nothing
+
+data Field = Field { fldName    :: Text
+                   , fldAliases :: [Text]
+                   , fldDoc     :: Maybe Text
+                   , fldOrder   :: Maybe Order
+                   , fldType    :: Schema
+                   , fldDefault :: Maybe DefaultValue
+                   }
+  deriving (Eq, Ord, Show, Generic, NFData)
+
+data Order = Ascending | Descending | Ignore
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 data Decimal
   = Decimal { precision :: Integer, scale :: Integer }
@@ -352,18 +379,6 @@ typeName bt =
     _               -> renderFullname $ name bt
   where
     decimalName (Decimal prec sc) = "decimal(" <> T.pack (show prec) <> "," <> T.pack (show sc) <> ")"
-
-data Field = Field { fldName    :: Text
-                   , fldAliases :: [Text]
-                   , fldDoc     :: Maybe Text
-                   , fldOrder   :: Maybe Order
-                   , fldType    :: Schema
-                   , fldDefault :: Maybe (Ty.Value Schema)
-                   }
-  deriving (Eq, Ord, Show, Generic, NFData)
-
-data Order = Ascending | Descending | Ignore
-  deriving (Eq, Ord, Show, Generic, NFData)
 
 instance FromJSON Schema where
   parseJSON = parseSchemaJSON Nothing
@@ -619,28 +634,27 @@ schemaToJSON context = \case
 
         -- Default values for unions are encoded differently:
         -- the default value always represents the first element of a union
-        adjustDefaultValue (Ty.Union _ _ val) = val
-        adjustDefaultValue ty                 = ty
+        adjustDefaultValue (DUnion _ _ val) = val
+        adjustDefaultValue ty               = ty
 
-instance ToJSON (Ty.Value Schema) where
+instance ToJSON DefaultValue where
   toJSON av =
     case av of
-      Ty.Null              -> A.Null
-      Ty.Boolean b         -> A.Bool b
-      Ty.Int _ i           -> A.Number (fromIntegral i)
-      Ty.Long _ i          -> A.Number (fromIntegral i)
-      Ty.Float _ f         -> A.Number (realToFrac f)
-      Ty.Double _ d        -> A.Number (realToFrac d)
-      Ty.Bytes _ bs        -> A.String (serializeBytes bs)
-      Ty.String _ t        -> A.String t
-      Ty.Array vec         -> A.Array (V.map toJSON vec)
-      Ty.Map mp            -> A.Object (HashMap.map toJSON mp)
-      Ty.Record _ flds     -> A.Object (HashMap.map toJSON flds)
-      Ty.Union _ _ Ty.Null -> A.Null
-      Ty.Union _ ty val    -> object [ typeName ty .= val ]
-      -- Ty.Union _ ty val    -> toJSON val
-      Ty.Fixed _ bs        -> A.String (serializeBytes bs)
-      Ty.Enum _ _ txt      -> A.String txt
+      DNull            -> A.Null
+      DBoolean b       -> A.Bool b
+      DInt _ i         -> A.Number (fromIntegral i)
+      DLong _ i        -> A.Number (fromIntegral i)
+      DFloat _ f       -> A.Number (realToFrac f)
+      DDouble _ d      -> A.Number (realToFrac d)
+      DBytes _ bs      -> A.String (serializeBytes bs)
+      DString _ t      -> A.String t
+      DArray vec       -> A.Array (V.map toJSON vec)
+      DMap mp          -> A.Object (HashMap.map toJSON mp)
+      DRecord _ flds   -> A.Object (HashMap.map toJSON flds)
+      DUnion _ _ DNull -> A.Null
+      DUnion _ ty val  -> object [ typeName ty .= val ]
+      DFixed _ bs      -> A.String (serializeBytes bs)
+      DEnum _ _ txt    -> A.String txt
 
 data Result a = Success a | Error String
   deriving (Eq, Ord, Show, Generic, NFData)
@@ -704,13 +718,13 @@ parseFieldDefault :: (TypeName -> Maybe Schema)
                      -- ^ The schema of the default value being parsed.
                   -> A.Value
                      -- ^ JSON encoding of an Avro value.
-                  -> Result (Ty.Value Schema)
+                  -> Result DefaultValue
 parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
-  where defaultUnion (Union ts) val = Ty.Union ts (V.head ts) <$> parseFieldDefault env (V.head ts) val
+  where defaultUnion (Union ts) val = DUnion ts (V.head ts) <$> parseFieldDefault env (V.head ts) val
         defaultUnion _ _            = error "Impossible: not Union."
 
 -- | Parse JSON-encoded avro data.
-parseAvroJSON :: (Schema -> A.Value -> Result (Ty.Value Schema))
+parseAvroJSON :: (Schema -> A.Value -> Result DefaultValue)
                  -- ^ How to handle unions. The way unions are
                  -- formatted in JSON depends on whether we're parsing
                  -- a normal Avro object or we're parsing a default
@@ -722,7 +736,7 @@ parseAvroJSON :: (Schema -> A.Value -> Result (Ty.Value Schema))
               -> (TypeName -> Maybe Schema)
               -> Schema
               -> A.Value
-              -> Result (Ty.Value Schema)
+              -> Result DefaultValue
 parseAvroJSON union env (NamedType name) av =
   case env name of
     Nothing -> fail $ "Could not resolve type name for " <> T.unpack (renderFullname name)
@@ -732,37 +746,37 @@ parseAvroJSON union env ty av                  =
     case av of
       A.String s      ->
         case ty of
-          String _    -> return $ Ty.String ty s
+          String _    -> return $ DString ty s
           Enum {..}   ->
               case s `V.elemIndex` symbols of
-                Just i  -> pure $ Ty.Enum ty i s
+                Just i  -> pure $ DEnum ty i s
                 Nothing -> fail $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> T.unpack s
-          Bytes _     -> Ty.Bytes ty <$> parseBytes s
+          Bytes _     -> DBytes ty <$> parseBytes s
           Fixed {..}  -> do
             bytes <- parseBytes s
             let len = B.length bytes
             when (len /= size) $
               fail $ "Fixed string wrong size. Expected " <> show size <> " but got " <> show len
-            return $ Ty.Fixed ty bytes
+            return $ DFixed ty bytes
           _ -> fail $ "Expected type String, Enum, Bytes, or Fixed, but found (Type,Value)="
              <> show (ty, av)
       A.Bool b       -> case ty of
-                          Boolean -> return $ Ty.Boolean b
+                          Boolean -> return $ DBoolean b
                           _       -> avroTypeMismatch ty "boolean"
       A.Number i     ->
         case ty of
-          Int _  -> return $ Ty.Int    ty (floor i)
-          Long _ -> return $ Ty.Long   ty (floor i)
-          Float  -> return $ Ty.Float  ty (realToFrac i)
-          Double -> return $ Ty.Double ty (realToFrac i)
+          Int _  -> return $ DInt    ty (floor i)
+          Long _ -> return $ DLong   ty (floor i)
+          Float  -> return $ DFloat  ty (realToFrac i)
+          Double -> return $ DDouble ty (realToFrac i)
           _      -> avroTypeMismatch ty "number"
       A.Array vec    ->
         case ty of
-          Array t -> Ty.Array <$> V.mapM (parseAvroJSON union env t) vec
+          Array t -> DArray <$> V.mapM (parseAvroJSON union env t) vec
           _       -> avroTypeMismatch ty "array"
       A.Object obj ->
         case ty of
-          Map mTy     -> Ty.Map <$> mapM (parseAvroJSON union env mTy) obj
+          Map mTy     -> DMap <$> mapM (parseAvroJSON union env mTy) obj
           Record {..} ->
            do let lkAndParse f =
                     case HashMap.lookup (fldName f) obj of
@@ -770,10 +784,10 @@ parseAvroJSON union env ty av                  =
                                   Just v  -> return v
                                   Nothing -> fail $ "Decode failure: No record field '" <> T.unpack (fldName f) <> "' and no default in schema."
                       Just v  -> parseAvroJSON union env (fldType f) v
-              Ty.Record ty . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
+              DRecord ty . HashMap.fromList <$> mapM (\f -> (fldName f,) <$> lkAndParse f) fields
           _ -> avroTypeMismatch ty "object"
       A.Null -> case ty of
-                  Null -> return Ty.Null
+                  Null -> return DNull
                   _    -> avroTypeMismatch ty "null"
 
 -- | Parses a string literal into a bytestring in the format expected

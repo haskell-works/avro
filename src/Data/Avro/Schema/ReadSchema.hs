@@ -28,8 +28,6 @@ import qualified Data.Text               as T
 import qualified Data.Vector             as V
 import           GHC.Generics            (Generic)
 
-import qualified Data.Avro.Schema.Value as Ty
-
 data ReadLong
   = LongFromInt
   | ReadLong
@@ -90,7 +88,7 @@ data ReadSchema
 data FieldStatus
   = AsIs Int
   | Ignored
-  | Defaulted Int (Ty.Value S.Schema)
+  | Defaulted Int S.DefaultValue
   deriving (Show, Eq, Ord, Generic, NFData)
 
 
@@ -101,7 +99,7 @@ data ReadField = ReadField
   , fldOrder   :: Maybe Order
   , fldStatus  :: FieldStatus
   , fldType    :: ReadSchema
-  , fldDefault :: Maybe (Ty.Value S.Schema)
+  , fldDefault :: Maybe S.DefaultValue
   }
   deriving (Eq, Show, Generic, NFData)
 
