@@ -5,7 +5,7 @@ module Avro.Decode.RawBlocksSpec
 where
 
 import Control.Monad                (forM_)
-import Data.Avro                    (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValue, nullCodec)
+import Data.Avro                    (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValueWithSchema, nullCodec)
 import Data.Avro.Internal.Container (decodeRawBlocks, packContainerBlocks, packContainerValues)
 import Data.Either                  (rights)
 import Data.List                    (unfoldr)
@@ -65,7 +65,7 @@ spec = describe "Avro.Decode.RawBlocksSpec" $ do
 
   it "should pack container with individual values" $ require $ withTests 20 $ property $ do
     srcValues <- forAll $ Gen.list (Range.linear 1 19) endpointGen
-    let values = encodeValue schema'Endpoint <$> srcValues
+    let values = encodeValueWithSchema schema'Endpoint <$> srcValues
     container <- evalIO $ packContainerValues nullCodec schema'Endpoint (chunksOf 4 values)
 
     (s, bs)  <- evalEither $ decodeRawBlocks container

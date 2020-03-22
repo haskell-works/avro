@@ -15,7 +15,7 @@ import qualified Hedgehog.Gen                as Gen
 import qualified Hedgehog.Range              as Range
 import           Test.Hspec
 
-import           Data.Avro                   (decodeValueWithSchema, encodeValue)
+import           Data.Avro                   (decodeValueWithSchema, encodeValueWithSchema)
 import           Data.Avro.Deriving          (deriveAvroFromByteString, r)
 import           Data.Avro.Schema.ReadSchema (fromSchema)
 import qualified Data.Avro.Schema.Schema     as Schema
@@ -39,7 +39,7 @@ spec = describe "Avro.Codec.TextSpec" $ do
     -- The '(' here is the length (ASCII value) of the string
     let expectedBuffer = "(This is an unit test"
     let value = OnlyText "This is an unit test"
-    encodeValue schema value === expectedBuffer
+    encodeValueWithSchema schema value === expectedBuffer
 
   it "Can decode encoded Text values" $ require $ property $ do
     roundtripGen schema (OnlyText <$> Gen.text (Range.linear 0 128) Gen.alphaNum)

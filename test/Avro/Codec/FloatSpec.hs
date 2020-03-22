@@ -14,7 +14,7 @@ import qualified Hedgehog.Gen                as Gen
 import qualified Hedgehog.Range              as Range
 import           Test.Hspec
 
-import           Data.Avro               (encodeValue)
+import           Data.Avro               (encodeValueWithSchema)
 import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
 import qualified Data.Avro.Schema.Schema as Schema
 import qualified Data.ByteString.Lazy    as BL
@@ -35,17 +35,17 @@ spec = describe "Avro.Codec.FloatSpec" $ do
   it "Can decode 0.89" $ require $ withTests 1 $ property $ do
     let expectedBuffer = BL.pack [10, -41, 99, 63]
     let value = OnlyFloat 0.89
-    encodeValue schema'OnlyFloat value === expectedBuffer
+    encodeValueWithSchema schema'OnlyFloat value === expectedBuffer
 
   it "Can decode -2.0" $ require $ withTests 1 $ property $ do
     let expectedBuffer = BL.pack [0, 0, 0, -64]
     let value = OnlyFloat (-2.0)
-    encodeValue schema'OnlyFloat value === expectedBuffer
+    encodeValueWithSchema schema'OnlyFloat value === expectedBuffer
 
   it "Can decode 1.0" $ require $ withTests 1 $ property $ do
     let expectedBuffer = BL.pack [0, 0, 128, 63]
     let value = OnlyFloat 1.0
-    encodeValue schema'OnlyFloat value === expectedBuffer
+    encodeValueWithSchema schema'OnlyFloat value === expectedBuffer
 
   it "Can decode encoded Float values" $ require $ property $ do
     roundtripGen schema'OnlyFloat (OnlyFloat <$> Gen.float (Range.linearFrac (-27000.0) 27000.0))

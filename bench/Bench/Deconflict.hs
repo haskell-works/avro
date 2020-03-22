@@ -8,7 +8,7 @@ module Bench.Deconflict
 )
 where
 
-import Data.Avro                   (decodeContainerWithReaderSchema, decodeValueWithSchema, encodeContainer, encodeValue, nullCodec)
+import Data.Avro                   (decodeContainerWithReaderSchema, decodeValueWithSchema, encodeContainer, encodeValueWithSchema, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Vector                 (Vector)
 
@@ -29,7 +29,7 @@ many :: Int -> IO a -> IO (Vector a)
 many = Vector.replicateM
 
 notOnly :: Benchmark
-notOnly = env (many 1e5 $ encodeValue W.schema'Outer <$> newOuter) $ \ values ->
+notOnly = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ values ->
   let
     readSchema = fromSchema W.schema'Outer
   in bgroup "Encoded: ByteString"

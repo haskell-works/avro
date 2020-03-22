@@ -7,7 +7,7 @@ where
 import qualified Avro.Data.Deconflict.Read   as Read
 import qualified Avro.Data.Deconflict.Write  as Write
 import           Control.Lens
-import           Data.Avro                   (decodeValueWithSchema, encodeValue)
+import           Data.Avro                   (decodeValueWithSchema, encodeValueWithSchema)
 import           Data.Avro.Schema.Deconflict (deconflict)
 import           Data.ByteString.Builder
 import           Data.ByteString.Lazy
@@ -28,7 +28,7 @@ spec = describe "Avro.Encoding.DeconflictSpec" $ do
       x       <- forAll Write.genFoo
       schema  <- evalEither $ deconflict Write.schema'Foo Read.schema'Foo
 
-      let bs  = encodeValue Write.schema'Foo x
+      let bs  = encodeValueWithSchema Write.schema'Foo x
       x'      <- evalEither $ decodeValueWithSchema @Read.Foo schema bs
 
       let bar  = x  ^. field @"fooFooBar"

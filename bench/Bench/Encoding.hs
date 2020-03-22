@@ -17,7 +17,7 @@ module Bench.Encoding
 where
 
 import           Control.DeepSeq
-import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValue, nullCodec)
+import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValueWithSchema, nullCodec)
 import qualified Data.Avro               as Avro
 import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
 import           Data.ByteString         (ByteString)
@@ -64,7 +64,7 @@ encodeToBS :: Benchmark
 encodeToBS = env (many 1e5 newOuter) $ \ values ->
   bgroup "Encode to ByteString"
     [ bgroup "Simple type"
-        [ bench "Encode via ToAvro" $ nf (fmap (BL.toStrict . encodeValue schema'Outer)) values
+        [ bench "Encode via ToAvro" $ nf (fmap (BL.toStrict . encodeValueWithSchema schema'Outer)) values
         ]
     ]
 

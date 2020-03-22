@@ -3,7 +3,7 @@ where
 
 import Control.Monad               (join)
 import Control.Monad.IO.Class      (MonadIO)
-import Data.Avro                   (Codec, FromAvro, ToAvro, decodeContainerWithEmbeddedSchema, decodeValueWithSchema, encodeContainer, encodeValue, nullCodec)
+import Data.Avro                   (Codec, FromAvro, ToAvro, decodeContainerWithEmbeddedSchema, decodeValueWithSchema, encodeContainer, encodeValueWithSchema, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Avro.Schema.Schema     (Schema)
 import Data.ByteString.Lazy        (ByteString)
@@ -15,7 +15,7 @@ import           Hedgehog.Range              (Range)
 import qualified Hedgehog.Range              as Range
 
 roundtrip :: (ToAvro a, FromAvro a) => Schema -> a -> Either String a
-roundtrip sch a = decodeValueWithSchema (fromSchema sch) (encodeValue sch a)
+roundtrip sch a = decodeValueWithSchema (fromSchema sch) (encodeValueWithSchema sch a)
 
 roundtripContainer' :: (MonadIO m, Show a, Eq a, ToAvro a, FromAvro a) => Codec -> Schema -> [[a]] -> PropertyT m ()
 roundtripContainer' codec sch as = do
@@ -29,7 +29,7 @@ roundtripContainer = roundtripContainer' nullCodec
 roundtripGen :: (MonadIO m, Eq a, Show a, ToAvro a, FromAvro a) => Schema -> Gen a -> PropertyT m ()
 roundtripGen sch gen = do
   value <- forAll gen
-  tripping value (encodeValue sch) (decodeValueWithSchema (fromSchema sch))
+  tripping value (encodeValueWithSchema sch) (decodeValueWithSchema (fromSchema sch))
 
 roundtripContainerGen :: (MonadIO m, Eq a, Show a, ToAvro a, FromAvro a) => Schema -> Gen a -> PropertyT m ()
 roundtripContainerGen s g = do

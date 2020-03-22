@@ -24,7 +24,7 @@ module Data.Avro
   , readSchemaFromSchema
 
   -- * Individual values
-  , encodeValue
+  , encodeValueWithSchema
   , decodeValueWithSchema
 
   -- * Working with containers
@@ -72,9 +72,9 @@ readSchemaFromSchema = fromSchema
 {-# INLINE readSchemaFromSchema #-}
 
 -- | Serialises an individual value into Avro.
-encodeValue :: ToAvro a => Schema -> a -> BL.ByteString
-encodeValue s = toLazyByteString . toAvro s
-{-# INLINE encodeValue #-}
+encodeValueWithSchema :: ToAvro a => Schema -> a -> BL.ByteString
+encodeValueWithSchema s = toLazyByteString . toAvro s
+{-# INLINE encodeValueWithSchema #-}
 
 -- | Deserialises an individual value from Avro.
 decodeValueWithSchema :: FromAvro a => ReadSchema -> BL.ByteString -> Either String a

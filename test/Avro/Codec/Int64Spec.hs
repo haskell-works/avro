@@ -21,7 +21,7 @@ import qualified Hedgehog.Gen                as Gen
 import qualified Hedgehog.Range              as Range
 import           Test.Hspec
 
-import           Data.Avro               (encodeValue)
+import           Data.Avro               (encodeValueWithSchema)
 import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
 import qualified Data.Avro.Schema.Schema as Schema
 
@@ -55,12 +55,12 @@ spec = describe "Avro.Codec.Int64Spec" $ do
   it "Can encode 90071992547409917L correctly" $ require $ withTests 1 $ property $ do
     let expectedBuffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
     let value = OnlyInt64 90071992547409917
-    encodeValue schema value === expectedBuffer
+    encodeValueWithSchema schema value === expectedBuffer
 
   it "Can decode 90071992547409917L correctly" $ require $ withTests 1 $ property $ do
     let buffer = BL.pack [0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0x02]
     let value = OnlyInt64 90071992547409917
-    encodeValue schema value === buffer
+    encodeValueWithSchema schema value === buffer
 
   it "Can decode encoded Int64 values" $ require $ property $ do
     roundtripGen schema (Gen.int64 Range.linearBounded)
@@ -73,7 +73,7 @@ spec = describe "Avro.Codec.Int64Spec" $ do
   it "Can decode 36028797018963968 correctly" $ require $ withTests 1 $ property $ do
     let buffer = BL.pack (bitStringToWord8s "10000000 10000000 10000000 10000000 10000000 10000000 10000000 10000000 00000001")
     let value = OnlyInt64 36028797018963968
-    encodeValue schema value === buffer
+    encodeValueWithSchema schema value === buffer
 
   it "bitStringToWord8s 00000000"                   $  bitStringToWord8s "00000000"                    `shouldBe` [0x00             ]
   it "bitStringToWord8s 00000001"                   $  bitStringToWord8s "00000001"                    `shouldBe` [0x01             ]
