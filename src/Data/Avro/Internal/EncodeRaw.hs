@@ -2,6 +2,8 @@
 
 module Data.Avro.Internal.EncodeRaw
   ( EncodeRaw(..)
+  , putI
+  , long0
   ) where
 
 import Data.Avro.Internal.Zig
@@ -58,3 +60,13 @@ instance EncodeRaw Int32 where
 instance EncodeRaw Int64 where
   encodeRaw = encodeRaw . zig
   {-# INLINE encodeRaw #-}
+
+-- Put a Haskell Int.
+putI :: Int -> Builder
+putI = encodeRaw
+{-# INLINE putI #-}
+
+-- Terminating word for array and map types.
+long0 :: Builder
+long0 = encodeRaw (0 :: Word64)
+{-# INLINE long0 #-}

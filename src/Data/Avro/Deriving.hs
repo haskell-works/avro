@@ -34,29 +34,30 @@ module Data.Avro.Deriving
 )
 where
 
-import           Control.Monad                 (join)
-import           Control.Monad.Identity        (Identity)
-import           Data.Aeson                    (eitherDecode)
-import qualified Data.Aeson                    as J
-import           Data.Avro                     hiding (decode, encode)
-import           Data.Avro.Encoding.EncodeAvro (EncodeAvro (..), putI)
-import           Data.Avro.Schema.Schema       as S
-import           Data.ByteString               (ByteString)
-import qualified Data.ByteString               as B
-import           Data.Char                     (isAlphaNum)
-import qualified Data.Foldable                 as Foldable
+import           Control.Monad                (join)
+import           Control.Monad.Identity       (Identity)
+import           Data.Aeson                   (eitherDecode)
+import qualified Data.Aeson                   as J
+import           Data.Avro                    hiding (decode, encode)
+import           Data.Avro.Encoding.ToAvro    (ToAvro (..))
+import           Data.Avro.Internal.EncodeRaw (putI)
+import           Data.Avro.Schema.Schema      as S
+import           Data.ByteString              (ByteString)
+import qualified Data.ByteString              as B
+import           Data.Char                    (isAlphaNum)
+import qualified Data.Foldable                as Foldable
 import           Data.Int
-import           Data.List.NonEmpty            (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty            as NE
-import           Data.Map                      (Map)
-import           Data.Maybe                    (fromMaybe)
-import           Data.Semigroup                ((<>))
-import qualified Data.Text                     as Text
-import           Data.Time                     (Day, DiffTime, UTCTime)
-import           Data.UUID                     (UUID)
-import           Text.RawString.QQ             (r)
+import           Data.List.NonEmpty           (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty           as NE
+import           Data.Map                     (Map)
+import           Data.Maybe                   (fromMaybe)
+import           Data.Semigroup               ((<>))
+import qualified Data.Text                    as Text
+import           Data.Time                    (Day, DiffTime, UTCTime)
+import           Data.UUID                    (UUID)
+import           Text.RawString.QQ            (r)
 
-import qualified Data.Avro.Encoding.DecodeAvro as AV
+import qualified Data.Avro.Encoding.FromAvro as AV
 
 import GHC.Generics (Generic)
 
@@ -243,9 +244,9 @@ deriveAvroWithOptions' o s = do
   let schemas = extractDerivables s
   types       <- traverse (genType o) schemas
   hasSchema   <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
-  fromValues  <- traverse (genFromValue $ namespaceBehavior o) schemas
-  encodeAvros <- traverse (genEncodeAvro o) schemas
-  pure $ join types <> join hasSchema <> join fromValues <> join encodeAvros
+  fromAvros  <- traverse (genFromValue $ namespaceBehavior o) schemas
+  encodeAvros <- traverse (genToAvro o) schemas
+  pure $ join types <> join hasSchema <> join fromAvros <> join encodeAvros
 
 -- | Same as 'deriveAvroWithOptions' but uses 'defaultDeriveOptions'
 --
@@ -302,21 +303,21 @@ badValueNew v t = Left $ "Unexpected value for '" <> t <> "': " <> show v
 
 genFromValue :: NamespaceBehavior -> Schema -> Q [Dec]
 genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
-  [d| instance AV.DecodeAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromValue (AV.Enum _ i _) = $([| pure . toEnum|]) i
-        fromValue value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromAvro (AV.Enum _ i _) = $([| pure . toEnum|]) i
+        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromValue namespaceBehavior (S.Record n _ _ _ fs) =
-  [d| instance AV.DecodeAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromValue (AV.Record r) =
+  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromAvro (AV.Record r) =
            $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
-        fromValue value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromValue namespaceBehavior (S.Fixed n _ s _) =
-  [d| instance AV.DecodeAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromValue (AV.Fixed _ v)
+  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromAvro (AV.Fixed _ v)
           | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
-        fromValue value = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromAvro value = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
 genFromValue _ _                             = pure []
 
@@ -324,7 +325,7 @@ genFromAvroNewFieldsExp :: Name -> [Field] -> Q Exp
 genFromAvroNewFieldsExp n xs =
   [| \r ->
     $(let ctor = [| pure $(conE n) |]
-      in foldl (\expr (i, _) -> [| $expr <*> AV.fromValue (r V.! i) |]) ctor (zip [(0 :: Int)..] xs)
+      in foldl (\expr (i, _) -> [| $expr <*> AV.fromAvro (r V.! i) |]) ctor (zip [(0 :: Int)..] xs)
     )
   |]
 
@@ -349,45 +350,45 @@ newNames :: String
          -> Q [Name]
 newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 
-------------------------- EncodeAvro ------------------------------------------------
+------------------------- ToAvro ------------------------------------------------
 
-genEncodeAvro :: DeriveOptions -> Schema -> Q [Dec]
-genEncodeAvro opts s@(S.Enum n _ _ _) =
+genToAvro :: DeriveOptions -> Schema -> Q [Dec]
+genToAvro opts s@(S.Enum n _ _ _) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     encodeAvroInstance sname =
-      [d| instance EncodeAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
-            toEncoding = $([| \_ x -> putI (fromEnum x) |])
+      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toAvro = $([| \_ x -> putI (fromEnum x) |])
       |]
 
-genEncodeAvro opts s@(S.Record n _ _ _ fs) =
+genToAvro opts s@(S.Record n _ _ _ fs) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     encodeAvroInstance sname =
-      [d| instance EncodeAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
-            toEncoding = $(encodeAvroFieldsExp sname)
+      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toAvro = $(encodeAvroFieldsExp sname)
       |]
     encodeAvroFieldsExp sname = do
       names <- newNames "p_" (length fs)
       wn <- varP <$> newName "_"
       let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
       lamE [wn, con]
-            [| mconcat $( let build (fld, n) = [| toEncoding (fldType fld) $(varE n) |]
+            [| mconcat $( let build (fld, n) = [| toAvro (fldType fld) $(varE n) |]
                           in listE $ build <$> (zip fs names)
                         )
             |]
 
-genEncodeAvro opts s@(S.Fixed n _ _ _) =
+genToAvro opts s@(S.Fixed n _ _ _) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     encodeAvroInstance sname =
-      [d| instance EncodeAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
-            toEncoding = $(do
+      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toAvro = $(do
               x <- newName "x"
               wc <- newName "_"
-              lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toEncoding $(varE sname) $(varE x) |])
+              lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toAvro $(varE sname) $(varE x) |])
       |]
-genEncodeAvro _ _ = pure []
+genToAvro _ _ = pure []
 
 schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $

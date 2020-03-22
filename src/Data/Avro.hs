@@ -6,33 +6,8 @@
 {-# LANGUAGE TupleSections       #-}
 -- | Avro encoding and decoding routines.
 --
--- This library provides a high level interface for encoding (and decoding)
+-- This library provides a high level interface for encoding and decoding
 -- Haskell values in Apache's Avro serialization format.
---
--- The goal is to match Aeson's API whenever reasonable,
--- meaning user experience with one effectively translate to the other.
---
--- Avro RPC is not currently supported.
---
--- == Library Structure
---
--- The library structure includes:
---
---   * This module, "Data.Avro", providing a high-level interface via
---     classes of 'FromAvro' and 'ToAvro' for decoding and encoding values.
---
---   * "Data.Avro.Schema": Defines the type for Avro schema's and its JSON
---      encoding/decoding.
---
---   * "Data.Avro.Encode" and "Data.Avro.Decode": More
---     efficient conversion capable of avoiding the intermediate representation.
---     Also, the implementation of the en/decoding of the intermediate
---     representation.
---
---   * "Data.Avro.Decode.Lazy": Lazy/Streaming decoding for Avro containers.
---
---   * "Data.Avro.Deconflict": translate decoded data from an
---     encoder schema to the (potentially different) decoder's schema.
 module Data.Avro
   ( -- * Schema
     Schema(..)
@@ -65,8 +40,8 @@ module Data.Avro
   , decodeContainerValuesBytes
 
   -- * Classes
-  , EncodeAvro
-  , DecodeAvro
+  , ToAvro
+  , FromAvro
 
   -- * Compression
   , Codec, nullCodec, deflateCodec
@@ -76,19 +51,19 @@ module Data.Avro
 
   ) where
 
-import           Control.Monad                 ((>=>))
-import           Data.Avro.Codec               (Codec, deflateCodec, nullCodec)
-import           Data.Avro.Encoding.DecodeAvro
-import           Data.Avro.Encoding.EncodeAvro
+import           Control.Monad                ((>=>))
+import           Data.Avro.Codec              (Codec, deflateCodec, nullCodec)
+import           Data.Avro.Encoding.FromAvro
+import           Data.Avro.Encoding.ToAvro
 import           Data.Avro.HasAvroSchema
-import qualified Data.Avro.Internal.Container  as Container
-import           Data.Avro.Schema.Deconflict   (deconflict)
-import           Data.Avro.Schema.ReadSchema   (ReadSchema, fromSchema)
-import           Data.Avro.Schema.Schema       (Schema)
-import qualified Data.Avro.Schema.Schema       as Schema
-import           Data.Binary.Get               (runGetOrFail)
-import           Data.ByteString.Builder       (toLazyByteString)
-import qualified Data.ByteString.Lazy          as BL
+import qualified Data.Avro.Internal.Container as Container
+import           Data.Avro.Schema.Deconflict  (deconflict)
+import           Data.Avro.Schema.ReadSchema  (ReadSchema, fromSchema)
+import           Data.Avro.Schema.Schema      (Schema)
+import qualified Data.Avro.Schema.Schema      as Schema
+import           Data.Binary.Get              (runGetOrFail)
+import           Data.ByteString.Builder      (toLazyByteString)
+import qualified Data.ByteString.Lazy         as BL
 
 -- | Converts 'Schema' into 'ReadSchema'. This function may be useful when it is known
 -- that the writer and the reader schemas are the same.
@@ -97,15 +72,15 @@ readSchemaFromSchema = fromSchema
 {-# INLINE readSchemaFromSchema #-}
 
 -- | Serialises an individual value into Avro.
-encodeValue :: EncodeAvro a => Schema -> a -> BL.ByteString
-encodeValue s = toLazyByteString . toEncoding s
+encodeValue :: ToAvro a => Schema -> a -> BL.ByteString
+encodeValue s = toLazyByteString . toAvro s
 {-# INLINE encodeValue #-}
 
 -- | Deserialises an individual value from Avro.
-decodeValueWithSchema :: DecodeAvro a => ReadSchema -> BL.ByteString -> Either String a
+decodeValueWithSchema :: FromAvro a => ReadSchema -> BL.ByteString -> Either String a
 decodeValueWithSchema schema payload =
   case runGetOrFail (getValue schema) payload of
-    Right (bs, _, v) -> fromValue v
+    Right (bs, _, v) -> fromAvro v
     Left (_, _, e)   -> Left e
 
 -- | Decodes the container as a lazy list of values of the requested type.
@@ -114,9 +89,9 @@ decodeValueWithSchema schema payload =
 -- error. This means that the consumer will get all the "good" content from
 -- the container until the error is detected, then this error and then the list
 -- is finished.
-decodeContainerWithEmbeddedSchema :: forall a. DecodeAvro a => BL.ByteString -> [Either String a]
+decodeContainerWithEmbeddedSchema :: forall a. FromAvro a => BL.ByteString -> [Either String a]
 decodeContainerWithEmbeddedSchema payload =
-  case Container.extractContainerValues (pure . fromSchema) (getValue >=> (either fail pure . fromValue)) payload of
+  case Container.extractContainerValues (pure . fromSchema) (getValue >=> (either fail pure . fromAvro)) payload of
     Left err          -> [Left err]
     Right (_, values) -> values
 
@@ -129,9 +104,9 @@ decodeContainerWithEmbeddedSchema payload =
 -- error. This means that the consumer will get all the "good" content from
 -- the container until the error is detected, then this error and then the list
 -- is finished.
-decodeContainerWithReaderSchema :: forall a. DecodeAvro a => Schema -> BL.ByteString -> [Either String a]
+decodeContainerWithReaderSchema :: forall a. FromAvro a => Schema -> BL.ByteString -> [Either String a]
 decodeContainerWithReaderSchema readerSchema payload =
-  case Container.extractContainerValues (flip deconflict readerSchema) (getValue >=> (either fail pure . fromValue)) payload of
+  case Container.extractContainerValues (flip deconflict readerSchema) (getValue >=> (either fail pure . fromAvro)) payload of
     Left err          -> [Left err]
     Right (_, values) -> values
 
@@ -151,25 +126,25 @@ extractContainerValuesBytes =
 -- This is particularly useful when slicing up containers into one or more
 -- smaller files.  By extracting the original bytestring it is possible to
 -- avoid re-encoding data.
-decodeContainerValuesBytes :: forall a. DecodeAvro a
+decodeContainerValuesBytes :: forall a. FromAvro a
   => Schema
   -> BL.ByteString
   -> Either String (Schema, [Either String (a, BL.ByteString)])
 decodeContainerValuesBytes readerSchema =
-  Container.extractContainerValuesBytes (flip deconflict readerSchema) (getValue >=> (either fail pure . fromValue))
+  Container.extractContainerValuesBytes (flip deconflict readerSchema) (getValue >=> (either fail pure . fromAvro))
 {-# INLINE decodeContainerValuesBytes #-}
 
 
 -- |Encode chunks of objects into a container, using 16 random bytes for
 -- the synchronization markers. Blocks are compressed (or not) according
 -- to the given `Codec` (`nullCodec` or `deflateCodec`).
-encodeContainer :: EncodeAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
+encodeContainer :: ToAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
 encodeContainer codec sch xss =
   do sync <- Container.newSyncBytes
      return $ encodeContainerWithSync codec sch sync xss
 
 -- |Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
-encodeContainerWithSync :: EncodeAvro a => Codec -> Schema -> BL.ByteString -> [[a]] -> BL.ByteString
-encodeContainerWithSync = Container.packContainerValuesWithSync' toEncoding
+encodeContainerWithSync :: ToAvro a => Codec -> Schema -> BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync = Container.packContainerValuesWithSync' toAvro
 {-# INLINE encodeContainerWithSync #-}

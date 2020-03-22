@@ -3,7 +3,7 @@
     - Test round trip of example .avro containers
     - Test round trip of each type.
         - Data.Avro level To/From Avro classes
-        - Data.Avro.{Encode,Decode} level EncodeAvro/GetAvro classes
+        - Data.Avro.{Encode,Decode} level ToAvro/GetAvro classes
     - Test 'deconflict' for all pathalogical deconflications
 * In-comment in-haddock tutorials and examples.
 * Deal with 'order'?

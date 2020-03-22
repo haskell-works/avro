@@ -1,4 +1,4 @@
-module Avro.EncodeAvroSpec
+module Avro.ToAvroSpec
 ( spec
 )
 where
@@ -15,7 +15,7 @@ import Test.Hspec
 {-# ANN module ("HLint: ignore Redundant flip"  :: String) #-}
 
 spec :: Spec
-spec = describe "Avro.EncodeAvroSpec" $ do
+spec = describe "Avro.ToAvroSpec" $ do
   describe "Should encode directly and decode via new value" $ do
     it "Unions" $ require $ property $ roundtripGen schema'Unions unionsGen
     it "Endpoint" $ require $ property $ roundtripGen schema'Endpoint endpointGen

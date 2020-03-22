@@ -82,7 +82,7 @@ schema'Person :: Schema
 schema'Person = ...
 ```
 
-As well as all the useful instances for these types: `Eq`, `Show`, `Generic`, `NFData`, `DecodeAvro`, `EncodeAvro`.
+As well as all the useful instances for these types: `Eq`, `Show`, `Generic`, `FromAvro`, `ToAvro`.
 
 See `Data.Avro.Deriving` module for more options like code generation from Avro schemas in files, specifying strictness and prefixes, etc.
 

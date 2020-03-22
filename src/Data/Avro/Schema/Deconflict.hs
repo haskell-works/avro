@@ -24,10 +24,10 @@ import qualified Data.Vector             as V
 import           Data.Avro.Schema.ReadSchema (FieldStatus (..), ReadField, ReadSchema)
 import qualified Data.Avro.Schema.ReadSchema as Read
 
--- | @deconflict writer reader@ will produce a schema that can encode/decode
+-- | @deconflict writer reader@ will produce a schema that can decode
 -- with the writer's schema into the form specified by the reader's schema.
--- The returned schema is lazy in that it may have errors (but those will not
--- get in the way of pure parsing).
+--
+-- Schema resolution rules are described by the specification: <https://avro.apache.org/docs/current/spec.html#Schema+Resolution>
 deconflict :: Schema -> Schema -> Either String ReadSchema
 deconflict writerSchema readerSchema | writerSchema == readerSchema = pure (Read.fromSchema readerSchema)
 deconflict S.Null S.Null             = pure Read.Null

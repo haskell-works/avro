@@ -4,7 +4,13 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE StrictData        #-}
 {-# LANGUAGE TupleSections     #-}
-module Data.Avro.Encoding.DecodeAvro where
+module Data.Avro.Encoding.FromAvro
+( FromAvro(..)
+  -- ** For internal use
+, Value(..)
+, getValue
+)
+where
 
 import           Control.DeepSeq             (NFData)
 import           Control.Monad               (forM, replicateM)
@@ -40,6 +46,14 @@ import qualified Data.Vector.Unboxed         as UV
 import           GHC.Generics                (Generic)
 import           GHC.TypeLits
 
+-- | An intermediate data structute for decoding between Avro bytes and Haskell types.
+--
+-- Because reader and writer schemas, and therefore expected data types and layout
+-- can be different, deserialising bytes into Haskell types directly is not possible.
+--
+-- To overcome this issue this intermediate data structure is used: bytes are decoded into
+-- values of type 'Value' (using reader's layout and rules) and then translated to target
+-- Haskell types using 'FromAvro' type class machinery.
 data Value
       = Null
       | Boolean Bool
@@ -57,6 +71,8 @@ data Value
       | Enum    ReadSchema {-# UNPACK #-} Int {-# UNPACK #-} Text
   deriving (Eq, Show, Generic, NFData)
 
+-- | Descrive the value in a way that is safe to use in error messages
+-- (i.e. do not print values)
 describeValue :: Value -> String
 describeValue = \case
   Null          -> "Null"
@@ -75,142 +91,144 @@ describeValue = \case
   Record vs     -> "Record (fieldsNum = " <> show (V.length vs) <> ")"
 
 --------------------------------------------------------------------------
-class DecodeAvro a where
-  fromValue :: Value -> Either String a
 
-instance DecodeAvro Int where
-  fromValue (Int _ x)  = Right (fromIntegral x)
-  fromValue (Long _ x) = Right (fromIntegral x)
-  fromValue x          = Left ("Unable decode Int from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+-- | Descrives how to convert a given intermediate 'Value' into a Haskell data type.
+class FromAvro a where
+  fromAvro :: Value -> Either String a
 
-instance DecodeAvro Int32 where
-  fromValue (Int _ x) = Right x
-  fromValue x         = Left ("Unable decode Int32 from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Int where
+  fromAvro (Int _ x)  = Right (fromIntegral x)
+  fromAvro (Long _ x) = Right (fromIntegral x)
+  fromAvro x          = Left ("Unable decode Int from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Int64 where
-  fromValue (Long _ x) = Right x
-  fromValue (Int _ x)  = Right (fromIntegral x)
-  fromValue x          = Left ("Unable decode Int64 from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Int32 where
+  fromAvro (Int _ x) = Right x
+  fromAvro x         = Left ("Unable decode Int32 from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Double where
-  fromValue (Double _ x) = Right x
-  fromValue (Float _ x)  = Right (realToFrac x)
-  fromValue (Long _ x)   = Right (fromIntegral x)
-  fromValue (Int _ x)    = Right (fromIntegral x)
-  fromValue x            = Left ("Unable decode Double from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Int64 where
+  fromAvro (Long _ x) = Right x
+  fromAvro (Int _ x)  = Right (fromIntegral x)
+  fromAvro x          = Left ("Unable decode Int64 from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Float where
-  fromValue (Float _ x) = Right x
-  fromValue (Long _ x)  = Right (fromIntegral x)
-  fromValue (Int _ x)   = Right (fromIntegral x)
-  fromValue x           = Left ("Unable decode Double from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Double where
+  fromAvro (Double _ x) = Right x
+  fromAvro (Float _ x)  = Right (realToFrac x)
+  fromAvro (Long _ x)   = Right (fromIntegral x)
+  fromAvro (Int _ x)    = Right (fromIntegral x)
+  fromAvro x            = Left ("Unable decode Double from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Bool where
-  fromValue (Boolean x) = Right x
-  fromValue x           = Left ("Unable decode Bool from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Float where
+  fromAvro (Float _ x) = Right x
+  fromAvro (Long _ x)  = Right (fromIntegral x)
+  fromAvro (Int _ x)   = Right (fromIntegral x)
+  fromAvro x           = Left ("Unable decode Double from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Text where
-  fromValue (String _ x) = Right x
-  fromValue (Bytes _ x) = case Text.decodeUtf8' x of
+instance FromAvro Bool where
+  fromAvro (Boolean x) = Right x
+  fromAvro x           = Left ("Unable decode Bool from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
+
+instance FromAvro Text where
+  fromAvro (String _ x) = Right x
+  fromAvro (Bytes _ x) = case Text.decodeUtf8' x of
     Left unicodeExc -> Left (show unicodeExc)
     Right text      -> Right text
-  fromValue x          = Left ("Unable decode Text from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+  fromAvro x          = Left ("Unable decode Text from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro BS.ByteString where
-  fromValue (Bytes _ x)  = Right x
-  fromValue (String _ x) = Right (Text.encodeUtf8 x)
-  fromValue x            = Left ("Unable to decode Bytes from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro BS.ByteString where
+  fromAvro (Bytes _ x)  = Right x
+  fromAvro (String _ x) = Right (Text.encodeUtf8 x)
+  fromAvro x            = Left ("Unable to decode Bytes from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro BL.ByteString where
-  fromValue (Bytes _ bs) = Right (BL.fromStrict bs)
-  fromValue (String _ x) = Right (BL.fromStrict $ Text.encodeUtf8 x)
-  fromValue x            = Left ("Unable decode Bytes from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro BL.ByteString where
+  fromAvro (Bytes _ bs) = Right (BL.fromStrict bs)
+  fromAvro (String _ x) = Right (BL.fromStrict $ Text.encodeUtf8 x)
+  fromAvro x            = Left ("Unable decode Bytes from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance (KnownNat p, KnownNat s) => DecodeAvro (D.Decimal p s) where
-  fromValue (Long _ n) = Right $ D.fromUnderlyingValue $ fromIntegral n
-  fromValue (Int _ n)  = Right $ D.fromUnderlyingValue $ fromIntegral n
-  fromValue x          = Left ("Unable to decode Decimal from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance (KnownNat p, KnownNat s) => FromAvro (D.Decimal p s) where
+  fromAvro (Long _ n) = Right $ D.fromUnderlyingValue $ fromIntegral n
+  fromAvro (Int _ n)  = Right $ D.fromUnderlyingValue $ fromIntegral n
+  fromAvro x          = Left ("Unable to decode Decimal from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro UUID.UUID where
-  fromValue (String _ x) =
+instance FromAvro UUID.UUID where
+  fromAvro (String _ x) =
     case UUID.fromText x of
       Nothing -> Left "Unable to UUID from a given String value"
       Just u  -> Right u
-  fromValue x            = Left ("Unable to decode UUID from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+  fromAvro x            = Left ("Unable to decode UUID from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Time.Day where
-  fromValue (Int (ReadSchema.Int (Just ReadSchema.Date)) n) = Right $ fromDaysSinceEpoch (toInteger n)
-  fromValue x                                               = Left ("Unable to decode Day from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Time.Day where
+  fromAvro (Int (ReadSchema.Int (Just ReadSchema.Date)) n) = Right $ fromDaysSinceEpoch (toInteger n)
+  fromAvro x                                               = Left ("Unable to decode Day from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Time.DiffTime where
-  fromValue (Int (ReadSchema.Int (Just ReadSchema.TimeMillis)) n)          = Right $ millisToDiffTime (toInteger n)
-  fromValue (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMillis)) n) = Right $ millisToDiffTime (toInteger n)
-  fromValue (Long (ReadSchema.Long _ (Just ReadSchema.TimeMicros)) n)      = Right $ microsToDiffTime (toInteger n)
-  fromValue (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMicros)) n) = Right $ microsToDiffTime (toInteger n)
-  fromValue x                                                              = Left ("Unable to decode TimeDiff from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Time.DiffTime where
+  fromAvro (Int (ReadSchema.Int (Just ReadSchema.TimeMillis)) n)          = Right $ millisToDiffTime (toInteger n)
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMillis)) n) = Right $ millisToDiffTime (toInteger n)
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.TimeMicros)) n)      = Right $ microsToDiffTime (toInteger n)
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMicros)) n) = Right $ microsToDiffTime (toInteger n)
+  fromAvro x                                                              = Left ("Unable to decode TimeDiff from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro Time.UTCTime where
-  fromValue (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMicros)) n) = Right $ microsToUTCTime (toInteger n)
-  fromValue (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMillis)) n) = Right $ millisToUTCTime (toInteger n)
-  fromValue x                                                              = Left ("Unable to decode UTCTime from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro Time.UTCTime where
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMicros)) n) = Right $ microsToUTCTime (toInteger n)
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMillis)) n) = Right $ millisToUTCTime (toInteger n)
+  fromAvro x                                                              = Left ("Unable to decode UTCTime from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro a => DecodeAvro [a] where
-  fromValue (Array vec) = mapM fromValue $ V.toList vec
-  fromValue x           = Left ("Unable to decode Array from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro a => FromAvro [a] where
+  fromAvro (Array vec) = mapM fromAvro $ V.toList vec
+  fromAvro x           = Left ("Unable to decode Array from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro a => DecodeAvro (Vector a) where
-  fromValue (Array vec) = mapM fromValue vec
-  fromValue x           = Left ("Unable to decode Array from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro a => FromAvro (Vector a) where
+  fromAvro (Array vec) = mapM fromAvro vec
+  fromAvro x           = Left ("Unable to decode Array from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance (UV.Unbox a, DecodeAvro a) => DecodeAvro (UV.Vector a) where
-  fromValue (Array vec) = UV.convert <$> mapM fromValue vec
-  fromValue x           = Left ("Unable to decode Array from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance (UV.Unbox a, FromAvro a) => FromAvro (UV.Vector a) where
+  fromAvro (Array vec) = UV.convert <$> mapM fromAvro vec
+  fromAvro x           = Left ("Unable to decode Array from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro a => DecodeAvro (Identity a) where
-  fromValue (Union _ 0 v) = Identity <$> fromValue v
-  fromValue (Union _ n _) = Left ("Unable to decode Identity value from value with a position #" <> show n)
-  fromValue x             = Left ("Unable to decode Identity from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro a => FromAvro (Identity a) where
+  fromAvro (Union _ 0 v) = Identity <$> fromAvro v
+  fromAvro (Union _ n _) = Left ("Unable to decode Identity value from value with a position #" <> show n)
+  fromAvro x             = Left ("Unable to decode Identity from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro a => DecodeAvro (Maybe a) where
-  fromValue (Union _ _ Null) = Right Nothing
-  fromValue (Union _ _ v)    = Just <$> fromValue v
-  fromValue x                = Left ("Unable to decode Maybe from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro a => FromAvro (Maybe a) where
+  fromAvro (Union _ _ Null) = Right Nothing
+  fromAvro (Union _ _ v)    = Just <$> fromAvro v
+  fromAvro x                = Left ("Unable to decode Maybe from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance (DecodeAvro a, DecodeAvro b) => DecodeAvro (Either a b) where
-  fromValue (Union _ 0 a) = Left <$> fromValue a
-  fromValue (Union _ 1 b) = Right <$> fromValue b
-  fromValue (Union _ n _) = Left ("Unable to decode union value with a position #" <> show n)
-  fromValue x             = Left ("Unable to decode Either from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
+  fromAvro (Union _ 0 a) = Left <$> fromAvro a
+  fromAvro (Union _ 1 b) = Right <$> fromAvro b
+  fromAvro (Union _ n _) = Left ("Unable to decode union value with a position #" <> show n)
+  fromAvro x             = Left ("Unable to decode Either from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro a => DecodeAvro (Map.Map Text a) where
-  fromValue (Map mp) = traverse fromValue (Map.fromList (HashMap.toList mp))
-  fromValue x        = Left ("Unable to decode Map from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro a => FromAvro (Map.Map Text a) where
+  fromAvro (Map mp) = traverse fromAvro (Map.fromList (HashMap.toList mp))
+  fromAvro x        = Left ("Unable to decode Map from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
-instance DecodeAvro a => DecodeAvro (HashMap.HashMap Text a) where
-  fromValue (Map mp) = traverse fromValue mp
-  fromValue x        = Left ("Unable to decode Map from: " <> show (describeValue x))
-  {-# INLINE fromValue #-}
+instance FromAvro a => FromAvro (HashMap.HashMap Text a) where
+  fromAvro (Map mp) = traverse fromAvro mp
+  fromAvro x        = Left ("Unable to decode Map from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
 
 
 getValue :: ReadSchema -> Get Value

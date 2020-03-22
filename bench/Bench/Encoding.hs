@@ -64,20 +64,20 @@ encodeToBS :: Benchmark
 encodeToBS = env (many 1e5 newOuter) $ \ values ->
   bgroup "Encode to ByteString"
     [ bgroup "Simple type"
-        [ bench "Encode via EncodeAvro" $ nf (fmap (BL.toStrict . encodeValue schema'Outer)) values
+        [ bench "Encode via ToAvro" $ nf (fmap (BL.toStrict . encodeValue schema'Outer)) values
         ]
     ]
 
 encodeContainer :: Benchmark
 encodeContainer = env (chunksOf 100 . Vector.toList <$> many 1e5 newOuter) $ \values ->
   bgroup "Encode container"
-    [ bench "Via EncodeAvro" $ nfIO $ Avro.encodeContainer nullCodec schema'Outer values
+    [ bench "Via ToAvro" $ nfIO $ Avro.encodeContainer nullCodec schema'Outer values
     ]
 
 roundtripContainer :: Benchmark
 roundtripContainer = env (chunksOf 100 . Vector.toList <$> many 1e5 newOuter) $ \values ->
   bgroup "Roundtrip container"
-    [ bench "Via EncodeAvro/DecodeAvro" $ nfIO $ decodeContainerWithEmbeddedSchema @Outer <$> Avro.encodeContainer nullCodec schema'Outer values
+    [ bench "Via ToAvro/FromAvro" $ nfIO $ decodeContainerWithEmbeddedSchema @Outer <$> Avro.encodeContainer nullCodec schema'Outer values
     ]
 
 chunksOf :: Int -> [a] -> [[a]]

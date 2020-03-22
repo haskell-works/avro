@@ -15,7 +15,7 @@ import Test.Hspec
 spec :: Spec
 spec = describe "Avro.Encoding.LogicalTypesSpec" $ do
   describe "Round-tripping" $ do
-    it "shoule encode with EncodeAvro and decode with DecodeAvro" $ require $ property $ do
+    it "shoule encode with ToAvro and decode with FromAvro" $ require $ property $ do
       x <- forAll logicalGen
       tripping x (encodeValue schema'Logical) (decodeValueWithSchema (fromSchema schema'Logical))
 

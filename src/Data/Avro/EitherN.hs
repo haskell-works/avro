@@ -7,18 +7,19 @@
 module Data.Avro.EitherN where
 
 import           Data.Avro
-import           Data.Avro.Encoding.DecodeAvro (DecodeAvro (..))
-import qualified Data.Avro.Encoding.DecodeAvro as AV
-import           Data.Avro.Encoding.EncodeAvro (EncodeAvro (..), putI)
-import           Data.Avro.Schema.Schema       as S
-import           Data.Bifoldable               (Bifoldable (..))
-import           Data.Bifunctor                (Bifunctor (..))
-import           Data.Bitraversable            (Bitraversable (..))
-import           Data.ByteString.Builder       (Builder)
+import           Data.Avro.Encoding.FromAvro  (FromAvro (..))
+import qualified Data.Avro.Encoding.FromAvro  as AV
+import           Data.Avro.Encoding.ToAvro    (ToAvro (..))
+import           Data.Avro.Internal.EncodeRaw (putI)
+import           Data.Avro.Schema.Schema      as S
+import           Data.Bifoldable              (Bifoldable (..))
+import           Data.Bifunctor               (Bifunctor (..))
+import           Data.Bitraversable           (Bitraversable (..))
+import           Data.ByteString.Builder      (Builder)
 import           Data.List.NonEmpty
 import           Data.Tagged
-import qualified Data.Vector                   as V
-import           GHC.Generics                  (Generic)
+import qualified Data.Vector                  as V
+import           GHC.Generics                 (Generic)
 
 data Either3 a b c = E3_1 a | E3_2 b | E3_3 c deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
@@ -438,98 +439,98 @@ instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, Ha
                               ])
 
 ------------ DATA.AVRO.VALUE --------------------------------
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c) => DecodeAvro (Either3 a b c) where
-  fromValue (AV.Union _ 0 a) = E3_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E3_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E3_3 <$> fromValue c
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either3 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c) => FromAvro (Either3 a b c) where
+  fromAvro (AV.Union _ 0 a) = E3_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E3_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E3_3 <$> fromAvro c
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either3 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d) => DecodeAvro (Either4 a b c d) where
-  fromValue (AV.Union _ 0 a) = E4_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E4_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E4_3 <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E4_4 <$> fromValue d
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either4 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d) => FromAvro (Either4 a b c d) where
+  fromAvro (AV.Union _ 0 a) = E4_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E4_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E4_3 <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E4_4 <$> fromAvro d
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either4 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e) => DecodeAvro (Either5 a b c d e) where
-  fromValue (AV.Union _ 0 a) = E5_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E5_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E5_3 <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E5_4 <$> fromValue d
-  fromValue (AV.Union _ 4 e) = E5_5 <$> fromValue e
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either5 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e) => FromAvro (Either5 a b c d e) where
+  fromAvro (AV.Union _ 0 a) = E5_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E5_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E5_3 <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E5_4 <$> fromAvro d
+  fromAvro (AV.Union _ 4 e) = E5_5 <$> fromAvro e
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either5 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e, DecodeAvro f) => DecodeAvro (Either6 a b c d e f) where
-  fromValue (AV.Union _ 0 a) = E6_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E6_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E6_3 <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E6_4 <$> fromValue d
-  fromValue (AV.Union _ 4 e) = E6_5 <$> fromValue e
-  fromValue (AV.Union _ 5 f) = E6_6 <$> fromValue f
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either6 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f) => FromAvro (Either6 a b c d e f) where
+  fromAvro (AV.Union _ 0 a) = E6_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E6_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E6_3 <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E6_4 <$> fromAvro d
+  fromAvro (AV.Union _ 4 e) = E6_5 <$> fromAvro e
+  fromAvro (AV.Union _ 5 f) = E6_6 <$> fromAvro f
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either6 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e, DecodeAvro f, DecodeAvro g) => DecodeAvro (Either7 a b c d e f g) where
-  fromValue (AV.Union _ 0 a) = E7_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E7_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E7_3 <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E7_4 <$> fromValue d
-  fromValue (AV.Union _ 4 e) = E7_5 <$> fromValue e
-  fromValue (AV.Union _ 5 f) = E7_6 <$> fromValue f
-  fromValue (AV.Union _ 6 g) = E7_7 <$> fromValue g
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either7 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g) => FromAvro (Either7 a b c d e f g) where
+  fromAvro (AV.Union _ 0 a) = E7_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E7_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E7_3 <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E7_4 <$> fromAvro d
+  fromAvro (AV.Union _ 4 e) = E7_5 <$> fromAvro e
+  fromAvro (AV.Union _ 5 f) = E7_6 <$> fromAvro f
+  fromAvro (AV.Union _ 6 g) = E7_7 <$> fromAvro g
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either7 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e, DecodeAvro f, DecodeAvro g, DecodeAvro h) => DecodeAvro (Either8 a b c d e f g h) where
-  fromValue (AV.Union _ 0 a) = E8_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E8_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E8_3 <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E8_4 <$> fromValue d
-  fromValue (AV.Union _ 4 e) = E8_5 <$> fromValue e
-  fromValue (AV.Union _ 5 f) = E8_6 <$> fromValue f
-  fromValue (AV.Union _ 6 g) = E8_7 <$> fromValue g
-  fromValue (AV.Union _ 7 h) = E8_8 <$> fromValue h
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either8 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h) => FromAvro (Either8 a b c d e f g h) where
+  fromAvro (AV.Union _ 0 a) = E8_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E8_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E8_3 <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E8_4 <$> fromAvro d
+  fromAvro (AV.Union _ 4 e) = E8_5 <$> fromAvro e
+  fromAvro (AV.Union _ 5 f) = E8_6 <$> fromAvro f
+  fromAvro (AV.Union _ 6 g) = E8_7 <$> fromAvro g
+  fromAvro (AV.Union _ 7 h) = E8_8 <$> fromAvro h
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either8 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e, DecodeAvro f, DecodeAvro g, DecodeAvro h, DecodeAvro i) => DecodeAvro (Either9 a b c d e f g h i) where
-  fromValue (AV.Union _ 0 a) = E9_1 <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E9_2 <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E9_3 <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E9_4 <$> fromValue d
-  fromValue (AV.Union _ 4 e) = E9_5 <$> fromValue e
-  fromValue (AV.Union _ 5 f) = E9_6 <$> fromValue f
-  fromValue (AV.Union _ 6 g) = E9_7 <$> fromValue g
-  fromValue (AV.Union _ 7 h) = E9_8 <$> fromValue h
-  fromValue (AV.Union _ 8 i) = E9_9 <$> fromValue i
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either9 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h, FromAvro i) => FromAvro (Either9 a b c d e f g h i) where
+  fromAvro (AV.Union _ 0 a) = E9_1 <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E9_2 <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E9_3 <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E9_4 <$> fromAvro d
+  fromAvro (AV.Union _ 4 e) = E9_5 <$> fromAvro e
+  fromAvro (AV.Union _ 5 f) = E9_6 <$> fromAvro f
+  fromAvro (AV.Union _ 6 g) = E9_7 <$> fromAvro g
+  fromAvro (AV.Union _ 7 h) = E9_8 <$> fromAvro h
+  fromAvro (AV.Union _ 8 i) = E9_9 <$> fromAvro i
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either9 from a position #" <> show n)
 
-instance (DecodeAvro a, DecodeAvro b, DecodeAvro c, DecodeAvro d, DecodeAvro e, DecodeAvro f, DecodeAvro g, DecodeAvro h, DecodeAvro i, DecodeAvro j) => DecodeAvro (Either10 a b c d e f g h i j) where
-  fromValue (AV.Union _ 0 a) = E10_1  <$> fromValue a
-  fromValue (AV.Union _ 1 b) = E10_2  <$> fromValue b
-  fromValue (AV.Union _ 2 c) = E10_3  <$> fromValue c
-  fromValue (AV.Union _ 3 d) = E10_4  <$> fromValue d
-  fromValue (AV.Union _ 4 e) = E10_5  <$> fromValue e
-  fromValue (AV.Union _ 5 f) = E10_6  <$> fromValue f
-  fromValue (AV.Union _ 6 g) = E10_7  <$> fromValue g
-  fromValue (AV.Union _ 7 h) = E10_8  <$> fromValue h
-  fromValue (AV.Union _ 8 i) = E10_9  <$> fromValue i
-  fromValue (AV.Union _ 9 j) = E10_10 <$> fromValue j
-  fromValue (AV.Union _ n _) = Left ("Unable to decode Either10 from a position #" <> show n)
+instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h, FromAvro i, FromAvro j) => FromAvro (Either10 a b c d e f g h i j) where
+  fromAvro (AV.Union _ 0 a) = E10_1  <$> fromAvro a
+  fromAvro (AV.Union _ 1 b) = E10_2  <$> fromAvro b
+  fromAvro (AV.Union _ 2 c) = E10_3  <$> fromAvro c
+  fromAvro (AV.Union _ 3 d) = E10_4  <$> fromAvro d
+  fromAvro (AV.Union _ 4 e) = E10_5  <$> fromAvro e
+  fromAvro (AV.Union _ 5 f) = E10_6  <$> fromAvro f
+  fromAvro (AV.Union _ 6 g) = E10_7  <$> fromAvro g
+  fromAvro (AV.Union _ 7 h) = E10_8  <$> fromAvro h
+  fromAvro (AV.Union _ 8 i) = E10_9  <$> fromAvro i
+  fromAvro (AV.Union _ 9 j) = E10_10 <$> fromAvro j
+  fromAvro (AV.Union _ n _) = Left ("Unable to decode Either10 from a position #" <> show n)
 
-putIndexedValue :: EncodeAvro a => Int -> V.Vector Schema -> a -> Builder
-putIndexedValue i opts x = putI i <> toEncoding (V.unsafeIndex opts i) x
+putIndexedValue :: ToAvro a => Int -> V.Vector Schema -> a -> Builder
+putIndexedValue i opts x = putI i <> toAvro (V.unsafeIndex opts i) x
 {-# INLINE putIndexedValue #-}
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c) => EncodeAvro (Either3 a b c) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c) => ToAvro (Either3 a b c) where
+  toAvro (S.Union opts) v =
     if V.length opts == 3
       then case v of
         E3_1 x -> putIndexedValue 0 opts x
         E3_2 x -> putIndexedValue 1 opts x
         E3_3 x -> putIndexedValue 2 opts x
       else error ("Unable to encode Either3 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either3 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either3 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d) => EncodeAvro (Either4 a b c d) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d) => ToAvro (Either4 a b c d) where
+  toAvro (S.Union opts) v =
     if V.length opts == 4
       then case v of
         E4_1 x -> putIndexedValue 0 opts x
@@ -537,10 +538,10 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d) => EncodeAvro 
         E4_3 x -> putIndexedValue 2 opts x
         E4_4 x -> putIndexedValue 3 opts x
       else error ("Unable to encode Either4 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either4 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either4 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e) => EncodeAvro (Either5 a b c d e) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e) => ToAvro (Either5 a b c d e) where
+  toAvro (S.Union opts) v =
     if V.length opts == 5
       then case v of
         E5_1 x -> putIndexedValue 0 opts x
@@ -549,10 +550,10 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e) 
         E5_4 x -> putIndexedValue 3 opts x
         E5_5 x -> putIndexedValue 4 opts x
       else error ("Unable to encode Either5 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either5 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either5 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f) => EncodeAvro (Either6 a b c d e f) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f) => ToAvro (Either6 a b c d e f) where
+  toAvro (S.Union opts) v =
     if V.length opts == 6
       then case v of
         E6_1 x -> putIndexedValue 0 opts x
@@ -562,10 +563,10 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
         E6_5 x -> putIndexedValue 4 opts x
         E6_6 x -> putIndexedValue 5 opts x
       else error ("Unable to encode Either6 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either6 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either6 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g) => EncodeAvro (Either7 a b c d e f g) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g) => ToAvro (Either7 a b c d e f g) where
+  toAvro (S.Union opts) v =
     if V.length opts == 7
       then case v of
         E7_1 x -> putIndexedValue 0 opts x
@@ -576,10 +577,10 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
         E7_6 x -> putIndexedValue 5 opts x
         E7_7 x -> putIndexedValue 6 opts x
       else error ("Unable to encode Either7 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either7 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either7 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g, EncodeAvro h) => EncodeAvro (Either8 a b c d e f g h) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g, ToAvro h) => ToAvro (Either8 a b c d e f g h) where
+  toAvro (S.Union opts) v =
     if V.length opts == 8
       then case v of
         E8_1 x -> putIndexedValue 0 opts x
@@ -591,10 +592,10 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
         E8_7 x -> putIndexedValue 6 opts x
         E8_8 x -> putIndexedValue 7 opts x
       else error ("Unable to encode Either8 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either8 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either8 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g, EncodeAvro h, EncodeAvro i) => EncodeAvro (Either9 a b c d e f g h i) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g, ToAvro h, ToAvro i) => ToAvro (Either9 a b c d e f g h i) where
+  toAvro (S.Union opts) v =
     if V.length opts == 9
       then case v of
         E9_1 x -> putIndexedValue 0 opts x
@@ -607,10 +608,10 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
         E9_8 x -> putIndexedValue 7 opts x
         E9_9 x -> putIndexedValue 8 opts x
       else error ("Unable to encode Either9 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either9 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either9 as " <> show s)
 
-instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, EncodeAvro f, EncodeAvro g, EncodeAvro h, EncodeAvro i, EncodeAvro j) => EncodeAvro (Either10 a b c d e f g h i j) where
-  toEncoding (S.Union opts) v =
+instance (ToAvro a, ToAvro b, ToAvro c, ToAvro d, ToAvro e, ToAvro f, ToAvro g, ToAvro h, ToAvro i, ToAvro j) => ToAvro (Either10 a b c d e f g h i j) where
+  toAvro (S.Union opts) v =
     if V.length opts == 10
       then case v of
         E10_1 x  -> putIndexedValue 0 opts x
@@ -624,4 +625,4 @@ instance (EncodeAvro a, EncodeAvro b, EncodeAvro c, EncodeAvro d, EncodeAvro e, 
         E10_9 x  -> putIndexedValue 8 opts x
         E10_10 x -> putIndexedValue 9 opts x
       else  error ("Unable to encode Either10 as " <> show opts)
-  toEncoding s _ = error ("Unable to encode Either10 as " <> show s)
+  toAvro s _ = error ("Unable to encode Either10 as " <> show s)

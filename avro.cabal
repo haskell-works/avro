@@ -120,13 +120,12 @@ library
                       , raw-strings-qq
   exposed-modules:      Data.Avro
                         Data.Avro.Codec
-                        Data.Avro.Decode.Get
                         Data.Avro.Deriving
                         Data.Avro.Deriving.Lift
                         Data.Avro.Deriving.NormSchema
                         Data.Avro.EitherN
-                        Data.Avro.Encoding.DecodeAvro
-                        Data.Avro.Encoding.EncodeAvro
+                        Data.Avro.Encoding.FromAvro
+                        Data.Avro.Encoding.ToAvro
                         Data.Avro.HasAvroSchema
                         Data.Avro.Internal.Container
                         Data.Avro.Internal.DecodeRaw
@@ -232,7 +231,7 @@ test-suite test
                         Avro.TestUtils
                         Avro.THEnumSpec
                         Avro.THReusedSpec
-                        Avro.EncodeAvroSpec
+                        Avro.ToAvroSpec
                         Paths_avro
   autogen-modules:      Paths_avro
   hs-source-dirs:       test

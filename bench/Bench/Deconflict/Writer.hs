@@ -1,50 +1,15 @@
-{-# LANGUAGE DeriveAnyClass      #-}
-{-# LANGUAGE DeriveFoldable      #-}
-{-# LANGUAGE DeriveFunctor       #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE DeriveTraversable   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE StrictData          #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE TypeApplications    #-}
-
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE QuasiQuotes        #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StrictData         #-}
+{-# LANGUAGE TemplateHaskell    #-}
 module Bench.Deconflict.Writer
 where
 
+import Control.DeepSeq    (NFData)
 import Data.Avro.Deriving
-import Data.Avro.Encoding.DecodeAvro (DecodeAvro (..), Value (..))
-
-import           Control.Monad           (replicateM, when)
-import           Data.Avro.Schema.Schema (Field, Schema, TypeName)
-import           Data.Binary.Get
-import           Data.ByteString         (ByteString)
-import           Data.Foldable
-import           Data.Text               (Text)
-import           Data.Traversable
-import           Data.Vector             (Vector)
-import qualified Data.Vector             as V
-import qualified Data.Vector.Mutable     as MV
-import           GHC.Int                 (Int32, Int64)
-
-import qualified Data.Avro.Decode.Get    as Get
-import qualified Data.Avro.Schema.Schema as S
-import qualified Data.Binary.Get         as Get
-
-import qualified Data.ByteString.Lazy as LBS
-import           Data.HashMap.Strict  (HashMap)
-import qualified Data.HashMap.Strict  as HashMap
-import qualified Data.Text            as Text
-import qualified Data.Text.Encoding   as Text
-
-import Control.Monad.ST (ST)
-import Data.Dynamic
-
-import Control.DeepSeq
 
 deriveAvroFromByteString [r|
 {
