@@ -8,7 +8,7 @@ module Bench.Deconflict
 )
 where
 
-import Data.Avro                   (decodeContainerWithReaderSchema, decodeValueWithSchema, encodeContainer, encodeValueWithSchema, nullCodec)
+import Data.Avro                   (decodeContainerWithReaderSchema, decodeValue, decodeValueWithSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Vector                 (Vector)
 
@@ -28,18 +28,18 @@ newOuter = do
 many :: Int -> IO a -> IO (Vector a)
 many = Vector.replicateM
 
-notOnly :: Benchmark
-notOnly = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ values ->
+values :: Benchmark
+values = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ values ->
   let
     readSchema = fromSchema W.schema'Outer
   in bgroup "Encoded: ByteString"
       [ bgroup "No Deconflict"
-          [ bench "Read via Encoding"      $ nf (fmap (decodeValueWithSchema @W.Outer readSchema)) values
+          [ bench "Read via FromAvro" $ nf (fmap (decodeValueWithSchema @W.Outer readSchema)) values
           ]
       ]
 
 container :: Benchmark
-container = env (many 1e5 newOuter >>= (\vs -> encodeContainer nullCodec W.schema'Outer [Vector.toList vs])) $ \payload ->
+container = env (many 1e5 newOuter >>= (\vs -> encodeContainerWithSchema nullCodec W.schema'Outer [Vector.toList vs])) $ \payload ->
   bgroup "Decoding container"
-    [ bench "From Encoding" $ nf (\v -> decodeContainerWithReaderSchema @R.Outer R.schema'Outer v) payload
+    [ bench "From FromAvro" $ nf (\v -> decodeContainerWithReaderSchema @R.Outer R.schema'Outer v) payload
     ]

@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module Data.Avro.EitherN where
 
@@ -358,84 +359,84 @@ instance Bitraversable (Either10 a b c d e f g h) where
   bitraverse _ g (E10_10 a) = E10_10 <$> (g a)
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c) => HasAvroSchema (Either3 a b c) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                             untag (schema :: Tagged b Schema),
-                             untag (schema :: Tagged c Schema)
+  schema = Tagged $ mkUnion (untag @a schema :| [
+                             untag @b schema,
+                             untag @c schema
                             ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d) => HasAvroSchema (Either4 a b c d) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                             untag (schema :: Tagged b Schema),
-                             untag (schema :: Tagged c Schema),
-                             untag (schema :: Tagged d Schema)
+  schema = Tagged $ mkUnion (untag @a schema :| [
+                             untag @b schema,
+                             untag @c schema,
+                             untag @d schema
                             ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e) => HasAvroSchema (Either5 a b c d e) where
-  schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                             untag (schema :: Tagged b Schema),
-                             untag (schema :: Tagged c Schema),
-                             untag (schema :: Tagged d Schema),
-                             untag (schema :: Tagged e Schema)
+  schema = Tagged $ mkUnion (untag @a schema :| [
+                             untag @b schema,
+                             untag @c schema,
+                             untag @d schema,
+                             untag @e schema
                             ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e, HasAvroSchema f)
   => HasAvroSchema (Either6 a b c d e f) where
-    schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                               untag (schema :: Tagged b Schema),
-                               untag (schema :: Tagged c Schema),
-                               untag (schema :: Tagged d Schema),
-                               untag (schema :: Tagged e Schema),
-                               untag (schema :: Tagged f Schema)
+    schema = Tagged $ mkUnion (untag @a schema :| [
+                               untag @b schema,
+                               untag @c schema,
+                               untag @d schema,
+                               untag @e schema,
+                               untag @f schema
                               ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e, HasAvroSchema f, HasAvroSchema g)
   => HasAvroSchema (Either7 a b c d e f g) where
-    schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                               untag (schema :: Tagged b Schema),
-                               untag (schema :: Tagged c Schema),
-                               untag (schema :: Tagged d Schema),
-                               untag (schema :: Tagged e Schema),
-                               untag (schema :: Tagged f Schema),
-                               untag (schema :: Tagged g Schema)
+    schema = Tagged $ mkUnion (untag @a schema :| [
+                               untag @b schema,
+                               untag @c schema,
+                               untag @d schema,
+                               untag @e schema,
+                               untag @f schema,
+                               untag @g schema
                               ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e, HasAvroSchema f, HasAvroSchema g, HasAvroSchema h)
   => HasAvroSchema (Either8 a b c d e f g h) where
-    schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                               untag (schema :: Tagged b Schema),
-                               untag (schema :: Tagged c Schema),
-                               untag (schema :: Tagged d Schema),
-                               untag (schema :: Tagged e Schema),
-                               untag (schema :: Tagged f Schema),
-                               untag (schema :: Tagged g Schema),
-                               untag (schema :: Tagged h Schema)
+    schema = Tagged $ mkUnion (untag @a schema :| [
+                               untag @b schema,
+                               untag @c schema,
+                               untag @d schema,
+                               untag @e schema,
+                               untag @f schema,
+                               untag @g schema,
+                               untag @h schema
                               ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e, HasAvroSchema f, HasAvroSchema g, HasAvroSchema h, HasAvroSchema i)
   => HasAvroSchema (Either9 a b c d e f g h i) where
-    schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                               untag (schema :: Tagged b Schema),
-                               untag (schema :: Tagged c Schema),
-                               untag (schema :: Tagged d Schema),
-                               untag (schema :: Tagged e Schema),
-                               untag (schema :: Tagged f Schema),
-                               untag (schema :: Tagged g Schema),
-                               untag (schema :: Tagged h Schema),
-                               untag (schema :: Tagged i Schema)
+    schema = Tagged $ mkUnion (untag @a schema :| [
+                               untag @b schema,
+                               untag @c schema,
+                               untag @d schema,
+                               untag @e schema,
+                               untag @f schema,
+                               untag @g schema,
+                               untag @h schema,
+                               untag @i schema
                               ])
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c, HasAvroSchema d, HasAvroSchema e, HasAvroSchema f, HasAvroSchema g, HasAvroSchema h, HasAvroSchema i, HasAvroSchema j)
   => HasAvroSchema (Either10 a b c d e f g h i j) where
-    schema = Tagged $ mkUnion (untag (schema :: Tagged a Schema) :| [
-                               untag (schema :: Tagged b Schema),
-                               untag (schema :: Tagged c Schema),
-                               untag (schema :: Tagged d Schema),
-                               untag (schema :: Tagged e Schema),
-                               untag (schema :: Tagged f Schema),
-                               untag (schema :: Tagged g Schema),
-                               untag (schema :: Tagged h Schema),
-                               untag (schema :: Tagged i Schema),
-                               untag (schema :: Tagged j Schema)
+    schema = Tagged $ mkUnion (untag @a schema :| [
+                               untag @b schema,
+                               untag @c schema,
+                               untag @d schema,
+                               untag @e schema,
+                               untag @f schema,
+                               untag @g schema,
+                               untag @h schema,
+                               untag @i schema,
+                               untag @j schema
                               ])
 
 ------------ DATA.AVRO.VALUE --------------------------------

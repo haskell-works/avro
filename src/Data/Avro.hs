@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
 -- | Avro encoding and decoding routines.
 --
 -- This library provides a high level interface for encoding and decoding
@@ -24,14 +24,19 @@ module Data.Avro
   , readSchemaFromSchema
 
   -- * Individual values
+  , encodeValue
   , encodeValueWithSchema
+
+  , decodeValue
   , decodeValueWithSchema
 
   -- * Working with containers
   -- ** Decoding containers
   , decodeContainerWithEmbeddedSchema
   , decodeContainerWithReaderSchema
+
   , encodeContainer
+  , encodeContainerWithSchema
   , encodeContainerWithSync
   , Container.newSyncBytes
 
@@ -64,6 +69,7 @@ import qualified Data.Avro.Schema.Schema      as Schema
 import           Data.Binary.Get              (runGetOrFail)
 import           Data.ByteString.Builder      (toLazyByteString)
 import qualified Data.ByteString.Lazy         as BL
+import           Data.Tagged                  (untag)
 
 -- | Converts 'Schema' into 'ReadSchema'. This function may be useful when it is known
 -- that the writer and the reader schemas are the same.
@@ -71,10 +77,16 @@ readSchemaFromSchema :: Schema -> ReadSchema
 readSchemaFromSchema = fromSchema
 {-# INLINE readSchemaFromSchema #-}
 
--- | Serialises an individual value into Avro.
+-- | Serialises an individual value into Avro with the schema provided.
 encodeValueWithSchema :: ToAvro a => Schema -> a -> BL.ByteString
 encodeValueWithSchema s = toLazyByteString . toAvro s
 {-# INLINE encodeValueWithSchema #-}
+
+-- | Serialises an individual value into Avro using the schema
+-- from its coresponding 'HasAvroSchema' instance.
+encodeValue :: (HasAvroSchema a, ToAvro a) => a -> BL.ByteString
+encodeValue a = encodeValueWithSchema (schemaOf a) a
+{-# INLINE encodeValue #-}
 
 -- | Deserialises an individual value from Avro.
 decodeValueWithSchema :: FromAvro a => ReadSchema -> BL.ByteString -> Either String a
@@ -82,6 +94,14 @@ decodeValueWithSchema schema payload =
   case runGetOrFail (getValue schema) payload of
     Right (bs, _, v) -> fromAvro v
     Left (_, _, e)   -> Left e
+
+-- | Deserialises an individual value from Avro using the schema from its coresponding 'HasAvroSchema'.
+--
+-- __NOTE__: __This function is only to be used when reader and writes schemas are known to be the same.__
+-- Because only one schema is known at this point, and it is the reader schema,
+-- /no decondlicting/ can be performed.
+decodeValue :: forall a. (HasAvroSchema a, FromAvro a) => BL.ByteString -> Either String a
+decodeValue = decodeValueWithSchema (fromSchema (untag @a schema))
 
 -- | Decodes the container as a lazy list of values of the requested type.
 --
@@ -134,12 +154,17 @@ decodeContainerValuesBytes readerSchema =
   Container.extractContainerValuesBytes (flip deconflict readerSchema) (getValue >=> (either fail pure . fromAvro))
 {-# INLINE decodeContainerValuesBytes #-}
 
+-- | Encode chunks of values into a container, using 16 random bytes for
+-- the synchronization markers and a corresponding 'HasAvroSchema' schema.
+-- Blocks are compressed (or not) according to the given 'Codec' ('nullCodec' or 'deflateCodec').
+encodeContainer :: forall a. (HasAvroSchema a, ToAvro a) => Codec -> [[a]] -> IO BL.ByteString
+encodeContainer codec = encodeContainerWithSchema codec (untag @a schema)
 
--- |Encode chunks of objects into a container, using 16 random bytes for
+-- | Encode chunks of values into a container, using 16 random bytes for
 -- the synchronization markers. Blocks are compressed (or not) according
--- to the given `Codec` (`nullCodec` or `deflateCodec`).
-encodeContainer :: ToAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
-encodeContainer codec sch xss =
+-- to the given 'Codec' ('nullCodec' or 'deflateCodec').
+encodeContainerWithSchema :: ToAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
+encodeContainerWithSchema codec sch xss =
   do sync <- Container.newSyncBytes
      return $ encodeContainerWithSync codec sch sync xss
 

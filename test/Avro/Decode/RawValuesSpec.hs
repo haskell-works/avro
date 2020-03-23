@@ -4,7 +4,7 @@
 module Avro.Decode.RawValuesSpec
 where
 
-import Data.Avro                   (decodeValueWithSchema, encodeContainer, extractContainerValuesBytes, nullCodec)
+import Data.Avro                   (decodeValueWithSchema, encodeContainerWithSchema, extractContainerValuesBytes, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Either                 (isLeft, isRight, rights)
 import Data.List                   (unfoldr)
@@ -26,13 +26,13 @@ spec :: Spec
 spec = describe "Avro.Decode.RawValuesSpec" $ do
 
   it "should decode empty container" $ require $ withTests 1 $ property $ do
-    empty <- evalIO $ encodeContainer @Endpoint nullCodec schema'Endpoint []
+    empty <- evalIO $ encodeContainerWithSchema @Endpoint nullCodec schema'Endpoint []
     decoded <- evalEither $ extractContainerValuesBytes empty
     decoded === (schema'Endpoint, [])
 
   it "should decode container with one block" $ require $ withTests 5 $ property $ do
     msgs <- forAll $ Gen.list (Range.linear 1 3) endpointGen
-    container   <- evalIO $ encodeContainer nullCodec schema'Endpoint [msgs]
+    container   <- evalIO $ encodeContainerWithSchema nullCodec schema'Endpoint [msgs]
     (sch, vals) <- evalEither $ extractContainerValuesBytes container
 
     sch === schema'Endpoint
@@ -43,7 +43,7 @@ spec = describe "Avro.Decode.RawValuesSpec" $ do
 
   it "should decode container with multiple blocks" $ require $ withTests 20 $ property $ do
     msgs <- forAll $ Gen.list (Range.linear 1 20) endpointGen
-    container   <- evalIO $ encodeContainer nullCodec schema'Endpoint (chunksOf 4 msgs)
+    container   <- evalIO $ encodeContainerWithSchema nullCodec schema'Endpoint (chunksOf 4 msgs)
     (sch, vals) <- evalEither $ extractContainerValuesBytes container
 
     sch === schema'Endpoint

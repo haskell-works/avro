@@ -5,7 +5,7 @@ module Avro.Decode.RawBlocksSpec
 where
 
 import Control.Monad                (forM_)
-import Data.Avro                    (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValueWithSchema, nullCodec)
+import Data.Avro                    (decodeContainerWithEmbeddedSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
 import Data.Avro.Internal.Container (decodeRawBlocks, packContainerBlocks, packContainerValues)
 import Data.Either                  (rights)
 import Data.List                    (unfoldr)
@@ -27,13 +27,13 @@ spec :: Spec
 spec = describe "Avro.Decode.RawBlocksSpec" $ do
 
   it "should decode empty container" $ require $ withTests 1 $ property $ do
-    empty <- evalIO $ encodeContainer @Endpoint nullCodec schema'Endpoint []
+    empty <- evalIO $ encodeContainerWithSchema @Endpoint nullCodec schema'Endpoint []
     decoded <- evalEither $ decodeRawBlocks empty
     decoded === (schema'Endpoint, [])
 
   it "should decode container with one block" $ require $ withTests 5 $ property $ do
     msgs <- forAll $ Gen.list (Range.linear 1 5) endpointGen
-    container <- evalIO $ encodeContainer nullCodec schema'Endpoint [msgs]
+    container <- evalIO $ encodeContainerWithSchema nullCodec schema'Endpoint [msgs]
     (s, bs)   <- evalEither $ decodeRawBlocks container
 
     s === schema'Endpoint
@@ -42,7 +42,7 @@ spec = describe "Avro.Decode.RawBlocksSpec" $ do
 
   it "should decode container with multiple blocks" $ require $ withTests 20 $ property $ do
     msgs <- forAll $ Gen.list (Range.linear 1 19) endpointGen
-    container <- evalIO $ encodeContainer nullCodec schema'Endpoint (chunksOf 4 msgs)
+    container <- evalIO $ encodeContainerWithSchema nullCodec schema'Endpoint (chunksOf 4 msgs)
     (s, bs)   <- evalEither $ decodeRawBlocks container
 
     s === schema'Endpoint
@@ -55,7 +55,7 @@ spec = describe "Avro.Decode.RawBlocksSpec" $ do
 
   it "should repack container" $ require $ withTests 20 $ property $ do
     srcValues <- forAll $ Gen.list (Range.linear 1 19) endpointGen
-    srcContainer  <- evalIO $ encodeContainer nullCodec schema'Endpoint (chunksOf 4 srcValues)
+    srcContainer  <- evalIO $ encodeContainerWithSchema nullCodec schema'Endpoint (chunksOf 4 srcValues)
     (s, bs)       <- evalEither $ decodeRawBlocks srcContainer
 
     tgtContainer <- evalIO $ packContainerBlocks nullCodec s (rights bs)

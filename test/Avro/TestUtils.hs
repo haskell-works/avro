@@ -3,7 +3,7 @@ where
 
 import Control.Monad               (join)
 import Control.Monad.IO.Class      (MonadIO)
-import Data.Avro                   (Codec, FromAvro, ToAvro, decodeContainerWithEmbeddedSchema, decodeValueWithSchema, encodeContainer, encodeValueWithSchema, nullCodec)
+import Data.Avro                   (Codec, FromAvro, ToAvro, decodeContainerWithEmbeddedSchema, decodeValueWithSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Avro.Schema.Schema     (Schema)
 import Data.ByteString.Lazy        (ByteString)
@@ -19,7 +19,7 @@ roundtrip sch a = decodeValueWithSchema (fromSchema sch) (encodeValueWithSchema 
 
 roundtripContainer' :: (MonadIO m, Show a, Eq a, ToAvro a, FromAvro a) => Codec -> Schema -> [[a]] -> PropertyT m ()
 roundtripContainer' codec sch as = do
-  bs <- evalIO $ encodeContainer codec sch as
+  bs <- evalIO $ encodeContainerWithSchema codec sch as
   decoded <- evalEither $ sequence $ decodeContainerWithEmbeddedSchema bs
   join as === decoded
 
@@ -35,7 +35,7 @@ roundtripContainerGen :: (MonadIO m, Eq a, Show a, ToAvro a, FromAvro a) => Sche
 roundtripContainerGen s g = do
   let gList = Gen.list (Range.linear 1 5) g
   values <- forAll $ Gen.list (Range.linear 1 5) gList
-  bs <- evalIO $ encodeContainer nullCodec s values
+  bs <- evalIO $ encodeContainerWithSchema nullCodec s values
   decoded <- evalEither $ sequence $ decodeContainerWithEmbeddedSchema bs
 
   join values === decoded

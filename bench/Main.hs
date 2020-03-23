@@ -1,6 +1,4 @@
-{-# LANGUAGE NumDecimals         #-}
 {-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main
 where
@@ -12,7 +10,7 @@ import Gauge
 
 main :: IO ()
 main = defaultMain
-  [ Deconflict.notOnly
+  [ Deconflict.values
   , Encoding.encodeToBS
   , Encoding.encodeContainer
   , Encoding.roundtripContainer

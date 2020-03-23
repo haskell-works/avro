@@ -17,7 +17,7 @@ module Bench.Encoding
 where
 
 import           Control.DeepSeq
-import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeContainer, encodeValueWithSchema, nullCodec)
+import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeContainer, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
 import qualified Data.Avro               as Avro
 import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
 import           Data.ByteString         (ByteString)
@@ -71,13 +71,14 @@ encodeToBS = env (many 1e5 newOuter) $ \ values ->
 encodeContainer :: Benchmark
 encodeContainer = env (chunksOf 100 . Vector.toList <$> many 1e5 newOuter) $ \values ->
   bgroup "Encode container"
-    [ bench "Via ToAvro" $ nfIO $ Avro.encodeContainer nullCodec schema'Outer values
+    [ bench "Via ToAvro" $ nfIO $ Avro.encodeContainerWithSchema nullCodec schema'Outer values
     ]
 
 roundtripContainer :: Benchmark
 roundtripContainer = env (chunksOf 100 . Vector.toList <$> many 1e5 newOuter) $ \values ->
   bgroup "Roundtrip container"
-    [ bench "Via ToAvro/FromAvro" $ nfIO $ decodeContainerWithEmbeddedSchema @Outer <$> Avro.encodeContainer nullCodec schema'Outer values
+    [ bench "Via ToAvro/FromAvro" $ nfIO $ decodeContainerWithEmbeddedSchema @Outer <$> Avro.encodeContainerWithSchema nullCodec schema'Outer values
+    , bench "Via ToAvro/FromAvro/HasAvroSchema" $ nfIO $ decodeContainerWithEmbeddedSchema @Outer <$> Avro.encodeContainer nullCodec values
     ]
 
 chunksOf :: Int -> [a] -> [[a]]
