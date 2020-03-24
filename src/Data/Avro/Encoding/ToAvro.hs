@@ -1,8 +1,11 @@
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TypeApplications          #-}
+{-# LANGUAGE TypeFamilies              #-}
+
 
 module Data.Avro.Encoding.ToAvro
 where
@@ -36,6 +39,27 @@ import qualified Data.Vector                  as V
 import qualified Data.Vector.Unboxed          as U
 import           Data.Word
 import           GHC.TypeLits
+
+newtype Encoder = Encoder { runEncoder :: Schema -> Builder }
+
+(.=) :: forall a. ToAvro a => Text -> a -> (Text, Encoder)
+(.=) fieldName fieldValue = (fieldName, Encoder (flip toAvro fieldValue))
+
+record :: Schema -> [(Text, Encoder)] -> Builder
+record (S.Record _ _ _ _ fs) vs =
+  foldMap (mapField provided) fs
+  where
+    provided :: HashMap Text Encoder
+    provided = HashMap.fromList vs
+
+    providedNames = fst <$> vs
+
+    failField :: S.Field -> Builder
+    failField fld = error $ "Field '" <> show (S.fldName fld) <> "' is missing from the provided list of fields: " <> show providedNames
+
+    mapField :: HashMap Text Encoder -> S.Field -> Builder
+    mapField env fld =
+      maybe (failField fld) (flip runEncoder (S.fldType fld)) (HashMap.lookup (S.fldName fld) env)
 
 -- | Describes how to encode Haskell data types into Avro bytes
 class ToAvro a where

@@ -224,6 +224,7 @@ test-suite test
                         Avro.Encoding.LogicalTypesSpec
                         Avro.Gen.Schema
                         Avro.JSONSpec
+                        Avro.ManualSpec
                         Avro.NamespaceSpec
                         Avro.NormSchemaSpec
                         Avro.ReuseFixedSpec

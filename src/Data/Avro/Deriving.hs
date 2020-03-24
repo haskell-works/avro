@@ -5,6 +5,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TypeApplications   #-}
 
 -- | This module lets us derive Haskell types from an Avro schema that
 -- can be serialized/deserialzed to Avro.
@@ -23,6 +24,7 @@ module Data.Avro.Deriving
   -- * Deriving Haskell types from Avro schema
   , makeSchema
   , makeSchemaFrom
+  , makeSchemaFromByteString
   , deriveAvroWithOptions
   , deriveAvroWithOptions'
   , deriveAvroFromByteString
@@ -268,7 +270,7 @@ deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
 deriveAvroFromByteString :: LBS.ByteString -> Q [Dec]
 deriveAvroFromByteString bs = case eitherDecode bs of
     Right schema -> deriveAvroWithOptions' defaultDeriveOptions schema
-    Left err     -> fail $ "Unable to generate AVRO for bytestring: " <> err
+    Left err     -> fail $ "Unable to generate Avro from bytestring: " <> err
 
 -- | Generates the value of type 'Schema' that it can later be used with
 -- 'deriveAvro'' or 'deriveAvroWithOptions''.
@@ -279,6 +281,11 @@ deriveAvroFromByteString bs = case eitherDecode bs of
 -- @
 makeSchema :: FilePath -> Q Exp
 makeSchema p = readSchema p >>= lift
+
+makeSchemaFromByteString :: LBS.ByteString -> Q Exp
+makeSchemaFromByteString bs = case eitherDecode @Schema bs of
+  Right schema -> lift schema
+  Left err     -> fail $ "Unable to generate Avro Schema from bytestring: " <> err
 
 makeSchemaFrom :: FilePath -> Text -> Q Exp
 makeSchemaFrom p name = do
@@ -309,7 +316,7 @@ genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
   |]
 genFromValue namespaceBehavior (S.Record n _ _ _ fs) =
   [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromAvro (AV.Record r) =
+        fromAvro (AV.Record _ r) =
            $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
         fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]

@@ -65,7 +65,7 @@ data Value
       | String  ReadSchema {-# UNPACK #-} Text
       | Array   (Vector Value)
       | Map     (HashMap Text Value)
-      | Record  (Vector Value)
+      | Record  ReadSchema (Vector Value)
       | Union   ReadSchema {-# UNPACK #-} Int Value
       | Fixed   ReadSchema {-# UNPACK #-} BS.ByteString
       | Enum    ReadSchema {-# UNPACK #-} Int {-# UNPACK #-} Text
@@ -88,9 +88,11 @@ describeValue = \case
   Enum s ix _   -> "Enum (position = " <> show ix <> ", schema =" <> show s <> ")"
   Array vs      -> "Array (length = " <> show (V.length vs) <> ")"
   Map vs        -> "Map (length = " <> show (HashMap.size vs) <> ")"
-  Record vs     -> "Record (fieldsNum = " <> show (V.length vs) <> ")"
+  Record s vs   -> "Record (name = " <> show (ReadSchema.name s) <> " fieldsNum = " <> show (V.length vs) <> ")"
 
 --------------------------------------------------------------------------
+
+-- fromRecord :: Schema -> Either String a
 
 -- | Descrives how to convert a given intermediate 'Value' into a Haskell data type.
 class FromAvro a where
@@ -256,7 +258,7 @@ getField env sch = case sch of
   ReadSchema.Double ReadSchema.DoubleFromLong  -> fmap (Double sch . fromIntegral)  Get.getLong
 
   ReadSchema.String _              -> fmap (String sch)           Get.getString
-  ReadSchema.Record _ _ _ _ fields -> fmap Record                 (getRecord env fields)
+  ReadSchema.Record _ _ _ _ fields -> fmap (Record sch)           (getRecord env fields)
   ReadSchema.Bytes _               -> fmap (Bytes sch)            Get.getBytes
 
   ReadSchema.NamedType tn          ->
@@ -349,4 +351,4 @@ convertValue = \case
     let
       fldNames = Schema.fldName <$> Schema.fields sch
       values = fmap (\n -> convertValue $ vs HashMap.! n) fldNames
-    in Record $ V.fromList values
+    in Record (ReadSchema.fromSchema sch) $ V.fromList values

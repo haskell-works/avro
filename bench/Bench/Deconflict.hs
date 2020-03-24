@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 module Bench.Deconflict
-( notOnly
+( values
 , container
 )
 where

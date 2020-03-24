@@ -32,6 +32,7 @@ module Data.Avro
 
   -- * Working with containers
   -- ** Decoding containers
+  , decodeContainer
   , decodeContainerWithEmbeddedSchema
   , decodeContainerWithReaderSchema
 
@@ -102,8 +103,19 @@ decodeValueWithSchema schema payload =
 -- /no decondlicting/ can be performed.
 decodeValue :: forall a. (HasAvroSchema a, FromAvro a) => BL.ByteString -> Either String a
 decodeValue = decodeValueWithSchema (fromSchema (untag @a schema))
+{-# INLINE decodeValue #-}
 
--- | Decodes the container as a lazy list of values of the requested type.
+-- | Decodes the container using a schema from 'HasAvroSchema' as a reader schema.
+--
+-- Errors are reported as a part of the list and the list will stop at first
+-- error. This means that the consumer will get all the "good" content from
+-- the container until the error is detected, then this error and then the list
+-- is finished.
+decodeContainer :: forall a. (HasAvroSchema a, FromAvro a) => BL.ByteString -> [Either String a]
+decodeContainer = decodeContainerWithReaderSchema (untag @a schema)
+{-# INLINE decodeContainer #-}
+
+-- | Decodes the container as a list of values of the requested type.
 --
 -- Errors are reported as a part of the list and the list will stop at first
 -- error. This means that the consumer will get all the "good" content from
@@ -115,7 +127,7 @@ decodeContainerWithEmbeddedSchema payload =
     Left err          -> [Left err]
     Right (_, values) -> values
 
--- | Decodes the container as a lazy list of values of the requested type.
+-- | Decodes the container as a list of values of the requested type.
 --
 -- The provided reader schema will be de-conflicted with the schema
 -- embedded with the container.
