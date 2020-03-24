@@ -62,11 +62,9 @@ See `Data.Avro.Deriving` module for more options like code generation from Avro 
 
 ## Using Avro with existing Haskell types
 
-For a Haskell type to be encodable to Avro it should have `ToAvro` instance, and to be decodable from Avro it should have `FromAvro` instance.
+**Note**: This is an advanced topic. Prefer generating from schemas unless it is required to make Avro work with manually defined Haskell types.
 
-There is also `HasAvroSchema` class that is useful to have an instance of (although it is not required strictly speaking).
-
-These instances can be implemented for a Haskell data type `Person`:
+In this section we assume that the following Haskell type is manually defined:
 
 ```haskell
 data Person = Person
@@ -75,6 +73,11 @@ data Person = Person
   , ssn       :: Maybe Text
   } deriving (Eq, Show, Generic)
 ```
+
+For a Haskell type to be encodable to Avro it should have `ToAvro` instance, and to be decodable from Avro it should have `FromAvro` instance.
+
+There is also `HasAvroSchema` class that is useful to have an instance of (although it is not required strictly speaking).
+
 
 ### Creating a schema
 
@@ -95,7 +98,7 @@ schema'Person = $(makeSchemaFromByteString [r|
 |])
 ```
 
-Alternatively we can define schema manually:
+Alternatively schema can be defined manually:
 
 ```haskell
 import Data.Avro
