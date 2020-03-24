@@ -74,34 +74,45 @@ instance ToAvro Int where
 instance ToAvro Int32 where
   toAvro (S.Long _) i = encodeRaw @Int64 (fromIntegral i)
   toAvro (S.Int _) i  = encodeRaw @Int32 i
+  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
   toAvro s _          = error ("Unable to encode Int32 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Int64 where
   toAvro (S.Long _) i = encodeRaw @Int64 i
+  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
   toAvro s _          = error ("Unable to encode Int64 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word8 where
   toAvro (S.Int _) i  = encodeRaw @Word8 i
   toAvro (S.Long _) i = encodeRaw @Word64 (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word8 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word16 where
   toAvro (S.Int _) i  = encodeRaw @Word16 i
   toAvro (S.Long _) i = encodeRaw @Word64 (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word16 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word32 where
   toAvro (S.Int _) i  = encodeRaw @Word32 i
   toAvro (S.Long _) i = encodeRaw @Word64 (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word32 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word64 where
   toAvro (S.Long _) i = encodeRaw @Word64 i
+  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word64 as: " <> show s)
   {-# INLINE toAvro #-}
 
@@ -146,6 +157,7 @@ instance ToAvro Time.UTCTime where
 instance ToAvro B.ByteString where
   toAvro s bs = case s of
     (S.Bytes _)                        -> encodeRaw (B.length bs) <> byteString bs
+    (S.String _)                       -> encodeRaw (B.length bs) <> byteString bs
     S.Fixed _ _ l _ | l == B.length bs -> byteString bs
     S.Fixed _ _ l _                    -> error ("Unable to encode ByteString as Fixed(" <> show l <> ") because its length is " <> show (B.length bs))
     _                                  -> error ("Unable to encode ByteString as: " <> show s)

@@ -101,18 +101,18 @@ class FromAvro a where
 instance FromAvro Int where
   fromAvro (Int _ x)  = Right (fromIntegral x)
   fromAvro (Long _ x) = Right (fromIntegral x)
-  fromAvro x          = Left ("Unable decode Int from: " <> show (describeValue x))
+  fromAvro x          = Left ("Unable to decode Int from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro Int32 where
   fromAvro (Int _ x) = Right x
-  fromAvro x         = Left ("Unable decode Int32 from: " <> show (describeValue x))
+  fromAvro x         = Left ("Unable to decode Int32 from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro Int64 where
   fromAvro (Long _ x) = Right x
   fromAvro (Int _ x)  = Right (fromIntegral x)
-  fromAvro x          = Left ("Unable decode Int64 from: " <> show (describeValue x))
+  fromAvro x          = Left ("Unable to decode Int64 from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro Double where
@@ -120,19 +120,19 @@ instance FromAvro Double where
   fromAvro (Float _ x)  = Right (realToFrac x)
   fromAvro (Long _ x)   = Right (fromIntegral x)
   fromAvro (Int _ x)    = Right (fromIntegral x)
-  fromAvro x            = Left ("Unable decode Double from: " <> show (describeValue x))
+  fromAvro x            = Left ("Unable to decode Double from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro Float where
   fromAvro (Float _ x) = Right x
   fromAvro (Long _ x)  = Right (fromIntegral x)
   fromAvro (Int _ x)   = Right (fromIntegral x)
-  fromAvro x           = Left ("Unable decode Double from: " <> show (describeValue x))
+  fromAvro x           = Left ("Unable to decode Double from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro Bool where
   fromAvro (Boolean x) = Right x
-  fromAvro x           = Left ("Unable decode Bool from: " <> show (describeValue x))
+  fromAvro x           = Left ("Unable to decode Bool from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro Text where
@@ -140,7 +140,7 @@ instance FromAvro Text where
   fromAvro (Bytes _ x) = case Text.decodeUtf8' x of
     Left unicodeExc -> Left (show unicodeExc)
     Right text      -> Right text
-  fromAvro x          = Left ("Unable decode Text from: " <> show (describeValue x))
+  fromAvro x          = Left ("Unable to decode Text from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance FromAvro BS.ByteString where
@@ -152,7 +152,7 @@ instance FromAvro BS.ByteString where
 instance FromAvro BL.ByteString where
   fromAvro (Bytes _ bs) = Right (BL.fromStrict bs)
   fromAvro (String _ x) = Right (BL.fromStrict $ Text.encodeUtf8 x)
-  fromAvro x            = Left ("Unable decode Bytes from: " <> show (describeValue x))
+  fromAvro x            = Left ("Unable to decode Bytes from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
 instance (KnownNat p, KnownNat s) => FromAvro (D.Decimal p s) where
@@ -218,7 +218,7 @@ instance FromAvro a => FromAvro (Maybe a) where
 instance (FromAvro a, FromAvro b) => FromAvro (Either a b) where
   fromAvro (Union _ 0 a) = Left <$> fromAvro a
   fromAvro (Union _ 1 b) = Right <$> fromAvro b
-  fromAvro (Union _ n _) = Left ("Unable to decode union value with a position #" <> show n)
+  fromAvro (Union _ n _) = Left ("Unable to decode Either value with a position #" <> show n)
   fromAvro x             = Left ("Unable to decode Either from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
