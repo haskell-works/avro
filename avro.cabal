@@ -1,7 +1,7 @@
 cabal-version: 2.4
 
 name:                   avro
-version:                0.4.7.0
+version:                0.5.0.0
 synopsis:               Avro serialization support for Haskell
 description:            Avro serialization and deserialization support for Haskell
 category:               Data
