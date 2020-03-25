@@ -5,6 +5,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TypeApplications   #-}
 
 -- | This module lets us derive Haskell types from an Avro schema that
 -- can be serialized/deserialzed to Avro.
@@ -23,35 +24,42 @@ module Data.Avro.Deriving
   -- * Deriving Haskell types from Avro schema
   , makeSchema
   , makeSchemaFrom
+  , makeSchemaFromByteString
   , deriveAvroWithOptions
   , deriveAvroWithOptions'
-  , deriveFromAvroWithOptions
   , deriveAvroFromByteString
   , deriveAvro
   , deriveAvro'
-  , deriveFromAvro
+
+  -- * Re-exporting a quasiquoter for raw string literals
+  , r
 )
 where
 
-import           Control.Monad          (join)
-import           Control.Monad.Identity (Identity)
-import           Data.Aeson             (eitherDecode)
-import qualified Data.Aeson             as J
-import           Data.Avro              hiding (decode, encode)
-import           Data.Avro.Schema       as S
-import qualified Data.Avro.Types        as AT
-import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as B
-import           Data.Char              (isAlphaNum)
+import           Control.Monad                (join)
+import           Control.Monad.Identity       (Identity)
+import           Data.Aeson                   (eitherDecode)
+import qualified Data.Aeson                   as J
+import           Data.Avro                    hiding (decode, encode)
+import           Data.Avro.Encoding.ToAvro    (ToAvro (..))
+import           Data.Avro.Internal.EncodeRaw (putI)
+import           Data.Avro.Schema.Schema      as S
+import           Data.ByteString              (ByteString)
+import qualified Data.ByteString              as B
+import           Data.Char                    (isAlphaNum)
+import qualified Data.Foldable                as Foldable
 import           Data.Int
-import           Data.List.NonEmpty (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty as NE
-import           Data.Map           (Map)
-import           Data.Maybe         (fromMaybe)
-import           Data.Semigroup     ((<>))
-import qualified Data.Text          as Text
-import           Data.Time          (Day, DiffTime)
-import           Data.UUID          (UUID)
+import           Data.List.NonEmpty           (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty           as NE
+import           Data.Map                     (Map)
+import           Data.Maybe                   (fromMaybe)
+import           Data.Semigroup               ((<>))
+import qualified Data.Text                    as Text
+import           Data.Time                    (Day, DiffTime, UTCTime)
+import           Data.UUID                    (UUID)
+import           Text.RawString.QQ            (r)
+
+import qualified Data.Avro.Encoding.FromAvro as AV
 
 import GHC.Generics (Generic)
 
@@ -70,9 +78,6 @@ import qualified Data.Set                   as S
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Data.Vector                as V
-
-import           Data.Avro.Decode.Lazy.FromLazyAvro
-import qualified Data.Avro.Decode.Lazy.LazyValue    as LV
 
 import Data.Avro.Deriving.Lift    ()
 import Language.Haskell.TH.Syntax (lift)
@@ -244,44 +249,11 @@ deriveAvroWithOptions o p = readSchema p >>= deriveAvroWithOptions' o
 deriveAvroWithOptions' :: DeriveOptions -> Schema -> Q [Dec]
 deriveAvroWithOptions' o s = do
   let schemas = extractDerivables s
-  types     <- traverse (genType o) schemas
-  hasSchema <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
-  fromAvros <- traverse (genFromAvro $ namespaceBehavior o) schemas
-  fromLazyAvros <- traverse (genFromLazyAvro $ namespaceBehavior o) schemas
-  toAvros   <- traverse (genToAvro o) schemas
-  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros <> join toAvros
-
--- | Derives "read only" Avro from a given schema file. For a schema
--- with a top-level definition @com.example.Foo@, this generates:
---
---  * a 'Schema' value with the name @schema'Foo@
---
---  * Haskell types for each named type defined in the schema
---    * 'HasSchema' instances for each type
---    * 'FromAvro' instances for each type
-deriveFromAvroWithOptions :: DeriveOptions -> FilePath -> Q [Dec]
-deriveFromAvroWithOptions o p = readSchema p >>= deriveFromAvroWithOptions' o
-
--- | Derive "read only" Haskell types from the given Avro schema with
--- configurable behavior for handling namespaces.
---
--- For an Avro schema with a top-level definition @com.example.Foo@, this
--- generates:
---
---   * a 'Schema' with the name @schema'Foo@ or
---     @schema'com'example'Foo@ depending on namespace handling
---
---   * Haskell types for each named type defined in the schema
---     * 'HasSchema' instances for each type
---     * 'FromAvro' instances for each type
-deriveFromAvroWithOptions' :: DeriveOptions -> Schema -> Q [Dec]
-deriveFromAvroWithOptions' o s = do
-  let schemas = extractDerivables s
-  types     <- traverse (genType o) schemas
-  hasSchema <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
-  fromAvros <- traverse (genFromAvro $ namespaceBehavior o) schemas
-  fromLazyAvros <- traverse (genFromLazyAvro $ namespaceBehavior o) schemas
-  pure $ join types <> join hasSchema <> join fromAvros <> join fromLazyAvros
+  types       <- traverse (genType o) schemas
+  hasSchema   <- traverse (genHasAvroSchema $ namespaceBehavior o) schemas
+  fromAvros  <- traverse (genFromValue $ namespaceBehavior o) schemas
+  encodeAvros <- traverse (genToAvro o) schemas
+  pure $ join types <> join hasSchema <> join fromAvros <> join encodeAvros
 
 -- | Same as 'deriveAvroWithOptions' but uses 'defaultDeriveOptions'
 --
@@ -303,16 +275,7 @@ deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
 deriveAvroFromByteString :: LBS.ByteString -> Q [Dec]
 deriveAvroFromByteString bs = case eitherDecode bs of
     Right schema -> deriveAvroWithOptions' defaultDeriveOptions schema
-    Left err     -> fail $ "Unable to generate AVRO for bytestring: " <> err
-
--- | Same as 'deriveFromAvroWithOptions' but uses
--- 'defaultDeriveOptions'.
---
--- @
--- deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
--- @
-deriveFromAvro :: FilePath -> Q [Dec]
-deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
+    Left err     -> fail $ "Unable to generate Avro from bytestring: " <> err
 
 -- | Generates the value of type 'Schema' that it can later be used with
 -- 'deriveAvro'' or 'deriveAvroWithOptions''.
@@ -323,6 +286,11 @@ deriveFromAvro = deriveFromAvroWithOptions defaultDeriveOptions
 -- @
 makeSchema :: FilePath -> Q Exp
 makeSchema p = readSchema p >>= lift
+
+makeSchemaFromByteString :: LBS.ByteString -> Q Exp
+makeSchemaFromByteString bs = case eitherDecode @Schema bs of
+  Right schema -> lift schema
+  Left err     -> fail $ "Unable to generate Avro Schema from bytestring: " <> err
 
 makeSchemaFrom :: FilePath -> Text -> Q Exp
 makeSchemaFrom p name = do
@@ -340,67 +308,37 @@ readSchema p = do
     Left err  -> fail $ "Unable to generate AVRO for " <> p <> ": " <> err
     Right sch -> pure sch
 
----------------------------- FromAvro -----------------------------------------
+---------------------------- New FromAvro -----------------------------------------
 
-genFromAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromAvro namespaceBehavior (S.Enum n _ _ _ ) =
-  [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromAvro (AT.Enum _ i _) = $([| pure . toEnum|]) i
-        fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
+badValueNew :: Show v => v -> String -> Either String a
+badValueNew v t = Left $ "Unexpected value for '" <> t <> "': " <> show v
+
+genFromValue :: NamespaceBehavior -> Schema -> Q [Dec]
+genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
+  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromAvro (AV.Enum _ i _) = $([| pure . toEnum|]) i
+        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
-genFromAvro namespaceBehavior (S.Record n _ _ _ fs) =
-  [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromAvro (AT.Record _ r) =
-           $(genFromAvroFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
-        fromAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
+genFromValue namespaceBehavior (S.Record n _ _ _ fs) =
+  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromAvro (AV.Record _ r) =
+           $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
+        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
-genFromAvro namespaceBehavior (S.Fixed n _ s _) =
-  [d| instance FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromAvro (AT.Fixed _ v)
+genFromValue namespaceBehavior (S.Fixed n _ s _) =
+  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+        fromAvro (AV.Fixed _ v)
           | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
-        fromAvro value = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromAvro value = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
-genFromAvro _ _                             = pure []
+genFromValue _ _                             = pure []
 
-genFromAvroFieldsExp :: Name -> [Field] -> Q Exp
-genFromAvroFieldsExp n []     = [| (return . return) $(conE n) |]
-genFromAvroFieldsExp n (x:xs) =
+genFromAvroNewFieldsExp :: Name -> [Field] -> Q Exp
+genFromAvroNewFieldsExp n xs =
   [| \r ->
-    $(let extract fld = [| r .: T.pack $(mkTextLit (fldName fld))|]
-          ctor = [| $(conE n) <$> $(extract x) |]
-      in foldl (\expr fld -> [| $expr <*> $(extract fld) |]) ctor xs
-     )
-  |]
-
--------------------------------- FromLazyAvro ---------------------------------
-genFromLazyAvro :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromLazyAvro namespaceBehavior (S.Enum n _ _ _) =
-  [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromLazyAvro (LV.Enum _ i _) = $([| pure . toEnum|]) i
-        fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
-  |]
-genFromLazyAvro namespaceBehavior (S.Record n _ _ _ fs) =
-  [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromLazyAvro (LV.Record _ r) =
-           $(genFromLazyAvroFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
-        fromLazyAvro value           = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
-  |]
-genFromLazyAvro namespaceBehavior (S.Fixed n _ s _) =
-  [d| instance FromLazyAvro $(conT $ mkDataTypeName namespaceBehavior n) where
-        fromLazyAvro (LV.Fixed _ v)
-          | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
-        fromLazyAvro value = $( [|\v -> badValue v $(mkTextLit $ S.renderFullname n)|] ) value
-  |]
-genFromLazyAvro _ _                             = pure []
-
-genFromLazyAvroFieldsExp :: Name -> [Field] -> Q Exp
-genFromLazyAvroFieldsExp n []     = [| (return . return) $(conE n) |]
-genFromLazyAvroFieldsExp n (x:xs) =
-  [| \r ->
-    $(let extract fld = [| r .~: T.pack $(mkTextLit (fldName fld))|]
-          ctor = [| $(conE n) <$> $(extract x) |]
-      in foldl (\expr fld -> [| $expr <*> $(extract fld) |]) ctor xs
-     )
+    $(let ctor = [| pure $(conE n) |]
+      in foldl (\expr (i, _) -> [| $expr <*> AV.fromAvro (r V.! i) |]) ctor (zip [(0 :: Int)..] xs)
+    )
   |]
 
 ----------------------- HasAvroSchema ----------------------------------------
@@ -424,47 +362,45 @@ newNames :: String
          -> Q [Name]
 newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 
-------------------------- ToAvro ----------------------------------------------
+------------------------- ToAvro ------------------------------------------------
 
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
-genToAvro opts s@(S.Enum n _ _ vs) =
-  toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genToAvro opts s@(S.Enum n _ _ _) =
+  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    conP' = flip conP [] . mkAdtCtorName (namespaceBehavior opts) n
-    toAvroInstance sname =
+    encodeAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
-            toAvro = $([| \x ->
-              let convert = AT.Enum $(varE sname) (fromEnum $([|x|]))
-              in $(caseE [|x|] ((\v -> match (conP' v)
-                               (normalB [| convert (T.pack $(mkTextLit v))|]) []) <$> V.toList vs))
-              |])
+            toAvro = $([| \_ x -> putI (fromEnum x) |])
       |]
+
 genToAvro opts s@(S.Record n _ _ _ fs) =
-  toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    toAvroInstance sname =
+    encodeAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
-            toAvro = $(genToAvroFieldsExp sname)
+            toAvro = $(encodeAvroFieldsExp sname)
       |]
-    genToAvroFieldsExp sname = do
+    encodeAvroFieldsExp sname = do
       names <- newNames "p_" (length fs)
+      wn <- varP <$> newName "_"
       let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
-      lamE [con]
-            [| record $(varE sname)
-                $(let assign (fld, n) = [| T.pack $(mkTextLit (fldName fld)) .= $(varE n) |]
-                  in listE $ assign <$> zip fs names
-                )
+      lamE [wn, con]
+            [| mconcat $( let build (fld, n) = [| toAvro (fldType fld) $(varE n) |]
+                          in listE $ build <$> (zip fs names)
+                        )
             |]
 
-genToAvro opts s@(S.Fixed n _ size _) =
-  toAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genToAvro opts s@(S.Fixed n _ _ _) =
+  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    toAvroInstance sname =
+    encodeAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $(do
               x <- newName "x"
-              lamE [conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| AT.Fixed $(varE sname) $(varE x) |])
+              wc <- newName "_"
+              lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toAvro $(varE sname) $(varE x) |])
       |]
+genToAvro _ _ = pure []
 
 schemaDef :: Name -> Schema -> Q [Dec]
 schemaDef sname sch = setName sname $
@@ -503,15 +439,21 @@ mkFieldTypeName namespaceBehavior = \case
                      -> [t| Decimal $(litT $ numTyLit p) $(litT $ numTyLit s) |]
   S.Long (Just TimeMicros)
                      -> [t| DiffTime |]
+  S.Long (Just TimestampMicros)
+                     -> [t| UTCTime |]
+  S.Long (Just TimestampMillis)
+                     -> [t| UTCTime |]
   S.Long _           -> [t| Int64 |]
   S.Int (Just Date)  -> [t| Day |]
+  S.Int (Just TimeMillis)
+                     -> [t| DiffTime |]
   S.Int _            -> [t| Int32 |]
   S.Float            -> [t| Float |]
   S.Double           -> [t| Double |]
   S.Bytes _          -> [t| ByteString |]
   S.String Nothing   -> [t| Text |]
   S.String (Just UUID) -> [t| UUID |]
-  S.Union branches   -> union (V.toList branches)
+  S.Union branches   -> union (Foldable.toList branches)
   S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
   S.Map x            -> [t| Map Text $(go x) |]
   S.Array x          -> [t| [$(go x)] |]
@@ -631,15 +573,15 @@ genNewtype dn = do
 genEnum :: Name -> [Name] -> Q Dec
 #if MIN_VERSION_template_haskell(2,12,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Bounded|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) [DerivClause Nothing ders]
 #elif MIN_VERSION_template_haskell(2,11,0)
 genEnum dn vs = do
-  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  ders <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Bounded|], [t|Generic|]]
   pure $ DataD [] dn [] Nothing ((\n -> NormalC n []) <$> vs) ders
 #else
 genEnum dn vs = do
-  [ConT eq, ConT sh, ConT or, ConT en, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Generic|]]
+  [ConT eq, ConT sh, ConT or, ConT en, ConT gen] <- sequenceA [[t|Eq|], [t|Show|], [t|Ord|], [t|Enum|], [t|Bounded|], [t|Generic|]]
   pure $ DataD [] dn [] ((\n -> NormalC n []) <$> vs) [eq, sh, or, en, gen]
 #endif
 

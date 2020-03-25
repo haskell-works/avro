@@ -1,11 +1,11 @@
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Avro.Deriving.NormSchema
 where
 
 import           Control.Monad.State.Strict
-import           Data.Avro.Schema
+import           Data.Avro.Schema.Schema
+import qualified Data.Foldable              as Foldable
 import qualified Data.List                  as L
 import           Data.List.NonEmpty         (NonEmpty ((:|)))
 import qualified Data.Map.Strict            as M
@@ -32,7 +32,7 @@ getTypes :: Schema -> [(TypeName, Schema)]
 getTypes rec = case rec of
   r@Record{name, fields} -> (name,r) : (fields >>= (getTypes . fldType))
   Array t                -> getTypes t
-  Union ts               -> concatMap getTypes (V.toList ts)
+  Union ts               -> concatMap getTypes (Foldable.toList ts)
   Map t                  -> getTypes t
   e@Enum{name}           -> [(name, e)]
   f@Fixed{name}          -> [(name, f)]

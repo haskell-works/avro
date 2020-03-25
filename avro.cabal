@@ -1,4 +1,4 @@
-cabal-version: 2.2
+cabal-version: 2.4
 
 name:                   avro
 version:                0.4.7.0
@@ -43,16 +43,10 @@ flag dev
   manual: True
   default: False
 
-flag templatehaskell
-  description: Build Avro.Deriving, which uses Template Haskell.
-  manual: False
-  default: True
-
 common base                     { build-depends: base                     >= 4          && < 5      }
 
 common aeson                    { build-depends: aeson                                              }
 common array                    { build-depends: array                                              }
-common avro                     { build-depends: avro                                               }
 common base16-bytestring        { build-depends: base16-bytestring                                  }
 common bifunctors               { build-depends: bifunctors                                         }
 common big-decimal              { build-depends: HasBigDecimal                                      }
@@ -67,7 +61,10 @@ common doctest-discover         { build-depends: doctest-discover         >= 0.2
 common extra                    { build-depends: extra                                              }
 common fail                     { build-depends: fail                                               }
 common gauge                    { build-depends: gauge                                              }
+common generic-lens             { build-depends: generic-lens                                       }
 common hashable                 { build-depends: hashable                                           }
+common hedgehog                 { build-depends: hedgehog                                           }
+common hw-hspec-hedgehog        { build-depends: hw-hspec-hedgehog                                  }
 common hspec                    { build-depends: hspec                                              }
 common lens                     { build-depends: lens                                               }
 common lens-aeson               { build-depends: lens-aeson                                         }
@@ -80,6 +77,7 @@ common semigroups               { build-depends: semigroups                     
 common tagged                   { build-depends: tagged                                             }
 common text                     { build-depends: text                     >= 1.2.3      && < 1.3    }
 common time                     { build-depends: time                                               }
+common template-haskell         { build-depends: template-haskell         >= 2.4        && < 3      }
 common tf-random                { build-depends: tf-random                                          }
 common transformers             { build-depends: transformers                                       }
 common unordered-containers     { build-depends: unordered-containers                               }
@@ -89,9 +87,6 @@ common zlib                     { build-depends: zlib                           
 
 common config
   default-language:     Haskell2010
-  if flag(templatehaskell)
-    other-extensions:   TemplateHaskell
-    build-depends:      template-haskell >=2.4
   if flag(dev)
     ghc-options:        -Wall -Werror
 
@@ -121,36 +116,30 @@ library
                       , uuid
                       , vector
                       , zlib
+                      , template-haskell
+                      , raw-strings-qq
   exposed-modules:      Data.Avro
                         Data.Avro.Codec
-                        Data.Avro.Decode
-                        Data.Avro.Decode.Get
-                        Data.Avro.Decode.Lazy
-                        Data.Avro.Decode.Lazy.Convert
-                        Data.Avro.Decode.Lazy.Deconflict
-                        Data.Avro.Decode.Lazy.FromLazyAvro
-                        Data.Avro.Decode.Lazy.LazyValue
-                        Data.Avro.Decode.Strict
-                        Data.Avro.Decode.Strict.Internal
-                        Data.Avro.DecodeRaw
-                        Data.Avro.Deconflict
                         Data.Avro.Deriving
                         Data.Avro.Deriving.Lift
                         Data.Avro.Deriving.NormSchema
                         Data.Avro.EitherN
-                        Data.Avro.Encode
-                        Data.Avro.EncodeRaw
-                        Data.Avro.FromAvro
+                        Data.Avro.Encoding.FromAvro
+                        Data.Avro.Encoding.ToAvro
                         Data.Avro.HasAvroSchema
+                        Data.Avro.Internal.Container
+                        Data.Avro.Internal.DecodeRaw
+                        Data.Avro.Internal.EncodeRaw
+                        Data.Avro.Internal.Get
+                        Data.Avro.Internal.Time
+                        Data.Avro.Internal.Zag
+                        Data.Avro.Internal.Zig
                         Data.Avro.JSON
-                        Data.Avro.Schema
-                        Data.Avro.ToAvro
-                        Data.Avro.Types
-                        Data.Avro.Types.Decimal
-                        Data.Avro.Types.Value
-                        Data.Avro.Zag
-                        Data.Avro.Zig
-  other-modules:        Data.Avro.Types.Time
+                        Data.Avro.Schema.Decimal
+                        Data.Avro.Schema.Deconflict
+                        Data.Avro.Schema.ReadSchema
+                        Data.Avro.Schema.Schema
+  other-modules:
   hs-source-dirs:       src
   other-extensions:     OverloadedStrings
 
@@ -158,7 +147,6 @@ test-suite test
   import:               base
                       , aeson
                       , array
-                      , avro
                       , base16-bytestring
                       , bifunctors
                       , big-decimal
@@ -168,12 +156,14 @@ test-suite test
                       , directory
                       , extra
                       , fail
+                      , generic-lens
                       , hashable
+                      , hedgehog
+                      , hw-hspec-hedgehog
                       , hspec
                       , lens
                       , lens-aeson
                       , mtl
-                      , zlib
                       , QuickCheck
                       , raw-strings-qq
                       , scientific
@@ -186,6 +176,8 @@ test-suite test
                       , unordered-containers
                       , uuid
                       , vector
+                      , zlib
+  build-depends: avro
   type:                 exitcode-stdio-1.0
   ghc-options:          -threaded
   default-language:     Haskell2010
@@ -202,43 +194,56 @@ test-suite test
                         Avro.Codec.NestedSpec
                         Avro.Codec.TextSpec
                         Avro.Codec.ZigZagSpec
-                        Avro.Decode.Lazy.ContainerSpec
-                        Avro.Decode.Lazy.RawBlocksSpec
-                        Avro.Decode.Lazy.RawValuesSpec
-                        Avro.Decode.Lazy.ValuesSpec
+                        Avro.Data.Deconflict.Read
+                        Avro.Data.Deconflict.Write
+                        Avro.Data.Enums
+                        Avro.Data.FixedTypes
+                        Avro.Data.Karma
+                        Avro.Data.Logical
+                        Avro.Data.Maybe
+                        Avro.Data.Reused
+                        Avro.Data.Endpoint
+                        Avro.Data.Unions
+                        Avro.Decode.ContainerSpec
+                        Avro.Decode.RawBlocksSpec
+                        Avro.Decode.RawValuesSpec
                         Avro.Deconflict.A.Reader
                         Avro.Deconflict.A.Writer
                         Avro.Deconflict.B.Reader
                         Avro.Deconflict.B.Writer
                         Avro.Deconflict.C.Reader
                         Avro.Deconflict.C.Writer
-                        Avro.DeconflictSpec
+                        Avro.Deconflict.D.Reader
+                        Avro.Deconflict.D.Writer
+                        Avro.Deconflict.Unions.Reader
+                        Avro.Deconflict.Unions.Writer
                         Avro.DefaultsSpec
                         Avro.EncodeRawSpec
+                        Avro.Encoding.ContainerSpec
+                        Avro.Encoding.DeconflictSpec
+                        Avro.Encoding.LogicalTypesSpec
+                        Avro.Gen.Schema
                         Avro.JSONSpec
+                        Avro.ManualSpec
                         Avro.NamespaceSpec
                         Avro.NormSchemaSpec
                         Avro.ReuseFixedSpec
                         Avro.SchemaSpec
-                        Avro.THEncodeContainerSpec
+                        Avro.TestUtils
                         Avro.THEnumSpec
-                        Avro.THLogicalTypeSpec
                         Avro.THReusedSpec
-                        Avro.THSimpleSpec
-                        Avro.THUnionSpec
                         Avro.ToAvroSpec
-                        DecodeContainer
-                        Example1
                         Paths_avro
   autogen-modules:      Paths_avro
   hs-source-dirs:       test
 
 benchmark bench-time
   import:               base, config
-                      , avro
                       , aeson
+                      , binary
                       , bytestring
                       , containers
+                      , deepseq
                       , gauge
                       , hashable
                       , mtl
@@ -248,20 +253,22 @@ benchmark bench-time
                       , transformers
                       , unordered-containers
                       , vector
+  build-depends: avro
   default-language:     Haskell2010
   type:                 exitcode-stdio-1.0
   main-is:              Main.hs
   other-modules:        Bench.Deconflict
                         Bench.Deconflict.Reader
                         Bench.Deconflict.Writer
-                        Bench.Time
+                        Bench.Encoding
   hs-source-dirs:       bench
 
 test-suite doctest
   import:               base, config
-                      , avro
                       , doctest
+                      , bytestring
                       , doctest-discover
+  build-depends: avro
   type:                 exitcode-stdio-1.0
   ghc-options:          -threaded
   main-is:              DoctestDriver.hs

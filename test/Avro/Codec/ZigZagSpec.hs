@@ -3,8 +3,8 @@
 
 module Avro.Codec.ZigZagSpec (spec) where
 
-import Data.Avro.Zag
-import Data.Avro.Zig
+import Data.Avro.Internal.Zag
+import Data.Avro.Internal.Zig
 import Data.Int
 import Data.Word
 import Test.Hspec

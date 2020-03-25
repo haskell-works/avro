@@ -37,7 +37,7 @@ data Codec = Codec
   }
 
 -- | `nullCodec` specifies @null@ required by Avro spec.
--- (see https://avro.apache.org/docs/1.8.1/spec.html#null)
+-- (see <https://avro.apache.org/docs/1.8.1/spec.html#null>)
 nullCodec :: Codec
 nullCodec =
   Codec
@@ -51,7 +51,7 @@ nullCodec =
     }
 
 -- | `deflateCodec` specifies @deflate@ codec required by Avro spec.
--- (see https://avro.apache.org/docs/1.8.1/spec.html#deflate)
+-- (see <https://avro.apache.org/docs/1.8.1/spec.html#deflate>)
 deflateCodec :: Codec
 deflateCodec =
   Codec

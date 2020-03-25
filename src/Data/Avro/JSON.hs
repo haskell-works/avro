@@ -63,6 +63,7 @@ import Data.Semigroup ((<>))
 
 import qualified Data.Aeson           as Aeson
 import           Data.ByteString.Lazy (ByteString)
+import qualified Data.Foldable        as Foldable
 import           Data.HashMap.Strict  ((!))
 import qualified Data.HashMap.Strict  as HashMap
 import           Data.List.NonEmpty   (NonEmpty (..))
@@ -70,14 +71,12 @@ import qualified Data.List.NonEmpty   as NE
 import           Data.Tagged
 import qualified Data.Text            as Text
 
-import           Data.Avro        (FromAvro (..), Result (..), ToAvro (..))
-import qualified Data.Avro        as Avro
-import           Data.Avro.Schema (Schema, parseAvroJSON)
-import qualified Data.Avro.Schema as Schema
-import qualified Data.Avro.Types  as Avro
-import qualified Data.Vector      as V
+import qualified Data.Avro.HasAvroSchema as Schema
+import           Data.Avro.Schema.Schema (DefaultValue (..), Result (..), Schema, parseAvroJSON)
+import qualified Data.Avro.Schema.Schema as Schema
+import qualified Data.Vector             as V
 
-decodeAvroJSON :: Schema -> Aeson.Value -> Result (Avro.Value Schema)
+decodeAvroJSON :: Schema -> Aeson.Value -> Result DefaultValue
 decodeAvroJSON schema json =
   parseAvroJSON union env schema json
   where
@@ -88,7 +87,7 @@ decodeAvroJSON schema json =
 
     union (Schema.Union schemas) Aeson.Null
       | Schema.Null `elem` schemas =
-          pure $ Avro.Union schemas Schema.Null Avro.Null
+          pure $ Schema.DUnion schemas Schema.Null Schema.DNull
       | otherwise                  =
           fail "Null not in union."
     union (Schema.Union schemas) (Aeson.Object obj)
@@ -104,41 +103,41 @@ decodeAvroJSON schema json =
             branch =
               head $ HashMap.keys obj
             names =
-              HashMap.fromList [(Schema.typeName t, t) | t <- V.toList schemas]
+              HashMap.fromList [(Schema.typeName t, t) | t <- Foldable.toList schemas]
           in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
               nested <- parseAvroJSON union env t (obj ! branch)
-              return (Avro.Union schemas t nested)
+              return (Schema.DUnion schemas t nested)
             Nothing -> fail ("Type '" <> Text.unpack branch <> "' not in union: " <> show schemas)
     union Schema.Union{} _ =
-      Avro.Error "Invalid JSON representation for union: has to be a JSON object with exactly one field."
+      Schema.Error "Invalid JSON representation for union: has to be a JSON object with exactly one field."
     union _ _ =
       error "Impossible: function given non-union schema."
 
     isBuiltIn name = name `elem` [ "null", "boolean", "int", "long", "float"
                                  , "double", "bytes", "string", "array", "map" ]
 
--- | Convert a 'Aeson.Value' into a type that has an Avro schema. The
--- schema is used to validate the JSON and will return an 'Error' if
--- the JSON object is not encoded correctly or does not match the schema.
-fromJSON :: forall a. (FromAvro a) => Aeson.Value -> Result a
-fromJSON json = do
-  value <- decodeAvroJSON schema json
-  fromAvro value
-  where
-    schema = untag (Avro.schema :: Tagged a Schema)
+-- -- | Convert a 'Aeson.Value' into a type that has an Avro schema. The
+-- -- schema is used to validate the JSON and will return an 'Error' if
+-- -- the JSON object is not encoded correctly or does not match the schema.
+-- fromJSON :: forall a. (FromAvro a) => Aeson.Value -> Result a
+-- fromJSON json = do
+--   value <- decodeAvroJSON schema json
+--   fromAvro value
+--   where
+--     schema = untag (Schema.schema :: Tagged a Schema)
 
--- | Parse a 'ByteString' as JSON and convert it to a type with an
--- Avro schema. Will return 'Error' if the input is not valid JSON or
--- the JSON does not convert with the specified schema.
-parseJSON :: forall a. (FromAvro a) => ByteString -> Result a
-parseJSON input = case Aeson.eitherDecode input of
-  Left msg    -> Error msg
-  Right value -> fromJSON value
+-- -- | Parse a 'ByteString' as JSON and convert it to a type with an
+-- -- Avro schema. Will return 'Error' if the input is not valid JSON or
+-- -- the JSON does not convert with the specified schema.
+-- parseJSON :: forall a. (FromAvro a) => ByteString -> Result a
+-- parseJSON input = case Aeson.eitherDecode input of
+--   Left msg    -> Error msg
+--   Right value -> fromJSON value
 
--- | Convert an object with an Avro schema to JSON using that schema.
---
--- We always need the schema to /encode/ to JSON because representing
--- unions requires using the names of named types.
-toJSON :: forall a. (ToAvro a) => a -> Aeson.Value
-toJSON = Aeson.toJSON . toAvro
+-- -- | Convert an object with an Avro schema to JSON using that schema.
+-- --
+-- -- We always need the schema to /encode/ to JSON because representing
+-- -- unions requires using the names of named types.
+-- toJSON :: forall a. (ToAvro a) => a -> Aeson.Value
+-- toJSON = Aeson.toJSON . toAvro

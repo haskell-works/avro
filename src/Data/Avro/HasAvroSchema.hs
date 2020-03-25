@@ -1,32 +1,32 @@
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 module Data.Avro.HasAvroSchema where
 
-import           Control.Monad.Identity  (Identity)
-import qualified Data.Array              as Ar
-import           Data.Avro.Schema        as S
-import           Data.Avro.Types         as T
-import           Data.Avro.Types.Decimal as D
-import qualified Data.ByteString         as B
-import           Data.ByteString.Lazy    (ByteString)
-import qualified Data.ByteString.Lazy    as BL
-import qualified Data.HashMap.Strict     as HashMap
+import           Control.Monad.Identity   (Identity)
+import qualified Data.Array               as Ar
+import           Data.Avro.Schema.Decimal as D
+import           Data.Avro.Schema.Schema  as S
+import qualified Data.ByteString          as B
+import           Data.ByteString.Lazy     (ByteString)
+import qualified Data.ByteString.Lazy     as BL
+import qualified Data.HashMap.Strict      as HashMap
 import           Data.Int
-import           Data.Ix                (Ix)
-import           Data.List.NonEmpty     (NonEmpty (..))
-import qualified Data.Map               as Map
-import           Data.Monoid            ((<>))
+import           Data.Ix                  (Ix)
+import           Data.List.NonEmpty       (NonEmpty (..))
+import qualified Data.Map                 as Map
+import           Data.Monoid              ((<>))
 import           Data.Proxy
-import qualified Data.Set               as S
+import qualified Data.Set                 as S
 import           Data.Tagged
-import           Data.Text            (Text)
-import qualified Data.Text            as Text
-import qualified Data.Text.Lazy       as TL
-import qualified Data.Time            as Time
-import qualified Data.UUID            as UUID
-import qualified Data.Vector          as V
-import qualified Data.Vector.Unboxed  as U
+import           Data.Text                (Text)
+import qualified Data.Text                as Text
+import qualified Data.Text.Lazy           as TL
+import qualified Data.Time                as Time
+import qualified Data.UUID                as UUID
+import qualified Data.Vector              as V
+import qualified Data.Vector.Unboxed      as U
 import           Data.Word
 import           GHC.TypeLits
 
@@ -105,46 +105,46 @@ instance HasAvroSchema Time.UTCTime where
   schema = Tagged $ S.Long (Just TimestampMicros)
 
 instance (HasAvroSchema a) => HasAvroSchema (Identity a) where
-  schema = Tagged $ S.Union $ V.fromListN 1 [untag (schema :: Tagged a Schema)]
+  schema = Tagged $ S.Union $ V.fromListN 1 [untag @a schema]
 
 instance (HasAvroSchema a, HasAvroSchema b) => HasAvroSchema (Either a b) where
-  schema = Tagged $ S.Union $ V.fromListN 2 [untag (schema :: Tagged a Schema), untag (schema :: Tagged b Schema)]
+  schema = Tagged $ S.Union $ V.fromListN 2 [untag @a schema, untag @b schema]
 
 instance (HasAvroSchema a) => HasAvroSchema (Map.Map Text a) where
-  schema = wrapTag S.Map (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Map schema
 
 instance (HasAvroSchema a) => HasAvroSchema (HashMap.HashMap Text a) where
-  schema = wrapTag S.Map (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Map schema
 
 instance (HasAvroSchema a) => HasAvroSchema (Map.Map TL.Text a) where
-  schema = wrapTag S.Map (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Map schema
 
 instance (HasAvroSchema a) => HasAvroSchema (HashMap.HashMap TL.Text a) where
-  schema = wrapTag S.Map (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Map schema
 
 instance (HasAvroSchema a) => HasAvroSchema (Map.Map String a) where
-  schema = wrapTag S.Map (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Map schema
 
 instance (HasAvroSchema a) => HasAvroSchema (HashMap.HashMap String a) where
-  schema = wrapTag S.Map (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Map schema
 
 instance (HasAvroSchema a) => HasAvroSchema (Maybe a) where
-  schema = Tagged $ mkUnion (S.Null:| [untag (schema :: Tagged a Schema)])
+  schema = Tagged $ mkUnion (S.Null:| [untag @a schema])
 
 instance (HasAvroSchema a) => HasAvroSchema [a] where
-  schema = wrapTag S.Array (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Array schema
 
 instance (HasAvroSchema a, Ix i) => HasAvroSchema (Ar.Array i a) where
-  schema = wrapTag S.Array (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Array schema
 
 instance HasAvroSchema a => HasAvroSchema (V.Vector a) where
-  schema = wrapTag S.Array (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Array schema
 
 instance HasAvroSchema a => HasAvroSchema (U.Vector a) where
-  schema = wrapTag S.Array (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Array schema
 
 instance HasAvroSchema a => HasAvroSchema (S.Set a) where
-  schema = wrapTag S.Array (schema :: Tagged a Schema)
+  schema = wrapTag @a S.Array schema
 
 wrapTag :: (Schema -> Schema) -> Tagged a Schema -> Tagged b Schema
 wrapTag f = Tagged . f . untag

@@ -1,19 +1,16 @@
-{-# LANGUAGE NumDecimals         #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-
+{-# LANGUAGE NumDecimals       #-}
+{-# LANGUAGE OverloadedLists   #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
 module Bench.Deconflict
-( only
+( values
+, container
 )
 where
 
-import Data.Avro            (toAvro)
-import Data.Avro.Deconflict
-import Data.Avro.Deriving
-import Data.Vector          (Vector)
-import Text.RawString.QQ
+import Data.Avro                   (decodeContainerWithReaderSchema, decodeValue, decodeValueWithSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
+import Data.Avro.Schema.ReadSchema (fromSchema)
+import Data.Vector                 (Vector)
 
 import qualified Bench.Deconflict.Reader as R
 import qualified Bench.Deconflict.Writer as W
@@ -22,21 +19,27 @@ import qualified System.Random           as Random
 
 import Gauge
 
-newOuter :: IO (W.Outer)
+newOuter :: IO W.Outer
 newOuter = do
   i1 <- Random.randomRIO (minBound, maxBound)
   i2 <- Random.randomRIO (minBound, maxBound)
   pure $ W.Outer "Written" (W.Inner i1) (W.Inner i2)
 
 many :: Int -> IO a -> IO (Vector a)
-many n f = Vector.replicateM n f
+many = Vector.replicateM
 
--- | Only deconflicts values without actually decoding into generated types
-only :: Benchmark
-only = env (many 1e5 $ toAvro <$> newOuter) $ \ values ->
-  bgroup "strict"
-    [ bgroup "deconflict"
-        [ bench "plain"     $ nf (fmap (deconflict          W.schema'Outer R.schema'Outer)) $ values
-        , bench "noResolve" $ nf (fmap (deconflictNoResolve W.schema'Outer R.schema'Outer)) $ values
-        ]
+values :: Benchmark
+values = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ values ->
+  let
+    readSchema = fromSchema W.schema'Outer
+  in bgroup "Encoded: ByteString"
+      [ bgroup "No Deconflict"
+          [ bench "Read via FromAvro" $ nf (fmap (decodeValueWithSchema @W.Outer readSchema)) values
+          ]
+      ]
+
+container :: Benchmark
+container = env (many 1e5 newOuter >>= (\vs -> encodeContainerWithSchema nullCodec W.schema'Outer [Vector.toList vs])) $ \payload ->
+  bgroup "Decoding container"
+    [ bench "From FromAvro" $ nf (\v -> decodeContainerWithReaderSchema @R.Outer R.schema'Outer v) payload
     ]

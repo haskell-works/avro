@@ -1,46 +1,31 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Avro.Codec.MaybeSpec (spec) where
 
+import           Avro.TestUtils
+import           HaskellWorks.Hspec.Hedgehog
+import           Hedgehog
+import qualified Hedgehog.Gen                as Gen
 import           Test.Hspec
-import qualified Test.QuickCheck as Q
 
-import           Data.List.NonEmpty (NonEmpty(..))
-import           Data.Tagged
-import           Data.Text
-
-import           Data.Avro
-import           Data.Avro.Schema
-import qualified Data.Avro.Types as AT
+import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
+import qualified Data.Avro.Schema.Schema as Schema
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
-newtype OnlyMaybeBool = OnlyMaybeBool
-  { onlyMaybeBoolValue :: Maybe Bool
-  } deriving (Show, Eq)
-
-onlyMaybeBoolSchema :: Schema
-onlyMaybeBoolSchema =
-  let fld nm = Field nm [] Nothing Nothing
-   in Record "test.contract.onlyMaybeBool" [] Nothing Nothing
-        [ fld "onlyMaybeBoolValue" (mkUnion (Null :| [Boolean])) Nothing
-        ]
-
-instance HasAvroSchema OnlyMaybeBool where
-  schema = pure onlyMaybeBoolSchema
-
-instance ToAvro OnlyMaybeBool where
-  toAvro sa = record onlyMaybeBoolSchema
-    [ "onlyMaybeBoolValue" .= onlyMaybeBoolValue sa
-    ]
-
-instance FromAvro OnlyMaybeBool where
-  fromAvro (AT.Record _ r) =
-    OnlyMaybeBool <$> r .: "onlyMaybeBoolValue"
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "OnlyMaybeBool",
+  "namespace": "test.contract",
+  "fields": [ {"name": "onlyMaybeBoolValue", "type": ["null", "boolean"]} ]
+}
+|]
 
 spec :: Spec
 spec = describe "Avro.Codec.MaybeSpec" $ do
-  it "should encode then decode Maybe Bool correctly" $ do
-    Q.property $ \(w :: Maybe Bool) ->
-      decode (encode (OnlyMaybeBool w)) `shouldBe` Success (OnlyMaybeBool w)
+  it "should encode then decode Maybe Bool correctly" $ require $ property $ do
+    roundtripGen schema'OnlyMaybeBool (OnlyMaybeBool <$> Gen.maybe Gen.bool)

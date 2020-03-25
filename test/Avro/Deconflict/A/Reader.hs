@@ -6,7 +6,6 @@
 module Avro.Deconflict.A.Reader where
 
 import Data.Avro.Deriving
-import Text.RawString.QQ
 
 deriveAvroFromByteString [r|
 {
