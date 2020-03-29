@@ -17,3 +17,6 @@ spec :: Spec
 spec = describe "Avro.RecursiveSpec" $ do
   it "should roundtrip recursive type" $ require $ property $
     roundtripGen schema'Recursive recursiveGen
+
+  it "should roundrip mutually recursive type" $ require $ property $
+    roundtripGen schema'RecursiveA recursiveAGen

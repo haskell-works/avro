@@ -35,10 +35,41 @@ deriveAvroFromByteString [r|
 }
 |]
 
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "RecursiveA",
+  "fields": [
+    { "name": "index", "type": "int" },
+    { "name": "recursiveB",
+      "type": {
+        "type": "record",
+        "name": "RecursiveB",
+        "fields": [
+          { "name": "index", "type": "int"},
+          { "name": "recursiveA", "type": ["null", "RecursiveA"] }
+        ]
+      }
+    }
+  ]
+}
+|]
+
+
 recursiveGen :: MonadGen m => m Recursive
 recursiveGen = Recursive
   <$> Gen.int32 Range.linearBounded
   <*> Gen.maybe recursiveGen
+
+recursiveAGen :: MonadGen m => m RecursiveA
+recursiveAGen = RecursiveA
+  <$> Gen.int32 Range.linearBounded
+  <*> recursiveBGen
+
+recursiveBGen :: MonadGen m => m RecursiveB
+recursiveBGen = RecursiveB
+  <$> Gen.int32 Range.linearBounded
+  <*> Gen.maybe recursiveAGen
 
 -- maybeTestGen :: MonadGen m => m MaybeTest
 -- maybeTestGen = MaybeTest
