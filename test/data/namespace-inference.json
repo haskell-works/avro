@@ -4,7 +4,6 @@
     "name" : "com.example.Foo",
     "aliases" : ["FooBar", "com.example.not.Bar"],
     "doc" : "An example schema to test namespace handling.",
-    "order" : "ascending",
     "fields" : [
       {
         "name" : "bar",
@@ -13,7 +12,6 @@
         "type" : {
           "type" : "record",
           "name" : "Bar",
-          "order" : "ascending",
           "aliases" : ["Bar2", "com.example.not.Foo"],
           "fields" : [
             {
@@ -22,7 +20,6 @@
               "order" : "ascending",
               "type" : {
                 "type" : "record",
-                "order" : "ascending",
                 "name" : "com.example.baz.Baz",
                 "aliases" : ["com.example.Bazzy"],
                 "fields" : [

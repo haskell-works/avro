@@ -24,7 +24,7 @@ import Test.Hspec
 spec :: Spec
 spec = describe "Avro.Encoding.DeconflictSpec" $ do
   describe "Deconflict between reader and writer" $ do
-    fit "should deconfict base scenario" $ require $ property $ do
+    it "should deconfict base scenario" $ require $ property $ do
       x       <- forAll Write.genFoo
       schema  <- evalEither $ deconflict Write.schema'Foo Read.schema'Foo
 
