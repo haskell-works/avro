@@ -40,7 +40,6 @@ expected = Record
   { name    = "com.example.Foo"
   , aliases = ["com.example.FooBar", "com.example.not.Bar"]
   , doc     = Just "An example schema to test namespace handling."
-  , order   = Just Ascending
   , fields  = [field "bar" bar, field "baz" $ NamedType "com.example.baz.Baz"]
   }
   where field name schema = Field name [] Nothing (Just Ascending) schema Nothing
@@ -49,7 +48,6 @@ expected = Record
           { name    = "com.example.Bar"
           , aliases = ["com.example.Bar2", "com.example.not.Foo"]
           , doc     = Nothing
-          , order   = Just Ascending
           , fields  = [ field "baz" baz
                       , field "bazzy" $ NamedType "com.example.Bazzy"
                       ]
@@ -59,7 +57,6 @@ expected = Record
           { name    = "com.example.baz.Baz"
           , aliases = ["com.example.Bazzy"]
           , doc     = Nothing
-          , order   = Just Ascending
           , fields  = [ field "baz"   $ NamedType "com.example.baz.Baz"
                       , field "bazzy" $ NamedType "com.example.Bazzy"
                       ]
@@ -71,7 +68,6 @@ expectedNullNamespace = Record
   { name    = "Foo"
   , aliases = []
   , doc     = Just "An example schema to test null namespace handling."
-  , order   = Just Ascending
   , fields  = [field "bar" $ NamedType "Bar", field "baz" $ NamedType "com.example.Baz"]
   }
   where field name schema = Field name [] Nothing (Just Ascending) schema Nothing

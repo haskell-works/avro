@@ -196,13 +196,14 @@ test-suite test
                         Avro.Codec.ZigZagSpec
                         Avro.Data.Deconflict.Read
                         Avro.Data.Deconflict.Write
+                        Avro.Data.Endpoint
                         Avro.Data.Enums
                         Avro.Data.FixedTypes
                         Avro.Data.Karma
                         Avro.Data.Logical
                         Avro.Data.Maybe
+                        Avro.Data.Recursive
                         Avro.Data.Reused
-                        Avro.Data.Endpoint
                         Avro.Data.Unions
                         Avro.Decode.ContainerSpec
                         Avro.Decode.RawBlocksSpec
@@ -227,6 +228,7 @@ test-suite test
                         Avro.ManualSpec
                         Avro.NamespaceSpec
                         Avro.NormSchemaSpec
+                        Avro.RecursiveSpec
                         Avro.ReuseFixedSpec
                         Avro.SchemaSpec
                         Avro.TestUtils

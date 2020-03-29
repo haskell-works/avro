@@ -46,7 +46,7 @@ newtype Encoder = Encoder { runEncoder :: Schema -> Builder }
 (.=) fieldName fieldValue = (fieldName, Encoder (flip toAvro fieldValue))
 
 record :: Schema -> [(Text, Encoder)] -> Builder
-record (S.Record _ _ _ _ fs) vs =
+record (S.Record _ _ _ fs) vs =
   foldMap (mapField provided) fs
   where
     provided :: HashMap Text Encoder

@@ -24,6 +24,8 @@ import qualified Data.Vector             as V
 import           Data.Avro.Schema.ReadSchema (FieldStatus (..), ReadField, ReadSchema)
 import qualified Data.Avro.Schema.ReadSchema as Read
 
+import Debug.Trace
+
 -- | @deconflict writer reader@ will produce a schema that can decode
 -- with the writer's schema into the form specified by the reader's schema.
 --
@@ -74,13 +76,12 @@ deconflict w@S.Fixed {} r@S.Fixed {}
     }
 
 deconflict w@S.Record {} r@S.Record {}
-  | name w == name r && order r `moreSpecified` order w = do
+  | name w == name r = do
     fields' <- deconflictFields (fields w) (fields r)
     pure Read.Record
       { Read.name    = name r
       , Read.aliases = aliases w <> aliases r
       , Read.doc     = doc r
-      , Read.order   = order r
       , Read.fields  = fields'
       }
 
@@ -94,14 +95,6 @@ deconflict nonUnion (S.Union rs)
     Read.FreeUnion ix <$> deconflict nonUnion y
 
 deconflict a b = Left $ "Can not resolve differing writer and reader schemas: " ++ show (a, b)
-
-
-moreSpecified :: Maybe Order -> Maybe Order -> Bool
-moreSpecified _ Nothing                           = True
-moreSpecified _ (Just Ignore)                     = True
-moreSpecified (Just Ascending)  (Just Ascending)  = True
-moreSpecified (Just Descending) (Just Descending) = True
-moreSpecified _ _                                 = False
 
 contains :: V.Vector Text -> V.Vector Text -> Bool
 contains container elts =

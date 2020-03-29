@@ -86,7 +86,6 @@ data ReadSchema
       | Record { name    :: TypeName
                , aliases :: [TypeName]
                , doc     :: Maybe Text
-               , order   :: Maybe Order
                , fields  :: [ReadField]
                }
       | Enum { name    :: TypeName
@@ -158,7 +157,6 @@ fromSchema = \case
     { name    = S.name v
     , aliases = S.aliases v
     , doc     = S.doc v
-    , order   = S.order v
     , fields  = (\(i, x) -> fromField (AsIs i) x) <$> zip [0..] (S.fields v)
     }
   v@S.Enum{} -> Enum

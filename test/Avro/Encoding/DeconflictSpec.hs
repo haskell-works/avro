@@ -28,6 +28,8 @@ spec = describe "Avro.Encoding.DeconflictSpec" $ do
       x       <- forAll Write.genFoo
       schema  <- evalEither $ deconflict Write.schema'Foo Read.schema'Foo
 
+      footnoteShow schema
+
       let bs  = encodeValueWithSchema Write.schema'Foo x
       x'      <- evalEither $ decodeValueWithSchema @Read.Foo schema bs
 

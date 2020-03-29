@@ -258,7 +258,7 @@ getField env sch = case sch of
   ReadSchema.Double ReadSchema.DoubleFromLong  -> fmap (Double sch . fromIntegral)  Get.getLong
 
   ReadSchema.String _              -> fmap (String sch)           Get.getString
-  ReadSchema.Record _ _ _ _ fields -> fmap (Record sch)           (getRecord env fields)
+  ReadSchema.Record _ _ _ fields   -> fmap (Record sch)             (getRecord env fields)
   ReadSchema.Bytes _               -> fmap (Bytes sch)            Get.getBytes
 
   ReadSchema.NamedType tn          ->
