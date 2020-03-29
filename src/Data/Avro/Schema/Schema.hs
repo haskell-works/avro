@@ -130,7 +130,6 @@ data Schema
       | Record { name    :: TypeName
                , aliases :: [TypeName]
                , doc     :: Maybe Text
-               , order   :: Maybe Order
                , fields  :: [Field]
                }
       | Enum { name    :: TypeName
@@ -202,7 +201,7 @@ instance Eq Schema where
   Map ty == Map ty2 = ty == ty2
   NamedType t == NamedType t2 = t == t2
 
-  Record name1 _ _ _ fs1 == Record name2 _ _ _ fs2 =
+  Record name1 _ _ fs1 == Record name2 _ _ fs2 =
     (name1 == name2) && (fs1 == fs2)
   Enum name1 _ _ s == Enum name2 _ _ s2 =
     (name1 == name2) && (s == s2)
@@ -461,9 +460,8 @@ parseSchemaJSON context = \case
               mkAlias name = mkTypeName (Just typeName) name Nothing
           aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
           doc     <- o .:? "doc"
-          order   <- o .:? "order" .!= Just Ascending
           fields  <- mapM (parseField typeName) =<< (o .: "fields")
-          pure $ Record typeName aliases doc order fields
+          pure $ Record typeName aliases doc fields
         "enum"   -> do
           name      <- o .: "name"
           namespace <- o .:? "namespace"
@@ -583,8 +581,7 @@ schemaToJSON context = \case
   NamedType name  -> toJSON $ render context name
   Record {..}     ->
     let opts = catMaybes
-          [ ("order" .=) <$> order
-          , ("doc" .=)   <$> doc
+          [ ("doc" .=)   <$> doc
           ]
     in object $ opts ++
        [ "type"    .= ("record" :: Text)

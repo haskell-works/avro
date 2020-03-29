@@ -34,7 +34,7 @@ data Person = Person
 
 schema'Person :: Schema
 schema'Person =
-  Record "Person" []  Nothing                                 Nothing
+  Record "Person" []  Nothing
     [ fld "fullName"  (String Nothing)                        Nothing
     , fld "age"       (Int Nothing)                           Nothing
     , fld "ssn"       (mkUnion $ Null :| [(String Nothing)])  Nothing

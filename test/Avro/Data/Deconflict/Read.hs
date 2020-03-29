@@ -17,7 +17,7 @@ deriveAvroFromByteString [r|
         "name": "Bar",
         "type": "record",
         "fields": [
-          { "name": "barInt",     "type": "int" },
+          { "name": "barInt",     "type": "int", "order": "descending" },
           { "name": "barTime",    "type": { "logicalType": "timestamp-millis", "type": "long" } },
           { "name": "barLong",    "type": { "logicalType": "timestamp-micros", "type": "long" } },
           { "name": "barString",  "type": "string" },

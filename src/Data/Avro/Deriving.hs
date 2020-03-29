@@ -319,7 +319,7 @@ genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
         fromAvro (AV.Enum _ i _) = $([| pure . toEnum|]) i
         fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
   |]
-genFromValue namespaceBehavior (S.Record n _ _ _ fs) =
+genFromValue namespaceBehavior (S.Record n _ _ fs) =
   [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AV.Record _ r) =
            $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
@@ -373,7 +373,7 @@ genToAvro opts s@(S.Enum n _ _ _) =
             toAvro = $([| \_ x -> putI (fromEnum x) |])
       |]
 
-genToAvro opts s@(S.Record n _ _ _ fs) =
+genToAvro opts s@(S.Record n _ _ fs) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     encodeAvroInstance sname =
@@ -420,7 +420,7 @@ setName = fmap . map . sn
     sn _ d                   = d
 
 genType :: DeriveOptions -> Schema -> Q [Dec]
-genType opts (S.Record n _ _ _ fs) = do
+genType opts (S.Record n _ _ fs) = do
   flds <- traverse (mkField opts n) fs
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genDataType dname flds]
@@ -454,7 +454,7 @@ mkFieldTypeName namespaceBehavior = \case
   S.String Nothing   -> [t| Text |]
   S.String (Just UUID) -> [t| UUID |]
   S.Union branches   -> union (Foldable.toList branches)
-  S.Record n _ _ _ _ -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
+  S.Record n _ _ _   -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
   S.Map x            -> [t| Map Text $(go x) |]
   S.Array x          -> [t| [$(go x)] |]
   S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
@@ -522,7 +522,7 @@ renderName :: NamespaceBehavior
 renderName namespaceBehavior (TN name namespace) = case namespaceBehavior of
   HandleNamespaces -> Text.intercalate "'" $ namespace <> [name]
   IgnoreNamespaces -> name
-  Custom f -> f name namespace
+  Custom f         -> f name namespace
 
 mkSchemaValueName :: NamespaceBehavior -> TypeName -> Name
 mkSchemaValueName namespaceBehavior typeName =
