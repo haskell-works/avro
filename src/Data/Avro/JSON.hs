@@ -59,8 +59,6 @@
 -- @
 module Data.Avro.JSON where
 
-import Data.Semigroup ((<>))
-
 import qualified Data.Aeson           as Aeson
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.Foldable        as Foldable

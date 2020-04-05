@@ -10,7 +10,6 @@ import Data.Avro.Internal.Zig
 import Data.Bits
 import Data.ByteString.Builder
 import Data.Int
-import Data.Monoid
 import Data.Word
 
 putNonNegative :: forall a. (FiniteBits a, Integral a) => a -> Builder

@@ -4,6 +4,7 @@
 module Avro.Decode.RawBlocksSpec
 where
 
+import Avro.Data.Endpoint
 import Control.Monad                (forM_)
 import Data.Avro                    (decodeContainerWithEmbeddedSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
 import Data.Avro.Internal.Container (decodeRawBlocks, packContainerBlocks, packContainerValues)
@@ -11,15 +12,13 @@ import Data.Either                  (rights)
 import Data.List                    (unfoldr)
 import Data.Semigroup               ((<>))
 import Data.Text                    (pack)
+import HaskellWorks.Hspec.Hedgehog
+import Hedgehog
+import Hedgehog.Range              (Range)
+import Test.Hspec
 
-import Avro.Data.Endpoint
-
-import           HaskellWorks.Hspec.Hedgehog
-import           Hedgehog
 import qualified Hedgehog.Gen                as Gen
-import           Hedgehog.Range              (Range)
 import qualified Hedgehog.Range              as Range
-import           Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 

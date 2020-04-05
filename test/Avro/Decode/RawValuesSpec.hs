@@ -4,21 +4,19 @@
 module Avro.Decode.RawValuesSpec
 where
 
+import Avro.Data.Endpoint
 import Data.Avro                   (decodeValueWithSchema, encodeContainerWithSchema, extractContainerValuesBytes, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Either                 (isLeft, isRight, rights)
 import Data.List                   (unfoldr)
-import Data.Semigroup              ((<>))
 import Data.Text                   (pack)
+import HaskellWorks.Hspec.Hedgehog
+import Hedgehog
+import Hedgehog.Range              (Range)
+import Test.Hspec
 
-import Avro.Data.Endpoint
-
-import           HaskellWorks.Hspec.Hedgehog
-import           Hedgehog
 import qualified Hedgehog.Gen                as Gen
-import           Hedgehog.Range              (Range)
 import qualified Hedgehog.Range              as Range
-import           Test.Hspec
 
 {-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
 
