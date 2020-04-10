@@ -11,6 +11,7 @@ author:                 Thomas M. DuBuisson
 maintainer:             Alexey Raga <alexey.raga@gmail.com>
 license:                BSD-3-Clause
 license-file:           LICENSE
+tested-with:            GHC == 8.10.1, GHC == 8.8.3, GHC == 8.6.5
 build-type:             Simple
 extra-source-files:     README.md
                         ChangeLog.md
