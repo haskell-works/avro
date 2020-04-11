@@ -42,6 +42,7 @@ workflows:
 
       - github/release-cabal:
           name: GitHub Release
+          checkout: true
           context: haskell-ci
           requires:
             - Build Ok
