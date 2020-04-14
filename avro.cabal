@@ -180,7 +180,7 @@ test-suite test
                       , zlib
   build-depends: avro
   type:                 exitcode-stdio-1.0
-  ghc-options:          -threaded
+  ghc-options:          -threaded -rtsopts -with-rtsopts=-N
   default-language:     Haskell2010
   main-is:              Spec.hs
   build-tool-depends:   hspec-discover:hspec-discover
@@ -271,9 +271,10 @@ test-suite doctest
                       , doctest
                       , bytestring
                       , doctest-discover
+                      , zlib
   build-depends: avro
   type:                 exitcode-stdio-1.0
-  ghc-options:          -threaded
+  ghc-options:          -threaded -rtsopts -with-rtsopts=-N
   main-is:              DoctestDriver.hs
   HS-Source-Dirs:       doctest
   build-tool-depends:   doctest-discover:doctest-discover
