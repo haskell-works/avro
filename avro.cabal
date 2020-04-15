@@ -193,6 +193,7 @@ test-suite test
                         Avro.Codec.Int64Spec
                         Avro.Codec.MaybeSpec
                         Avro.Codec.NestedSpec
+                        Avro.Codec.NullSpec
                         Avro.Codec.TextSpec
                         Avro.Codec.ZigZagSpec
                         Avro.Data.Deconflict.Read

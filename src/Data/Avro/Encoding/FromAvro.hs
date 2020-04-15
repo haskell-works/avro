@@ -130,6 +130,11 @@ instance FromAvro Float where
   fromAvro x           = Left ("Unable to decode Double from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
 
+instance FromAvro () where
+  fromAvro Null = Right ()
+  fromAvro x    = Left ("Unable to decode () from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
+
 instance FromAvro Bool where
   fromAvro (Boolean x) = Right x
   fromAvro x           = Left ("Unable to decode Bool from: " <> show (describeValue x))

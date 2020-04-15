@@ -434,6 +434,7 @@ genType _ _ = pure []
 
 mkFieldTypeName :: NamespaceBehavior -> S.Schema -> Q TH.Type
 mkFieldTypeName namespaceBehavior = \case
+  S.Null             -> [t| () |]
   S.Boolean          -> [t| Bool |]
   S.Long (Just (DecimalL (Decimal p s)))
                      -> [t| Decimal $(litT $ numTyLit p) $(litT $ numTyLit s) |]
@@ -460,7 +461,6 @@ mkFieldTypeName namespaceBehavior = \case
   S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   S.Fixed n _ _ _    -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   S.Enum n _ _ _     -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  t                  -> error $ "Avro type is not supported: " <> show t
   where go = mkFieldTypeName namespaceBehavior
         union = \case
           []              ->

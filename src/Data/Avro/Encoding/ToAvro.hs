@@ -127,6 +127,10 @@ instance ToAvro Float where
   toAvro s _        = error ("Unable to encode Float as: " <> show s)
   {-# INLINE toAvro #-}
 
+instance ToAvro () where
+  toAvro S.Null () = mempty
+  toAvro s () = error ("Unable to encode () as: " <> show s)
+
 instance ToAvro Bool where
   toAvro S.Boolean v = word8 $ fromIntegral (fromEnum v)
   toAvro s _         = error ("Unable to encode Bool as: " <> show s)
