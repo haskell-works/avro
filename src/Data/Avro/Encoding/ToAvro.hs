@@ -222,6 +222,7 @@ instance ToAvro a => ToAvro (Maybe a) where
   toAvro (S.Union opts) v =
     case F.toList opts of
       [S.Null, s] -> maybe (putI 0) (\a -> putI 1 <> toAvro s a) v
+      [s, S.Null] -> maybe (putI 1) (\a -> putI 0 <> toAvro s a) v
       wrongOpts   -> error ("Unable to encode Maybe as " <> show wrongOpts)
   toAvro s _ = error ("Unable to encode Maybe as " <> show s)
 

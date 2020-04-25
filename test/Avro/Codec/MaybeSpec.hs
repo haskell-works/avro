@@ -25,7 +25,19 @@ deriveAvroFromByteString [r|
 }
 |]
 
+deriveAvroFromByteString [r|
+{
+  "type": "record",
+  "name": "OnlyMaybeBool'",
+  "namespace": "test.contract",
+  "fields": [ {"name": "onlyMaybeBoolValue", "type": ["boolean", "null"]} ]
+}
+|]
+
 spec :: Spec
 spec = describe "Avro.Codec.MaybeSpec" $ do
   it "should encode then decode Maybe Bool correctly" $ require $ property $ do
     roundtripGen schema'OnlyMaybeBool (OnlyMaybeBool <$> Gen.maybe Gen.bool)
+
+  it "should be able to roundtrip a Maybe Bool defined with flipped union type" $ require $ property $ do
+    roundtripGen schema'OnlyMaybeBool' (OnlyMaybeBool' <$> Gen.maybe Gen.bool)
