@@ -62,7 +62,7 @@ common doctest-discover         { build-depends: doctest-discover         >= 0.2
 common extra                    { build-depends: extra                                              }
 common fail                     { build-depends: fail                                               }
 common gauge                    { build-depends: gauge                                              }
-common generic-lens             { build-depends: generic-lens                                       }
+common generic-lens             { build-depends: generic-lens             >= 1.2        && < 2.1    }
 common hashable                 { build-depends: hashable                                           }
 common hedgehog                 { build-depends: hedgehog                                           }
 common hw-hspec-hedgehog        { build-depends: hw-hspec-hedgehog                                  }
