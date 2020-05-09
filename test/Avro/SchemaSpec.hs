@@ -15,7 +15,7 @@ import Data.Avro.Schema.Schema (extractBindings, matches, overlay)
 
 import Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "Avro.SchemaSpec" $ do

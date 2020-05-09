@@ -9,7 +9,7 @@ import Data.Avro.Deriving
 import Avro.TestUtils (roundtrip)
 import Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "Avro.ReuseFixedSpec" $ do

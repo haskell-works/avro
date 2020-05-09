@@ -8,7 +8,7 @@ import           Data.List.Extra
 import           Data.Word
 import           Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 bitStringToWord8s :: String -> [Word8]
 bitStringToWord8s = reverse . map (toWord . reverse) . chunksOf 8 . reverse . toBinary

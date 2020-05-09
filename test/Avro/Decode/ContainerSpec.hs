@@ -17,7 +17,7 @@ import           Hedgehog.Range              (Range)
 import qualified Hedgehog.Range              as Range
 import           Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = do
