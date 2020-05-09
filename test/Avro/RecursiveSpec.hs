@@ -11,7 +11,7 @@ import HaskellWorks.Hspec.Hedgehog
 import Hedgehog
 import Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "Avro.RecursiveSpec" $ do

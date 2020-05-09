@@ -31,7 +31,7 @@ import Test.Hspec
 import System.Directory   (doesFileExist, getCurrentDirectory)
 import System.Environment (setEnv)
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 deriveAvro "test/data/unions-no-namespace.avsc"
 

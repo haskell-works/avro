@@ -12,7 +12,7 @@ import Avro.Data.Reused
 
 import Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "Avro.NormSchemaSpec" $ do

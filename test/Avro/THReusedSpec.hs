@@ -10,7 +10,7 @@ import Data.Avro.Deriving
 
 import Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 deriveAvroWithOptions (defaultDeriveOptions { namespaceBehavior = HandleNamespaces }) "test/data/reused.avsc"
 

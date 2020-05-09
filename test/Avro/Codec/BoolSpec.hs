@@ -17,7 +17,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Avro          (encodeValueWithSchema)
 import Data.Avro.Deriving (deriveAvroFromByteString, r)
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 deriveAvroFromByteString [r|
 {

@@ -9,8 +9,8 @@ import HaskellWorks.Hspec.Hedgehog
 import Hedgehog
 import Test.Hspec
 
-{-# ANN module ("HLint: ignore Redundant do"    :: String) #-}
-{-# ANN module ("HLint: ignore Redundant flip"  :: String) #-}
+{- HLINT ignore "Reduce duplication"  -}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "Avro.Encoding.LogicalTypesSpec" $ do

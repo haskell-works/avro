@@ -10,7 +10,7 @@ import Data.Word
 import Test.Hspec
 import Test.QuickCheck
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "Avro.Codec.Int64Spec" $ do

@@ -13,8 +13,7 @@ import System.Environment (setEnv)
 import Paths_avro
 import Test.Hspec
 
-
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 spec :: Spec
 spec = describe "NamespaceSpec.hs: namespace inference in Avro schemas" $ do

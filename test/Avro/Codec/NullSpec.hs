@@ -20,7 +20,7 @@ import Data.Avro          (encodeValueWithSchema)
 import Data.Avro.Deriving (deriveAvroFromByteString, r)
 import Data.Avro.EitherN  (Either3 (E3_1, E3_3))
 
-{-# ANN module ("HLint: ignore Redundant do"        :: String) #-}
+{- HLINT ignore "Redundant do"        -}
 
 deriveAvroFromByteString [r|
 {
