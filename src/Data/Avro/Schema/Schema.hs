@@ -61,6 +61,7 @@ module Data.Avro.Schema.Schema
 
 import           Control.Applicative
 import           Control.DeepSeq            (NFData)
+import           Control.Monad
 import           Control.Monad.Except
 import qualified Control.Monad.Fail         as MF
 import           Control.Monad.State.Strict
