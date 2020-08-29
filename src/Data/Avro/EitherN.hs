@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFoldable      #-}
-{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -322,8 +320,8 @@ instance Bitraversable (Either7 a b c d e) where
   bitraverse _ _ (E7_3 a) = pure (E7_3 a)
   bitraverse _ _ (E7_4 a) = pure (E7_4 a)
   bitraverse _ _ (E7_5 a) = pure (E7_5 a)
-  bitraverse f _ (E7_6 a) = E7_6 <$> (f a)
-  bitraverse _ g (E7_7 a) = E7_7 <$> (g a)
+  bitraverse f _ (E7_6 a) = E7_6 <$> f a
+  bitraverse _ g (E7_7 a) = E7_7 <$> g a
 
 instance Bitraversable (Either8 a b c d e f) where
   bitraverse _ _ (E8_1 a) = pure (E8_1 a)
@@ -332,8 +330,8 @@ instance Bitraversable (Either8 a b c d e f) where
   bitraverse _ _ (E8_4 a) = pure (E8_4 a)
   bitraverse _ _ (E8_5 a) = pure (E8_5 a)
   bitraverse _ _ (E8_6 a) = pure (E8_6 a)
-  bitraverse f _ (E8_7 a) = E8_7 <$> (f a)
-  bitraverse _ g (E8_8 a) = E8_8 <$> (g a)
+  bitraverse f _ (E8_7 a) = E8_7 <$> f a
+  bitraverse _ g (E8_8 a) = E8_8 <$> g a
 
 instance Bitraversable (Either9 a b c d e f g) where
   bitraverse _ _ (E9_1 a) = pure (E9_1 a)
@@ -343,8 +341,8 @@ instance Bitraversable (Either9 a b c d e f g) where
   bitraverse _ _ (E9_5 a) = pure (E9_5 a)
   bitraverse _ _ (E9_6 a) = pure (E9_6 a)
   bitraverse _ _ (E9_7 a) = pure (E9_7 a)
-  bitraverse f _ (E9_8 a) = E9_8 <$> (f a)
-  bitraverse _ g (E9_9 a) = E9_9 <$> (g a)
+  bitraverse f _ (E9_8 a) = E9_8 <$> f a
+  bitraverse _ g (E9_9 a) = E9_9 <$> g a
 
 instance Bitraversable (Either10 a b c d e f g h) where
   bitraverse _ _ (E10_1 a)  = pure (E10_1 a)
@@ -355,8 +353,8 @@ instance Bitraversable (Either10 a b c d e f g h) where
   bitraverse _ _ (E10_6 a)  = pure (E10_6 a)
   bitraverse _ _ (E10_7 a)  = pure (E10_7 a)
   bitraverse _ _ (E10_8 a)  = pure (E10_8 a)
-  bitraverse f _ (E10_9 a)  = E10_9 <$> (f a)
-  bitraverse _ g (E10_10 a) = E10_10 <$> (g a)
+  bitraverse f _ (E10_9 a)  = E10_9 <$> f a
+  bitraverse _ g (E10_10 a) = E10_10 <$> g a
 
 instance (HasAvroSchema a, HasAvroSchema b, HasAvroSchema c) => HasAvroSchema (Either3 a b c) where
   schema = Tagged $ mkUnion (untag @a schema :| [

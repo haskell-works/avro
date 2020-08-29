@@ -37,7 +37,7 @@ deriveAvro "test/data/unions-no-namespace.avsc"
 
 spec :: Spec
 spec = describe "Avro.JSONSpec: JSON serialization/parsing" $ do
-  it "should pass" $ require $ withTests 1 $ property $ success
+  it "should pass" $ require $ withTests 1 $ property success
 
   -- it "should do roundtrip (enums)" $ require $ property $ do
   --   msg <- forAll enumWrapperGen
