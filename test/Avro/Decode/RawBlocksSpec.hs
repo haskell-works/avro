@@ -20,6 +20,7 @@ import Test.Hspec
 import qualified Hedgehog.Gen   as Gen
 import qualified Hedgehog.Range as Range
 
+{- HLINT ignore "Reduce duplication"  -}
 {- HLINT ignore "Redundant do"        -}
 
 spec :: Spec

@@ -89,7 +89,7 @@ deflateDecompress bytes parser = do
         bytes
 
     decode :: G.Decoder a -> [Chunk] -> Either String (G.Decoder a)
-    decode !dec@G.Fail{} _ =
+    decode dec@G.Fail{} _ =
       -- short circuit if decoding failed
       pure dec
     decode !dec [] =

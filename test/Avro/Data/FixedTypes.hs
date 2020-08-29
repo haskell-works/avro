@@ -1,6 +1,4 @@
 {-# LANGUAGE DeriveAnyClass      #-}
-{-# LANGUAGE DeriveFoldable      #-}
-{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
 {-# LANGUAGE NumDecimals         #-}
@@ -13,6 +11,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+
 module Avro.Data.FixedTypes
 where
 

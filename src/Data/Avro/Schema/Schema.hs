@@ -1,9 +1,6 @@
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveFoldable        #-}
-{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -93,6 +90,9 @@ import qualified Data.Vector            as V
 import           Prelude                as P
 
 import GHC.Generics (Generic)
+
+{- HLINT ignore "Reduce duplication"  -}
+{- HLINT ignore "Use &&"              -}
 
 data DefaultValue
       = DNull
