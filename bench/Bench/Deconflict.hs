@@ -41,5 +41,5 @@ values = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ 
 container :: Benchmark
 container = env (many 1e5 newOuter >>= (\vs -> encodeContainerWithSchema nullCodec W.schema'Outer [Vector.toList vs])) $ \payload ->
   bgroup "Decoding container"
-    [ bench "From FromAvro" $ nf (\v -> decodeContainerWithReaderSchema @R.Outer R.schema'Outer v) payload
+    [ bench "From FromAvro" $ nf (decodeContainerWithReaderSchema @R.Outer R.schema'Outer) payload
     ]

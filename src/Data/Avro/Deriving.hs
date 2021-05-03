@@ -7,6 +7,8 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TypeApplications   #-}
 
+{- HLINT ignore "Avoid lambda using `infix`" -}
+
 -- | This module lets us derive Haskell types from an Avro schema that
 -- can be serialized/deserialzed to Avro.
 module Data.Avro.Deriving
@@ -79,8 +81,7 @@ import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Data.Vector                as V
 
-import Data.Avro.Deriving.Lift    ()
-import Language.Haskell.TH.Syntax (lift)
+import Data.Avro.Deriving.Lift ()
 
 -- | How to treat Avro namespaces in the generated Haskell types.
 data NamespaceBehavior =
@@ -386,7 +387,7 @@ genToAvro opts s@(S.Record n _ _ fs) =
       let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
       lamE [wn, con]
             [| mconcat $( let build (fld, n) = [| toAvro (fldType fld) $(varE n) |]
-                          in listE $ build <$> (zip fs names)
+                          in listE $ build <$> zip fs names
                         )
             |]
 
@@ -403,7 +404,7 @@ genToAvro opts s@(S.Fixed n _ _ _) =
 genToAvro _ _ = pure []
 
 schemaDef :: Name -> Schema -> Q [Dec]
-schemaDef sname sch = setName sname $
+schemaDef sname sch = setName sname
   [d|
       x :: Schema
       x = sch
@@ -426,7 +427,7 @@ genType opts (S.Record n _ _ fs) = do
   sequenceA [genDataType dname flds]
 genType opts (S.Enum n _ _ vs) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
-  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> (V.toList vs))]
+  sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> V.toList vs)]
 genType opts (S.Fixed n _ s _) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genNewtype dname]
@@ -539,7 +540,7 @@ mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
 mkField opts typeName field = do
   ftype <- mkFieldTypeName (namespaceBehavior opts) (fldType field)
   let prefix = renderName (namespaceBehavior opts) typeName
-      fName = mkTextName $ (fieldNameBuilder opts) prefix field
+      fName = mkTextName $ fieldNameBuilder opts prefix field
       (fieldStrictness, fieldUnpackedness) =
         fieldRepresentation opts typeName field
       strictness =

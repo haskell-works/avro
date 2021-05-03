@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeFamilies              #-}
 
-
 module Data.Avro.Encoding.ToAvro
 where
 
@@ -39,6 +38,8 @@ import qualified Data.Vector                  as V
 import qualified Data.Vector.Unboxed          as U
 import           Data.Word
 import           GHC.TypeLits
+
+{- HLINT ignore "Use section"         -}
 
 newtype Encoder = Encoder { runEncoder :: Schema -> Builder }
 
@@ -74,45 +75,45 @@ instance ToAvro Int where
 instance ToAvro Int32 where
   toAvro (S.Long _) i = encodeRaw @Int64 (fromIntegral i)
   toAvro (S.Int _) i  = encodeRaw @Int32 i
-  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
-  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double S.Double (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float S.Float (fromIntegral i)
   toAvro s _          = error ("Unable to encode Int32 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Int64 where
   toAvro (S.Long _) i = encodeRaw @Int64 i
-  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
-  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double S.Double (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float S.Float (fromIntegral i)
   toAvro s _          = error ("Unable to encode Int64 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word8 where
   toAvro (S.Int _) i  = encodeRaw @Word8 i
   toAvro (S.Long _) i = encodeRaw @Word64 (fromIntegral i)
-  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
-  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double S.Double (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float S.Float (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word8 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word16 where
   toAvro (S.Int _) i  = encodeRaw @Word16 i
   toAvro (S.Long _) i = encodeRaw @Word64 (fromIntegral i)
-  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
-  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double S.Double (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float S.Float (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word16 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word32 where
   toAvro (S.Int _) i  = encodeRaw @Word32 i
   toAvro (S.Long _) i = encodeRaw @Word64 (fromIntegral i)
-  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
-  toAvro S.Float i    = toAvro @Float (S.Float) (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double S.Double (fromIntegral i)
+  toAvro S.Float i    = toAvro @Float S.Float (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word32 as: " <> show s)
   {-# INLINE toAvro #-}
 
 instance ToAvro Word64 where
   toAvro (S.Long _) i = encodeRaw @Word64 i
-  toAvro S.Double i   = toAvro @Double (S.Double) (fromIntegral i)
+  toAvro S.Double i   = toAvro @Double S.Double (fromIntegral i)
   toAvro s _          = error ("Unable to encode Word64 as: " <> show s)
   {-# INLINE toAvro #-}
 
@@ -129,7 +130,7 @@ instance ToAvro Float where
 
 instance ToAvro () where
   toAvro S.Null () = mempty
-  toAvro s () = error ("Unable to encode () as: " <> show s)
+  toAvro s ()      = error ("Unable to encode () as: " <> show s)
 
 instance ToAvro Bool where
   toAvro S.Boolean v = word8 $ fromIntegral (fromEnum v)
@@ -228,14 +229,14 @@ instance ToAvro a => ToAvro (Maybe a) where
 
 instance (ToAvro a) => ToAvro (Identity a) where
   toAvro (S.Union opts) e@(Identity a) =
-    if (V.length opts == 1)
+    if V.length opts == 1
       then putI 0 <> toAvro (V.unsafeIndex opts 0) a
       else error ("Unable to encode Identity as a single-value union: " <> show opts)
   toAvro s _ = error ("Unable to encode Identity value as " <> show s)
 
 instance (ToAvro a, ToAvro b) => ToAvro (Either a b) where
   toAvro (S.Union opts) v =
-    if (V.length opts == 2)
+    if V.length opts == 2
       then case v of
         Left a  -> putI 0 <> toAvro (V.unsafeIndex opts 0) a
         Right b -> putI 1 <> toAvro (V.unsafeIndex opts 1) b

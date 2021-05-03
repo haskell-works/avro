@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE StrictData          #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+
 module Data.Avro.Internal.Container
 where
 
@@ -98,7 +100,7 @@ decodeRawBlocks bs =
       in Right (containedSchema, blocks)
   where
     allBlocks sync decompress bytes =
-      flip unfoldr (Just bytes) $ \acc -> case acc of
+      flip unfoldr (Just bytes) $ \case
         Just rest -> next sync decompress rest
         Nothing   -> Nothing
 

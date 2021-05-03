@@ -35,9 +35,9 @@ data Person = Person
 schema'Person :: Schema
 schema'Person =
   Record "Person" []  Nothing
-    [ fld "fullName"  (String Nothing)                        Nothing
-    , fld "age"       (Int Nothing)                           Nothing
-    , fld "ssn"       (mkUnion $ Null :| [(String Nothing)])  Nothing
+    [ fld "fullName"  (String Nothing)                      Nothing
+    , fld "age"       (Int Nothing)                         Nothing
+    , fld "ssn"       (mkUnion $ Null :| [String Nothing])  Nothing
     ]
   where
      fld nm ty def = Field nm [] Nothing Nothing ty def

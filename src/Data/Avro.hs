@@ -1,9 +1,8 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
+
 -- | Avro encoding and decoding routines.
 --
 -- This library provides a high level interface for encoding and decoding
@@ -71,6 +70,8 @@ import           Data.Binary.Get              (runGetOrFail)
 import           Data.ByteString.Builder      (toLazyByteString)
 import qualified Data.ByteString.Lazy         as BL
 import           Data.Tagged                  (untag)
+
+{- HLINT ignore "Use section"         -}
 
 -- | Converts 'Schema' into 'ReadSchema'. This function may be useful when it is known
 -- that the writer and the reader schemas are the same.
