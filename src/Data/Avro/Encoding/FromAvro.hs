@@ -316,11 +316,6 @@ getBlocksOf env t = do
     vs <- replicateM (fromIntegral blockLength) (getField env t)
     (vs:) <$> getBlocksOf env t
 
-writeByPositions :: MV.MVector s Value -> [(Int, Value)] -> ST s ()
-writeByPositions mv = traverse_ (go mv)
-  where go :: MV.MVector s Value ->  (Int, Value) -> ST s ()
-        go mv = uncurry (MV.write mv)
-
 getRecord :: HashMap Schema.TypeName ReadSchema -> [ReadSchema.ReadField] -> Get (Vector Value)
 getRecord env fs = do
   moos <- fmap concat . forM fs $ \f ->
@@ -331,7 +326,7 @@ getRecord env fs = do
 
   return $ V.create $ do
     vals <- MV.unsafeNew (length moos)
-    writeByPositions vals moos
+    traverse_ (uncurry (MV.write vals)) moos
     return vals
 
 -- | This function will be unnecessary when we fully migrate to 'Value'
