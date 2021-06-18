@@ -138,5 +138,4 @@ findField w rs =
 findTypeV :: Schema -> Vector Schema -> Maybe (Int, Schema)
 findTypeV schema schemas =
   let tn = typeName schema
-  in case V.findIndex ((tn ==) . typeName) schemas of
-      Just ix -> Just (ix, V.unsafeIndex schemas ix)
+  in ((,) <$> id <*> V.unsafeIndex schemas) <$> V.findIndex ((tn ==) . typeName) schemas
