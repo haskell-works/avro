@@ -32,6 +32,7 @@ import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Int
 import           Data.List.NonEmpty          (NonEmpty)
+import           Data.Foldable               (traverse_)
 import qualified Data.Map                    as Map
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
@@ -315,22 +316,17 @@ getBlocksOf env t = do
     vs <- replicateM (fromIntegral blockLength) (getField env t)
     (vs:) <$> getBlocksOf env t
 
-writeByPositions :: MV.MVector s Value -> [(Int, Value)] -> ST s ()
-writeByPositions mv writes = foldl (>>) (return ()) (fmap (go mv) writes)
-  where go :: MV.MVector s Value ->  (Int, Value) -> ST s ()
-        go mv (n, v) = MV.write mv n v
-
 getRecord :: HashMap Schema.TypeName ReadSchema -> [ReadSchema.ReadField] -> Get (Vector Value)
 getRecord env fs = do
-  moos <- forM fs $ \f ->
+  moos <- fmap concat . forM fs $ \f ->
     case ReadSchema.fldStatus f of
-      ReadSchema.Ignored       -> getField env (ReadSchema.fldType f) >> pure []
-      ReadSchema.AsIs i        -> fmap ((:[]) . (i, )) (getField env (ReadSchema.fldType f))
+      ReadSchema.Ignored       -> [] <$ getField env (ReadSchema.fldType f)
+      ReadSchema.AsIs i        -> (\f -> [(i,f)]) <$> getField env (ReadSchema.fldType f)
       ReadSchema.Defaulted i v -> pure [(i, convertValue v)] --undefined
 
   return $ V.create $ do
-    vals <- MV.unsafeNew (length fs)
-    writeByPositions vals (mconcat moos)
+    vals <- MV.unsafeNew (length moos)
+    traverse_ (uncurry (MV.write vals)) moos
     return vals
 
 -- | This function will be unnecessary when we fully migrate to 'Value'
