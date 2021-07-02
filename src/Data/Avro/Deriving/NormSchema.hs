@@ -49,7 +49,9 @@ normSchema r = case r of
         -- use the looked up schema (which might be a full record) and replace
         -- it in the state with NamedType for future resolves
         -- because only one full definition per schema is needed
-        modify' (M.insert tn t) >> pure rs
+        modify' (M.insert tn t) >> case rs of
+            NamedType _ -> pure rs -- If we get a reference, the schema was already normalised.
+            _ -> normSchema rs -- Otherwise, normalise the schema before inlining.
 
         -- NamedType but no corresponding record?! Baaad!
       Nothing ->
