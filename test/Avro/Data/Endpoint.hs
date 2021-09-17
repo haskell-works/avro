@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
@@ -16,6 +17,7 @@ module Avro.Data.Endpoint
 where
 
 import           Data.Avro.Deriving (deriveAvroFromByteString, r)
+import           Data.Avro.Sum
 import           Data.Text          (Text (..))
 import qualified Data.Text          as Text
 
@@ -82,7 +84,7 @@ endpointGen :: MonadGen m => m Endpoint
 endpointGen = do
   opq <- opaqueGen
   cor <- opaqueGen
-  tag <- Gen.choice [Left <$> Gen.int32 Range.linearBounded, Right <$> Gen.text (Range.linear 0 64) Gen.alphaNum]
+  tag <- Gen.choice [makeNSum <$> Gen.int32 Range.linearBounded, makeNSum <$> Gen.text (Range.linear 0 64) Gen.alphaNum]
   ips <- Gen.list (Range.linear 0 20) ipGen
   pts <- Gen.list (Range.linear 0 8) portRangeGen
   pure $ Endpoint opq cor tag ips pts

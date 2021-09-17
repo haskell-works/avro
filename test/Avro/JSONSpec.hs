@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,7 +14,6 @@ import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map               as Map
 
 import Data.Avro.Deriving
-import Data.Avro.EitherN
 import Data.Avro.JSON
 
 import Avro.Data.Endpoint

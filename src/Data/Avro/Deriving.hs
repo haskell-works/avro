@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP                #-}
+{-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -6,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TypeApplications   #-}
+{-# LANGUAGE TypeOperators      #-}
 
 {- HLINT ignore "Avoid lambda using `infix`" -}
 
@@ -70,7 +72,7 @@ import Language.Haskell.TH.Lib    as TH hiding (notStrict)
 import Language.Haskell.TH.Syntax
 
 import Data.Avro.Deriving.NormSchema
-import Data.Avro.EitherN
+import Data.Avro.Sum
 
 import qualified Data.ByteString            as BS
 import qualified Data.ByteString.Lazy       as LBS
@@ -464,22 +466,17 @@ mkFieldTypeName namespaceBehavior = \case
   S.Enum n _ _ _     -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
   where go = mkFieldTypeName namespaceBehavior
         union = \case
-          []              ->
-            error "Empty union types are not supported"
-          [x]             -> [t| Identity $(go x) |]
           [Null, x]       -> [t| Maybe $(go x) |]
           [x, Null]       -> [t| Maybe $(go x) |]
-          [x, y]          -> [t| Either $(go x) $(go y) |]
-          [a, b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
-          [a, b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
-          [a, b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
-          [a, b, c, d, e, f] -> [t| Either6 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) |]
-          [a, b, c, d, e, f, g] -> [t| Either7 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g)|]
-          [a, b, c, d, e, f, g, h] -> [t| Either8 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h)|]
-          [a, b, c, d, e, f, g, h, i] -> [t| Either9 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h) $(go i)|]
-          [a, b, c, d, e, f, g, h, i, j] -> [t| Either10 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h) $(go i) $(go j)|]
-          ls              ->
-            error $ "Unions with more than 10 elements are not yet supported: Union has " <> (show . length) ls <> " elements"
+          ts              -> [t| NSum $(typeList ts) |]
+
+        typeList = \case
+          [] -> pure PromotedNilT
+          (s:ss) -> do
+            headTy <- go s
+            tailTy <- typeList ss
+            pure $ AppT PromotedConsT headTy `AppT` tailTy
+
 
 updateFirst :: (Text -> Text) -> Text -> Text
 updateFirst f t =
