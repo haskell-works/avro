@@ -11,7 +11,7 @@ author:                 Thomas M. DuBuisson
 maintainer:             Alexey Raga <alexey.raga@gmail.com>
 license:                BSD-3-Clause
 license-file:           LICENSE
-tested-with:            GHC == 8.10.2, GHC == 8.8.3, GHC == 8.6.5
+tested-with:            GHC == 9.0.1, GHC == 8.10.7, GHC == 8.8.4, GHC == 8.6.5
 build-type:             Simple
 extra-source-files:     README.md
                         ChangeLog.md
@@ -62,7 +62,7 @@ common doctest-discover         { build-depends: doctest-discover         >= 0.2
 common extra                    { build-depends: extra                                              }
 common fail                     { build-depends: fail                                               }
 common gauge                    { build-depends: gauge                                              }
-common generic-lens             { build-depends: generic-lens             >= 1.2        && < 2.1    }
+common generic-lens             { build-depends: generic-lens             >= 1.2        && < 2.3    }
 common hashable                 { build-depends: hashable                                           }
 common hedgehog                 { build-depends: hedgehog                                           }
 common hw-hspec-hedgehog        { build-depends: hw-hspec-hedgehog                                  }
@@ -80,7 +80,7 @@ common text                     { build-depends: text                     >= 1.2
 common time                     { build-depends: time                                               }
 common template-haskell         { build-depends: template-haskell         >= 2.4        && < 3      }
 common tf-random                { build-depends: tf-random                                          }
-common transformers             { build-depends: transformers                                       }
+common transformers             { build-depends: transformers             >= 0.5.6.2    && < 0.7    }
 common unordered-containers     { build-depends: unordered-containers                               }
 common uuid                     { build-depends: uuid                                               }
 common vector                   { build-depends: vector                                             }
