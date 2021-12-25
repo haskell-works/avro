@@ -76,7 +76,7 @@ common raw-strings-qq           { build-depends: raw-strings-qq                 
 common scientific               { build-depends: scientific                                         }
 common semigroups               { build-depends: semigroups                                         }
 common tagged                   { build-depends: tagged                                             }
-common text                     { build-depends: text                     >= 1.2.3      && < 1.3    }
+common text                     { build-depends: text                     >= 1.2.3      && < 1.3 || >= 2.0 && < 2.1 }
 common time                     { build-depends: time                                               }
 common template-haskell         { build-depends: template-haskell         >= 2.4        && < 3      }
 common tf-random                { build-depends: tf-random                                          }
