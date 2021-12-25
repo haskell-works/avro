@@ -4,6 +4,7 @@ module Avro.DefaultsSpec
 where
 
 import qualified Data.Aeson              as J
+import qualified Data.Aeson.KeyMap       as KM
 import           Data.Avro.Schema.Schema
 import qualified Data.HashMap.Strict     as M
 import           Data.List.NonEmpty      (NonEmpty (..))
@@ -36,6 +37,6 @@ spec = describe "Avro.DefaultsSpec: Schema with named types" $ do
     let
       msgSchema = schema'MaybeTest
       (J.Object jSchema) = J.toJSON msgSchema
-      (Just (J.Array flds)) = M.lookup "fields" jSchema
+      (Just (J.Array flds)) = KM.lookup "fields" jSchema
       (J.Object jFld) = V.head flds
-    in M.lookup "default" jFld `shouldBe` Just J.Null
+    in KM.lookup "default" jFld `shouldBe` Just J.Null

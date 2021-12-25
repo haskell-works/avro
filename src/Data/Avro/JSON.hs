@@ -60,6 +60,8 @@
 module Data.Avro.JSON where
 
 import qualified Data.Aeson           as Aeson
+import qualified Data.Aeson.Key       as K
+import qualified Data.Aeson.KeyMap    as KM
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.Foldable        as Foldable
 import           Data.HashMap.Strict  ((!))
@@ -99,12 +101,14 @@ decodeAvroJSON schema json =
               | isBuiltIn name = name
               | otherwise      = Schema.renderFullname $ Schema.parseFullname name
             branch =
-              head $ HashMap.keys obj
+              K.toText $ head (KM.keys obj)
             names =
               HashMap.fromList [(Schema.typeName t, t) | t <- Foldable.toList schemas]
           in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
-              nested <- parseAvroJSON union env t (obj ! branch)
+              nested <- parseAvroJSON union env t $ case KM.lookup (K.fromText branch) obj of
+                Just val -> val
+                Nothing -> error "impossible"
               return (Schema.DUnion schemas t nested)
             Nothing -> fail ("Type '" <> Text.unpack branch <> "' not in union: " <> show schemas)
     union Schema.Union{} _ =
