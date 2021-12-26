@@ -46,7 +46,7 @@ flag dev
 
 common base                     { build-depends: base                     >= 4          && < 5      }
 
-common aeson                    { build-depends: aeson                                              }
+common aeson                    { build-depends: aeson                    >= 2.0.1.0                }
 common array                    { build-depends: array                                              }
 common base16-bytestring        { build-depends: base16-bytestring                                  }
 common bifunctors               { build-depends: bifunctors                                         }

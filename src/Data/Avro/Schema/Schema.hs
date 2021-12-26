@@ -65,6 +65,8 @@ import           Control.Monad.State.Strict
 
 import           Data.Aeson             (FromJSON (..), ToJSON (..), object, (.!=), (.:), (.:!), (.:?), (.=))
 import qualified Data.Aeson             as A
+import qualified Data.Aeson.Key         as A
+import qualified Data.Aeson.KeyMap      as KM
 import           Data.Aeson.Types       (Parser, typeMismatch)
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as Base16
@@ -523,7 +525,7 @@ parseField record = \case
       Just (Success x) -> return (Just x)
       Just (Error e)   -> fail e
       Nothing          -> return Nothing
-    order <- o .:? ("order" :: Text)    .!= Just Ascending
+    order <- o .:? "order" .!= Just Ascending
 
     let mkAlias name = mkTypeName (Just record) name Nothing
     aliases  <- o .:? "aliases"  .!= []
@@ -647,10 +649,10 @@ instance ToJSON DefaultValue where
       DBytes _ bs      -> A.String (serializeBytes bs)
       DString _ t      -> A.String t
       DArray vec       -> A.Array (V.map toJSON vec)
-      DMap mp          -> A.Object (HashMap.map toJSON mp)
-      DRecord _ flds   -> A.Object (HashMap.map toJSON flds)
+      DMap mp          -> A.Object $ fmap toJSON (KM.fromHashMapText mp)
+      DRecord _ flds   -> A.Object $ fmap toJSON (KM.fromHashMapText flds)
       DUnion _ _ DNull -> A.Null
-      DUnion _ ty val  -> object [ typeName ty .= val ]
+      DUnion _ ty val  -> object [ A.fromText (typeName ty) .= val ]
       DFixed _ bs      -> A.String (serializeBytes bs)
       DEnum _ _ txt    -> A.String txt
 
@@ -774,10 +776,10 @@ parseAvroJSON union env ty av                  =
           _       -> avroTypeMismatch ty "array"
       A.Object obj ->
         case ty of
-          Map mTy     -> DMap <$> mapM (parseAvroJSON union env mTy) obj
+          Map mTy     -> DMap <$> mapM (parseAvroJSON union env mTy) (KM.toHashMapText obj)
           Record {..} ->
            do let lkAndParse f =
-                    case HashMap.lookup (fldName f) obj of
+                    case KM.lookup (A.fromText (fldName f)) obj of
                       Nothing -> case fldDefault f of
                                   Just v  -> return v
                                   Nothing -> fail $ "Decode failure: No record field '" <> T.unpack (fldName f) <> "' and no default in schema."
