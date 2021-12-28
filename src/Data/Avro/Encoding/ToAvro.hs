@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE OverloadedStrings         #-}
@@ -30,6 +31,9 @@ import           Data.Maybe                   (fromJust)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
+#if MIN_VERSION_text(2,0,0)
+import qualified Data.Text.Foreign            as T
+#endif
 import qualified Data.Text.Lazy               as TL
 import qualified Data.Text.Lazy.Encoding      as TL
 import qualified Data.Time                    as Time
@@ -174,6 +178,15 @@ instance ToAvro BL.ByteString where
 
 instance ToAvro Text where
   toAvro s v =
+#if MIN_VERSION_text(2,0,0)
+    let
+      res =
+        encodeRaw @Int64 (fromIntegral (T.lengthWord8 v)) <> T.encodeUtf8Builder v
+     in case s of
+       (S.Bytes _)  -> res
+       (S.String _) -> res
+       _            -> error ("Unable to encode Text as: " <> show s)
+#else
     let
       bs = T.encodeUtf8 v
       res = encodeRaw (B.length bs) <> byteString bs
@@ -181,6 +194,7 @@ instance ToAvro Text where
       (S.Bytes _)  -> res
       (S.String _) -> res
       _            -> error ("Unable to encode Text as: " <> show s)
+#endif
   {-# INLINE toAvro #-}
 
 instance ToAvro TL.Text where
