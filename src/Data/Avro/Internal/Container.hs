@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -21,6 +23,7 @@ import qualified Data.Avro.Schema.Schema      as Schema
 import           Data.Binary.Get              (Get)
 import qualified Data.Binary.Get              as Get
 import           Data.ByteString              (ByteString)
+import qualified Data.ByteString              as B
 import           Data.ByteString.Builder      (Builder, lazyByteString, toLazyByteString)
 import qualified Data.ByteString.Lazy         as BL
 import qualified Data.ByteString.Lazy.Char8   as BLC
@@ -95,50 +98,74 @@ decodeRawBlocks :: BL.ByteString -> Either String (Schema, [Either String (Int, 
 decodeRawBlocks bs =
   case Get.runGetOrFail getContainerHeader bs of
     Left (bs', _, err) -> Left err
-    Right (bs', _, ContainerHeader {..}) ->
-      let blocks = allBlocks syncBytes decompress bs'
+    Right (bs', _, containerHeader@ContainerHeader {..}) ->
+      let blocks = allBlocks containerHeader bs'
       in Right (containedSchema, blocks)
   where
-    allBlocks sync decompress bytes =
-      flip unfoldr (Just bytes) $ \case
-        Just rest -> next sync decompress rest
-        Nothing   -> Nothing
+    allBlocks containerHeader bytes =
+      foldrBlocks (\x -> (Right x :)) (\err -> [Left err]) [] bytes
+        (decodeRawBlocksIncremental containerHeader)
 
-    next syncBytes decompress bytes =
-      case getNextBlock syncBytes decompress bytes of
-        Right (Just (numObj, block, rest)) -> Just (Right (numObj, block), Just rest)
-        Right Nothing                      -> Nothing
-        Left err                           -> Just (Left err, Nothing)
+data Blocks a
+  = Block
+      a
+      (Blocks a)
+  | More
+      (ByteString -> Blocks a) -- ^ Feed more bytes. Pass the empty ByteString to
+                               -- signal end of input.
+  | Error
+      String -- ^ Error message
+      ByteString -- ^ Leftover bytes
+  | Done
+      ByteString -- ^ Leftover bytes
+  deriving (Functor)
 
-getNextBlock :: BL.ByteString
-             -> Decompress BL.ByteString
-             -> BL.ByteString
-             -> Either String (Maybe (Int, BL.ByteString, BL.ByteString))
-getNextBlock sync decompress bs =
-  if BL.null bs
-    then Right Nothing
-    else case Get.runGetOrFail (getRawBlock decompress) bs of
-      Left (bs', _, err)             -> Left err
-      Right (bs', _, (nrObj, bytes)) ->
-        case checkMarker sync bs' of
-          Left err   -> Left err
-          Right rest -> Right $ Just (nrObj, bytes, rest)
+-- | Feeds a 'BL.ByteString' to the 'Blocks' until exhausted.
+-- Consumes the 'BL.ByteString' lazily.
+foldrBlocks :: (a -> b -> b) -> (String -> b) -> b -> BL.ByteString -> Blocks a -> b
+foldrBlocks block err done input = go (BL.toChunks input)
   where
-    getRawBlock :: Decompress BL.ByteString -> Get (Int, BL.ByteString)
-    getRawBlock decompress = do
-      nrObj    <- AGet.getLong >>= AGet.sFromIntegral
-      nrBytes  <- AGet.getLong
+    go chunks (Block a rest)     = block a (go chunks rest)
+    go []     (More cont)        = go [] (cont "")
+    go (c:cx) (More cont)        = go cx (cont c)
+    go _      (Error message _)  = err message
+    go _      (Done _)           = done
+
+decodeRawBlocksIncremental :: ContainerHeader -> Blocks (Int, BL.ByteString)
+decodeRawBlocksIncremental ContainerHeader{..} = initial
+  where
+    initialDecoder =
+      Get.runGetIncremental getRawBlock
+
+    initial = More $ \input ->
+      case input of
+        "" -> Done ""
+        _  -> go (Get.pushChunk initialDecoder input)
+
+    go decoder = case decoder of
+      Get.Done rest _ !block ->
+        case rest of
+          "" -> Block block initial
+          _  -> Block block (go (Get.pushChunk initialDecoder rest))
+      Get.Fail rest _ err ->
+        Error err rest
+      Get.Partial{} -> More $ \input ->
+        case input of
+          "" -> go (Get.pushEndOfInput decoder)
+          _  -> go (Get.pushChunk decoder input)
+
+    getRawBlock = do
+      nrObj   <- AGet.getLong >>= AGet.sFromIntegral
+      nrBytes <- AGet.getLong
       compressed <- Get.getLazyByteString nrBytes
       bytes <- case decompress compressed Get.getRemainingLazyByteString of
-        Right x  -> pure x
+        Right x -> pure x
         Left err -> fail err
-      pure (nrObj, bytes)
-
-    checkMarker :: BL.ByteString -> BL.ByteString -> Either String BL.ByteString
-    checkMarker sync bs =
-      case BL.splitAt nrSyncBytes bs of
-        (marker, _) | marker /= sync -> Left "Invalid marker, does not match sync bytes."
-        (_, rest)                    -> Right rest
+      trailer <- Get.getLazyByteString nrSyncBytes
+      if trailer /= syncBytes then
+        fail "Invalid marker, does not match sync bytes."
+      else
+        pure (nrObj, bytes)
 
 -- | Splits container into a list of individual avro-encoded values.
 -- This version provides both encoded and decoded values.
@@ -166,17 +193,30 @@ extractContainerValues :: forall a schema.
   -> BL.ByteString
   -> Either String (Schema, [Either String a])
 extractContainerValues deconflict f bs = do
-  (sch, blocks) <- decodeRawBlocks bs
-  readSchema <- deconflict sch
-  pure (sch, takeWhileInclusive isRight $ blocks >>= decodeBlock readSchema)
-  where
-    decodeBlock _ (Left err)               = undefined
-    decodeBlock sch (Right (nrObj, bytes)) = snd $ consumeN (fromIntegral nrObj) (decodeValue sch) bytes
+  case Get.runGetOrFail getContainerHeader bs of
+    Left (_, _, err) -> Left err
+    Right (rest, _, containerHeader) -> do
+      (schema, blocks) <- extractContainerValuesIncremental deconflict f containerHeader
+      let values = foldrBlocks (++) (\err -> [Left err]) [] rest blocks
+      pure (schema, values)
 
-    decodeValue sch bytes =
-      case Get.runGetOrFail (f sch) bytes of
-        Left (bs', _, err)  -> (bs', Left err)
-        Right (bs', _, res) -> (bs', Right res)
+extractContainerValuesIncremental
+  :: (Schema -> Either String schema)
+  -> (schema -> Get a)
+  -> ContainerHeader
+  -> Either String (Schema, Blocks [Either String a])
+extractContainerValuesIncremental deconflict getValue containerHeader@ContainerHeader{..} = do
+  readSchema <- deconflict containedSchema
+  let blocks = decodeRawBlocksIncremental containerHeader
+  pure (containedSchema, fmap (decodeBlock readSchema) blocks)
+  where
+    decodeBlock readSchema (nrObj, bytes) =
+      snd $ consumeN (fromIntegral nrObj) (decodeValue readSchema) bytes
+
+    decodeValue readSchema bytes =
+      case Get.runGetOrFail (getValue readSchema) bytes of
+        Left (rest, _, err) -> (rest, Left err)
+        Right (rest, _, value) -> (rest, Right value)
 
 -- | Packs a container from a given list of already encoded Avro values
 -- Each bytestring should represent exactly one one value serialised to Avro.
