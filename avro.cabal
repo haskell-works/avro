@@ -206,6 +206,7 @@ test-suite test
                         Avro.Data.Maybe
                         Avro.Data.Recursive
                         Avro.Data.Reused
+                        Avro.Data.TwoBits
                         Avro.Data.Unions
                         Avro.Decode.ContainerSpec
                         Avro.Decode.RawBlocksSpec

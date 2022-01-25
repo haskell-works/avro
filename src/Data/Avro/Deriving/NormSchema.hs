@@ -67,6 +67,9 @@ normSchema r = case r of
   r@Fixed{name = tn} -> do
     modify' (M.insert tn (NamedType tn))
     pure r
+  r@Enum{name = tn} -> do
+    modify' (M.insert tn (NamedType tn))
+    pure r
   s         -> pure s
   where
     setType fld t = fld { fldType = t}
