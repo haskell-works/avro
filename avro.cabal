@@ -11,7 +11,7 @@ author:                 Thomas M. DuBuisson
 maintainer:             Alexey Raga <alexey.raga@gmail.com>
 license:                BSD-3-Clause
 license-file:           LICENSE
-tested-with:            GHC == 9.0.1, GHC == 8.10.7, GHC == 8.8.4, GHC == 8.6.5
+tested-with:            GHC == 9.2.2, GHC == 9.0.2, GHC == 8.10.7, GHC == 8.8.4, GHC == 8.6.5
 build-type:             Simple
 extra-source-files:     README.md
                         ChangeLog.md
@@ -44,47 +44,49 @@ flag dev
   manual: True
   default: False
 
-common base                     { build-depends: base                     >= 4          && < 5      }
+common base                     { build-depends: base                     >= 4          && < 5                      }
 
-common aeson                    { build-depends: aeson                    >= 2.0.1.0                }
-common array                    { build-depends: array                                              }
-common base16-bytestring        { build-depends: base16-bytestring                                  }
-common bifunctors               { build-depends: bifunctors                                         }
-common big-decimal              { build-depends: HasBigDecimal                                      }
-common binary                   { build-depends: binary                                             }
-common bytestring               { build-depends: bytestring                                         }
-common containers               { build-depends: containers                                         }
-common data-binary-ieee754      { build-depends: data-binary-ieee754                                }
-common deepseq                  { build-depends: deepseq                                            }
-common directory                { build-depends: directory                                          }
-common doctest                  { build-depends: doctest                  >= 0.16.2     && < 0.19   }
-common doctest-discover         { build-depends: doctest-discover         >= 0.2        && < 0.3    }
-common extra                    { build-depends: extra                                              }
-common fail                     { build-depends: fail                                               }
-common gauge                    { build-depends: gauge                                              }
-common generic-lens             { build-depends: generic-lens             >= 1.2        && < 2.3    }
-common hashable                 { build-depends: hashable                                           }
-common hedgehog                 { build-depends: hedgehog                                           }
-common hw-hspec-hedgehog        { build-depends: hw-hspec-hedgehog                                  }
-common hspec                    { build-depends: hspec                                              }
-common lens                     { build-depends: lens                                               }
-common lens-aeson               { build-depends: lens-aeson                                         }
-common mtl                      { build-depends: mtl                                                }
-common QuickCheck               { build-depends: QuickCheck                                         }
-common random                   { build-depends: random                                             }
-common raw-strings-qq           { build-depends: raw-strings-qq                                     }
-common scientific               { build-depends: scientific                                         }
-common semigroups               { build-depends: semigroups                                         }
-common tagged                   { build-depends: tagged                                             }
+common aeson                    { build-depends: aeson                    >= 2.0.1.0                                }
+common array                    { build-depends: array                                                              }
+common base16-bytestring        { build-depends: base16-bytestring                                                  }
+common bifunctors               { build-depends: bifunctors                                                         }
+common big-decimal              { build-depends: HasBigDecimal                                                      }
+common binary                   { build-depends: binary                                                             }
+common bytestring               { build-depends: bytestring                                                         }
+common containers               { build-depends: containers                                                         }
+common data-binary-ieee754      { build-depends: data-binary-ieee754                                                }
+common deepseq                  { build-depends: deepseq                                                            }
+common directory                { build-depends: directory                                                          }
+common doctest                  { build-depends: doctest                  >= 0.16.2     && < 0.21                   }
+common doctest-discover         { build-depends: doctest-discover         >= 0.2        && < 0.3                    }
+common extra                    { build-depends: extra                                                              }
+common fail                     { build-depends: fail                                                               }
+common generic-lens             { build-depends: generic-lens             >= 1.2        && < 2.3                    }
+common hashable                 { build-depends: hashable                                                           }
+common hedgehog                 { build-depends: hedgehog                                                           }
+common hw-hspec-hedgehog        { build-depends: hw-hspec-hedgehog                                                  }
+common hspec                    { build-depends: hspec                                                              }
+common lens                     { build-depends: lens                                                               }
+common lens-aeson               { build-depends: lens-aeson                                                         }
+common mtl                      { build-depends: mtl                                                                }
+common QuickCheck               { build-depends: QuickCheck                                                         }
+common random                   { build-depends: random                                                             }
+common raw-strings-qq           { build-depends: raw-strings-qq                                                     }
+common scientific               { build-depends: scientific                                                         }
+common semigroups               { build-depends: semigroups                                                         }
+common tagged                   { build-depends: tagged                                                             }
 common text                     { build-depends: text                     >= 1.2.3      && < 1.3 || >= 2.0 && < 2.1 }
-common time                     { build-depends: time                                               }
-common template-haskell         { build-depends: template-haskell         >= 2.4        && < 3      }
-common tf-random                { build-depends: tf-random                                          }
-common transformers             { build-depends: transformers             >= 0.5.6.2    && < 0.7    }
-common unordered-containers     { build-depends: unordered-containers                               }
-common uuid                     { build-depends: uuid                                               }
-common vector                   { build-depends: vector                                             }
-common zlib                     { build-depends: zlib                                               }
+common time                     { build-depends: time                                                               }
+common template-haskell         { build-depends: template-haskell         >= 2.4        && < 3                      }
+common tf-random                { build-depends: tf-random                                                          }
+common th-lift-instances        { build-depends: th-lift-instances                                                  }
+common transformers             { build-depends: transformers             >= 0.5.6.2    && < 0.7                    }
+common unordered-containers     { build-depends: unordered-containers                                               }
+common uuid                     { build-depends: uuid                                                               }
+common vector                   { build-depends: vector                                                             }
+common zlib                     { build-depends: zlib                                                               }
+
+common gauge                    { if arch(x86_64) || arch(i386) { build-depends: gauge                            } }
 
 common config
   default-language:     Haskell2010
@@ -113,6 +115,7 @@ library
                       , text
                       , time
                       , tf-random
+                      , th-lift-instances
                       , unordered-containers
                       , uuid
                       , vector
@@ -262,7 +265,8 @@ benchmark bench-time
   default-language:     Haskell2010
   type:                 exitcode-stdio-1.0
   main-is:              Main.hs
-  other-modules:        Bench.Deconflict
+  if arch(x86_64) || arch(i386)
+    other-modules:      Bench.Deconflict
                         Bench.Deconflict.Reader
                         Bench.Deconflict.Writer
                         Bench.Encoding
