@@ -14,8 +14,11 @@ import qualified Data.Text                  as Text
 import qualified Data.Vector                as Vector
 import           Language.Haskell.TH.Syntax (Lift (..))
 
+#if MIN_VERSION_bytestring(0,11,2)
+#else
 instance Lift ByteString.ByteString where
   lift b = [| ByteString.pack $(lift $ ByteString.unpack b) |]
+#endif
 
 #if MIN_VERSION_text(1,2,4)
 #else
@@ -26,8 +29,11 @@ instance Lift Text.Text where
 instance Lift a => Lift (Vector.Vector a) where
   lift v = [| Vector.fromList $(lift $ Vector.toList v) |]
 
+#if MIN_VERSION_unordered_containers(0,2,17)
+#else
 instance (Lift k, Lift v) => Lift (HashMap.HashMap k v) where
   lift m = [| HashMap.fromList $(lift $ HashMap.toList m) |]
+#endif
 
 deriving instance Lift Schema.DefaultValue
 deriving instance Lift Schema.Field
