@@ -1,6 +1,6 @@
 # Native Haskell implementation of Avro
 
-[![CircleCI](https://circleci.com/gh/haskell-works/avro.svg?style=svg)](https://circleci.com/gh/haskell-works/avro)
+[![Binaries](https://github.com/haskell-works/avro/actions/workflows/haskell.yml/badge.svg)](https://github.com/haskell-works/avro/actions/workflows/haskell.yml)
 [![Hackage](https://img.shields.io/hackage/v/avro.svg?logo=haskell)](https://hackage.haskell.org/package/avro)
 
 This is a Haskell [Avro](https://avro.apache.org/) library useful for decoding
