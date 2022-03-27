@@ -27,4 +27,6 @@ int = do
 long :: MonadGen m => m Schema
 long = do
   dec <- decimalGen
-  Long <$> Gen.maybe (Gen.element [DecimalL dec, TimeMicros, TimestampMillis, TimestampMicros])
+  Long <$> Gen.maybe (Gen.element
+    [DecimalL dec, TimeMicros, TimestampMillis,
+     TimestampMicros, LocalTimestampMillis, LocalTimestampMicros])

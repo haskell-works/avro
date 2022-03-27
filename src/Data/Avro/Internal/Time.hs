@@ -50,3 +50,15 @@ microsToUTCTime x = addUTCTime (realToFrac $ picosecondsToDiffTime (x * 1000000)
 
 millisToUTCTime :: Integer -> UTCTime
 millisToUTCTime x = addUTCTime (realToFrac $ picosecondsToDiffTime (x * 1000000000)) epoch
+
+localTimeToMicros :: LocalTime -> Integer
+localTimeToMicros = utcTimeToMicros . localTimeToUTC utc
+
+localTimeToMillis :: LocalTime -> Integer
+localTimeToMillis = utcTimeToMillis . localTimeToUTC utc
+
+microsToLocalTime :: Integer -> LocalTime
+microsToLocalTime = utcToLocalTime utc . microsToUTCTime
+
+millisToLocalTime :: Integer -> LocalTime
+millisToLocalTime = utcToLocalTime utc . millisToUTCTime

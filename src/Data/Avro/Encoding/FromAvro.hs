@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE StrictData        #-}
-{-# LANGUAGE TupleSections     #-}
 module Data.Avro.Encoding.FromAvro
 ( FromAvro(..)
   -- ** For internal use
@@ -24,19 +23,19 @@ import           Data.Avro.Schema.ReadSchema (ReadSchema)
 import qualified Data.Avro.Schema.ReadSchema as ReadSchema
 import qualified Data.Avro.Schema.Schema     as Schema
 import           Data.Binary.Get             (Get, getByteString, runGetOrFail)
-import qualified Data.ByteString             as BS
 import qualified Data.ByteString             as B
+import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 import qualified Data.Char                   as Char
+import           Data.Foldable               (traverse_)
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Int
 import           Data.List.NonEmpty          (NonEmpty)
-import           Data.Foldable               (traverse_)
 import qualified Data.Map                    as Map
 import           Data.Text                   (Text)
-import qualified Data.Text                   as Text
 import qualified Data.Text                   as T
+import qualified Data.Text                   as Text
 import qualified Data.Text.Encoding          as Text
 import qualified Data.Time                   as Time
 import qualified Data.UUID                   as UUID
@@ -76,20 +75,20 @@ data Value
 -- (i.e. do not print values)
 describeValue :: Value -> String
 describeValue = \case
-  Null          -> "Null"
-  Boolean b     -> "Boolean"
-  Int s _       -> "Int (" <> show s <> ")"
-  Long s _      -> "Long (" <> show s <> ")"
-  Float s _     -> "Float (" <> show s <> ")"
-  Double s _    -> "Double (" <> show s <> ")"
-  Bytes s _     -> "Bytes (" <> show s <> ")"
-  String s _    -> "String (" <> show s <> ")"
-  Union s ix _  -> "Union (position = " <> show ix <> ", schema = " <> show s <> ")"
-  Fixed s _     -> "Fixed (" <> show s <> ")"
-  Enum s ix _   -> "Enum (position = " <> show ix <> ", schema =" <> show s <> ")"
-  Array vs      -> "Array (length = " <> show (V.length vs) <> ")"
-  Map vs        -> "Map (length = " <> show (HashMap.size vs) <> ")"
-  Record s vs   -> "Record (name = " <> show (ReadSchema.name s) <> " fieldsNum = " <> show (V.length vs) <> ")"
+  Null         -> "Null"
+  Boolean b    -> "Boolean"
+  Int s _      -> "Int (" <> show s <> ")"
+  Long s _     -> "Long (" <> show s <> ")"
+  Float s _    -> "Float (" <> show s <> ")"
+  Double s _   -> "Double (" <> show s <> ")"
+  Bytes s _    -> "Bytes (" <> show s <> ")"
+  String s _   -> "String (" <> show s <> ")"
+  Union s ix _ -> "Union (position = " <> show ix <> ", schema = " <> show s <> ")"
+  Fixed s _    -> "Fixed (" <> show s <> ")"
+  Enum s ix _  -> "Enum (position = " <> show ix <> ", schema =" <> show s <> ")"
+  Array vs     -> "Array (length = " <> show (V.length vs) <> ")"
+  Map vs       -> "Map (length = " <> show (HashMap.size vs) <> ")"
+  Record s vs  -> "Record (name = " <> show (ReadSchema.name s) <> " fieldsNum = " <> show (V.length vs) <> ")"
 
 --------------------------------------------------------------------------
 
@@ -193,6 +192,15 @@ instance FromAvro Time.UTCTime where
   fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.TimestampMillis)) n) = Right $ millisToUTCTime (toInteger n)
   fromAvro x                                                              = Left ("Unable to decode UTCTime from: " <> show (describeValue x))
   {-# INLINE fromAvro #-}
+
+instance FromAvro Time.LocalTime where
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.LocalTimestampMicros)) n) =
+    Right $ microsToLocalTime (toInteger n)
+  fromAvro (Long (ReadSchema.Long _ (Just ReadSchema.LocalTimestampMillis)) n) =
+    Right $ millisToLocalTime (toInteger n)
+  fromAvro x = Left ("Unable to decode LocalTime from: " <> show (describeValue x))
+  {-# INLINE fromAvro #-}
+  
 
 instance FromAvro a => FromAvro [a] where
   fromAvro (Array vec) = mapM fromAvro $ V.toList vec

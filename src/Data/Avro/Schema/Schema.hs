@@ -63,7 +63,7 @@ import           Control.Monad.Except
 import qualified Control.Monad.Fail         as MF
 import           Control.Monad.State.Strict
 
-import           Data.Aeson             (FromJSON (..), ToJSON (..), object, (.!=), (.:), (.:!), (.:?), (.=))
+import           Data.Aeson             (FromJSON (..), ToJSON (..), object, (.!=), (.:!), (.:), (.:?), (.=))
 import qualified Data.Aeson             as A
 import qualified Data.Aeson.Key         as A
 import qualified Data.Aeson.KeyMap      as KM
@@ -72,9 +72,9 @@ import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.Char              as Char
 import           Data.Function          (on)
-import           Data.Hashable
 import           Data.HashMap.Strict    (HashMap)
 import qualified Data.HashMap.Strict    as HashMap
+import           Data.Hashable
 import           Data.Int
 import qualified Data.IntMap            as IM
 import qualified Data.List              as L
@@ -166,28 +166,138 @@ data Field = Field { fldName    :: Text
 data Order = Ascending | Descending | Ignore
   deriving (Eq, Ord, Show, Generic, NFData)
 
-data Decimal
-  = Decimal { precision :: Integer, scale :: Integer }
-  deriving (Eq, Show, Ord, Generic, NFData)
+-- ** Logical Types
+
+-- $ In addition to primitive types, Avro supports [**logical
+-- types**](https://avro.apache.org/docs/current/spec.html#Logical+Types). A
+-- logical type is represented the same way as a primitive type, but
+-- has an extra annotation in the Avro schema that Avro libraries can
+-- use to generate more specific types.
+--
+-- Example:
+--
+-- @
+-- {
+--   "type": "int",
+--   "logicalType": "date"
+-- }
+-- @
+--
+-- The @date@ logical type represents a calendar date with no
+-- timezone. It is encoded as an Avro @int@ with the number of days
+-- from the Unix epoch (1970-01-01). Avro implementations /may/ parse
+-- this type into a language-specific date type (eg 'Data.Time.Day' in
+-- Haskell), but could also treat it as a normal Avro @int@ instead.
 
 newtype LogicalTypeBytes
   = DecimalB Decimal
+    -- ^ An arbitrary-precision signed decimal number. See 'Decimal'.
   deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeFixed
-  = DecimalF Decimal | Duration
+  = DecimalF Decimal
+    -- ^ An arbitrary-precision signed decimal number. See 'Decimal'.
+  | Duration
+    -- ^ An interval of time, represented as some number of months,
+    -- days and milliseconds.
+    --
+    -- Encoded as three little-endian unsigned integers for months,
+    -- days and milliseconds respectively.
   deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeInt
-  = DecimalI Decimal | Date | TimeMillis
+  = DecimalI Decimal
+    -- ^ An arbitrary-precision signed decimal number. See 'Decimal'.
+  | Date
+    -- ^ A date (eg @2020-01-10@) with no timezone/locale.
+    --
+    -- Encoded as the number of days before/after the Unix epoch
+    -- (1970-01-01).
+  | TimeMillis
+    -- ^ A time of day with millisecond precision.
+    --
+    -- Encoded as the number of milliseconds after midnight.
   deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeLong
-  = DecimalL Decimal | TimeMicros | TimestampMillis | TimestampMicros
+  = DecimalL Decimal
+    -- ^ An arbitrary-precision signed decimal number. See 'Decimal'.
+  | TimeMicros
+    -- ^ A time of day with microsecond precision.
+    --
+    -- Encoded as the number of microseconds after midnight.
+  | TimestampMillis
+    -- ^ A UTC timestamp with millisecond precision.
+    --
+    -- Encoded as the number of milliseconds before/after the Unix
+    -- epoch (1970-01-01 00:00:00.000).
+  | TimestampMicros
+    -- ^ A UTC timestamp with microsecond precision.
+    --
+    -- Encoded as the number of microseconds before/after the Unix
+    -- epoch (1970-01-01 00:00:00.000000).
+  | LocalTimestampMillis
+    -- ^ A timestamp in the local timezone, whatever that happens to
+    -- be, with millisecond precision.
+    --
+    -- Encoded as the number of milliseconds before/after the Unix
+    -- epoch (1970-01-01 00:00:00.000).
+  | LocalTimestampMicros
+    -- ^ A timestamp in the local timezone, whatever that happens to
+    -- be, with microsecond precision.
+    --
+    -- Encoded as the number of microseconds before/after the Unix
+    -- epoch (1970-01-01 00:00:00.000000).
   deriving (Eq, Show, Ord, Generic, NFData)
 
 data LogicalTypeString
   = UUID
+    -- ^ A Universally Unique Identifier (UUID).
+    --
+    -- Encoded as a string that is valid according to [RFC
+    -- 4122](https://www.ietf.org/rfc/rfc4122.txt).
+  deriving (Eq, Show, Ord, Generic, NFData)
+
+-- | The @decimal@ logical type represents arbitrary-precision decimal
+-- numbers. Numbers are represented as @unscaled * (10 ** -scale)@
+-- where @scale@ is part of the logical type and @unscaled@ is an
+-- integer represented by the underlying primitive type.
+--
+-- Instances of the @decimal@ logical type need to specify a @scale@
+-- and @precision@.
+--
+-- @decimal@ can be encoded as one of several different primitive
+-- types:
+--
+--  * @bytes@
+--  * @fixed@
+--  * @long@
+--  * @int@
+--
+-- For @long@ and @int@, @unscaled@ is the underlying number.
+--
+-- For @bytes@ and @fixed@, @unscaled@ is represented as a
+-- two's-complement signed integer in big-endian byte order.
+--
+-- Note: @int@ and @long@ representations for @decimal@ are not part
+-- of the [current Avro
+-- specification](https://avro.apache.org/docs/current/spec.html#Decimal),
+-- but they are supported by some language implementations including
+-- the official Java library. Implementations that do not support this
+-- should ignore the logical type and use the underlying primitive
+-- type instead.
+data Decimal
+  = Decimal { precision :: Integer
+              -- ^ The maximum number of digits that can be
+              -- represented by this @decimal@ type.
+              --
+              -- @precision > 0@
+            , scale     :: Integer
+              -- ^ The @scale@ in @unscaled * (10 ** -scale)@ for this
+              -- type.
+              --
+              -- @0 ≤ scale ≤ precision@
+            }
   deriving (Eq, Show, Ord, Generic, NFData)
 
 instance Eq Schema where
@@ -362,6 +472,10 @@ typeName bt =
                     -> "timestamp-millis"
     Long (Just TimestampMicros)
                     -> "timestamp-micros"
+    Long (Just LocalTimestampMillis)
+                    -> "local-timestamp-millis"
+    Long (Just LocalTimestampMicros)
+                    -> "local-timestamp-micros"
     Float           -> "float"
     Double          -> "double"
     Bytes Nothing   -> "bytes"
@@ -397,21 +511,23 @@ parseSchemaJSON :: Maybe TypeName
                 -> Parser Schema
 parseSchemaJSON context = \case
   A.String s -> case s of
-    "null"             -> return Null
-    "boolean"          -> return Boolean
-    "int"              -> return $ Int Nothing
-    "long"             -> return $ Long Nothing
-    "float"            -> return Float
-    "double"           -> return Double
-    "bytes"            -> return $ Bytes Nothing
-    "string"           -> return $ String Nothing
-    "uuid"             -> return $ String (Just UUID)
-    "date"             -> return $ Int (Just Date)
-    "time-millis"      -> return $ Int (Just TimeMillis)
-    "time-micros"      -> return $ Long (Just TimeMicros)
-    "timestamp-millis" -> return $ Long (Just TimestampMillis)
-    "timestamp-micros" -> return $ Long (Just TimestampMicros)
-    somename           -> return $ NamedType $ mkTypeName context somename Nothing
+    "null"                   -> return Null
+    "boolean"                -> return Boolean
+    "int"                    -> return $ Int Nothing
+    "long"                   -> return $ Long Nothing
+    "float"                  -> return Float
+    "double"                 -> return Double
+    "bytes"                  -> return $ Bytes Nothing
+    "string"                 -> return $ String Nothing
+    "uuid"                   -> return $ String (Just UUID)
+    "date"                   -> return $ Int (Just Date)
+    "time-millis"            -> return $ Int (Just TimeMillis)
+    "time-micros"            -> return $ Long (Just TimeMicros)
+    "timestamp-millis"       -> return $ Long (Just TimestampMillis)
+    "timestamp-micros"       -> return $ Long (Just TimestampMicros)
+    "local-timestamp-millis" -> return $ Long (Just LocalTimestampMillis)
+    "local-timestamp-micros" -> return $ Long (Just LocalTimestampMicros)
+    somename                 -> return $ NamedType $ mkTypeName context somename Nothing
   A.Array arr
     | V.length arr > 0 ->
       Union <$> V.mapM (parseSchemaJSON context) arr
@@ -448,6 +564,12 @@ parseSchemaJSON context = \case
           s      -> fail $ "Unsupported underlying type: " <> T.unpack s
       Just "timestamp-micros" -> case ty of
           "long" -> pure $ Long (Just TimestampMicros)
+          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "local-timestamp-millis" -> case ty of
+          "long" -> pure $ Long (Just LocalTimestampMillis)
+          s      -> fail $ "Unsupported underlying type: " <> T.unpack s
+      Just "local-timestamp-micros" -> case ty of
+          "long" -> pure $ Long (Just LocalTimestampMicros)
           s      -> fail $ "Unsupported underlying type: " <> T.unpack s
       Just "duration" -> case ty of
           "fixed" -> (\fx -> fx { logicalTypeF = Just Duration }) <$> parseFixed o
@@ -568,6 +690,10 @@ schemaToJSON context = \case
     object [ "type" .= ("long" :: Text), "logicalType" .= ("timestamp-millis" :: Text) ]
   Long (Just TimestampMicros) ->
     object [ "type" .= ("long" :: Text), "logicalType" .= ("timestamp-micros" :: Text) ]
+  Long (Just LocalTimestampMillis) ->
+    object [ "type" .= ("long" :: Text), "logicalType" .= ("local-timestamp-millis" :: Text) ]
+  Long (Just LocalTimestampMicros) ->
+    object [ "type" .= ("long" :: Text), "logicalType" .= ("local-timestamp-micros" :: Text) ]
   Float           -> A.String "float"
   Double          -> A.String "double"
   Bytes Nothing   -> A.String "bytes"
@@ -672,7 +798,7 @@ resultToEither r =
 instance Monad Result where
   return = pure
   Success a >>= k = k a
-  Error e >>= _ = Error e
+  Error e >>= _   = Error e
 #if !MIN_VERSION_base(4,13,0)
   fail = MF.fail
 #endif

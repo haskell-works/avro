@@ -15,7 +15,7 @@
 module Avro.Data.Logical
 where
 
-import Data.Avro.Internal.Time (microsToDiffTime, microsToUTCTime, millisToDiffTime, millisToUTCTime)
+import Data.Avro.Internal.Time (microsToDiffTime, microsToLocalTime, microsToUTCTime, millisToDiffTime, millisToLocalTime, millisToUTCTime)
 
 import Data.Avro.Deriving (deriveAvroFromByteString, r)
 
@@ -59,7 +59,23 @@ deriveAvroFromByteString [r|
           "logicalType": "time-micros",
           "type": "long"
         }
-    }
+    },
+    {
+      "name": "localTimestampMillis",
+      "type":
+        {
+          "logicalType": "local-timestamp-millis",
+          "type": "long"
+        }
+     },
+     {
+      "name": "localTimestampMicros",
+      "type":
+        {
+          "logicalType": "local-timestamp-micros",
+          "type": "long"
+        }
+     }
   ]
 }
 |]
@@ -70,3 +86,5 @@ logicalGen = Logical
   <*> (microsToUTCTime  . toInteger <$> Gen.int64 (Range.linear 0 maxBound))
   <*> (millisToDiffTime . toInteger <$> Gen.int32 (Range.linear 0 maxBound))
   <*> (microsToDiffTime . toInteger <$> Gen.int64 (Range.linear 0 maxBound))
+  <*> (millisToLocalTime . toInteger <$> Gen.int64 (Range.linear 0 maxBound))
+  <*> (microsToLocalTime . toInteger <$> Gen.int64 (Range.linear 0 maxBound))

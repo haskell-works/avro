@@ -104,6 +104,9 @@ instance HasAvroSchema Time.DiffTime where
 instance HasAvroSchema Time.UTCTime where
   schema = Tagged $ S.Long (Just TimestampMicros)
 
+instance HasAvroSchema Time.LocalTime where
+  schema = Tagged $ S.Long (Just LocalTimestampMicros)
+
 instance (HasAvroSchema a) => HasAvroSchema (Identity a) where
   schema = Tagged $ S.Union $ V.fromListN 1 [untag @a schema]
 

@@ -57,7 +57,7 @@ import           Data.Map                     (Map)
 import           Data.Maybe                   (fromMaybe)
 import           Data.Semigroup               ((<>))
 import qualified Data.Text                    as Text
-import           Data.Time                    (Day, DiffTime, UTCTime)
+import           Data.Time                    (Day, DiffTime, LocalTime, UTCTime)
 import           Data.UUID                    (UUID)
 import           Text.RawString.QQ            (r)
 
@@ -437,6 +437,7 @@ mkFieldTypeName :: NamespaceBehavior -> S.Schema -> Q TH.Type
 mkFieldTypeName namespaceBehavior = \case
   S.Null             -> [t| () |]
   S.Boolean          -> [t| Bool |]
+
   S.Long (Just (DecimalL (Decimal p s)))
                      -> [t| Decimal $(litT $ numTyLit p) $(litT $ numTyLit s) |]
   S.Long (Just TimeMicros)
@@ -445,7 +446,12 @@ mkFieldTypeName namespaceBehavior = \case
                      -> [t| UTCTime |]
   S.Long (Just TimestampMillis)
                      -> [t| UTCTime |]
-  S.Long _           -> [t| Int64 |]
+  S.Long (Just LocalTimestampMillis)
+                     -> [t| LocalTime |]
+  S.Long (Just LocalTimestampMicros)
+                     -> [t| LocalTime |]
+  S.Long Nothing     -> [t| Int64 |]
+
   S.Int (Just Date)  -> [t| Day |]
   S.Int (Just TimeMillis)
                      -> [t| DiffTime |]
