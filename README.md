@@ -196,28 +196,30 @@ Full list can be found in `ToAvro` and `FromAvro` modules.
 
 This library provides the following conversions between Haskell types and Avro types:
 
-| Haskell type      | Avro type                                               |
-|:------------------|:--------------------------------------------------------|
-| ()                | "null"                                                  |
-| Bool              | "boolean"                                               |
-| Int, Int64        | "long"                                                  |
-| Int32             | "int"                                                   |
-| Double            | "double"                                                |
-| Text              | "string"                                                |
-| ByteString        | "bytes"                                                 |
-| Maybe a           | ["null", "a"]                                           |
-| Either a b        | ["a", "b"]                                              |
-| Identity a        | ["a"]                                                   |
-| Map Text a        | { "type": "map",    "value": "a" }                      |
-| Map String a      | { "type": "map",    "value": "a" }                      |
-| HashMap Text a    | { "type": "map",    "value": "a" }                      |
-| HashMap String a  | { "type": "map",    "value": "a" }                      |
-| [a]               | { "type": "array",  "value": "a" }                      |
-| UTCTime           | { "type": "long",   "logicalType": "timestamp-millis" } |
-| UTCTime           | { "type": "long",   "logicalType": "timestamp-micros" } |
-| DiffTime          | { "type": "int",    "logicalType": "time-millis" }      |
-| DiffTime          | { "type": "long",   "logicalType": "time-micros" }      |
-| Day               | { "type": "int",    "logicalType": "date" }             |
-| UUID              | { "type": "string", "logicalType": "uuid" }             |
+| Haskell type     | Avro type                                                     |
+|:-----------------|:--------------------------------------------------------------|
+| ()               | "null"                                                        |
+| Bool             | "boolean"                                                     |
+| Int, Int64       | "long"                                                        |
+| Int32            | "int"                                                         |
+| Double           | "double"                                                      |
+| Text             | "string"                                                      |
+| ByteString       | "bytes"                                                       |
+| Maybe a          | ["null", "a"]                                                 |
+| Either a b       | ["a", "b"]                                                    |
+| Identity a       | ["a"]                                                         |
+| Map Text a       | { "type": "map",    "value": "a" }                            |
+| Map String a     | { "type": "map",    "value": "a" }                            |
+| HashMap Text a   | { "type": "map",    "value": "a" }                            |
+| HashMap String a | { "type": "map",    "value": "a" }                            |
+| [a]              | { "type": "array",  "value": "a" }                            |
+| UTCTime          | { "type": "long",   "logicalType": "timestamp-millis" }       |
+| UTCTime          | { "type": "long",   "logicalType": "timestamp-micros" }       |
+| LocalTime        | { "type": "long",   "logicalType": "local-timestamp-millis" } |
+| LocalTime        | { "type": "long",   "logicalType": "local-timestamp-micros" } |
+| DiffTime         | { "type": "int",    "logicalType": "time-millis" }            |
+| DiffTime         | { "type": "long",   "logicalType": "time-micros" }            |
+| Day              | { "type": "int",    "logicalType": "date" }                   |
+| UUID             | { "type": "string", "logicalType": "uuid" }                   |
 
 User defined data types should provide `HasAvroSchema` / `ToAvro` / `FromAvro` instances to be encoded/decoded to/from Avro.

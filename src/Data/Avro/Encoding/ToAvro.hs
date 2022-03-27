@@ -157,11 +157,20 @@ instance ToAvro Time.DiffTime where
   toAvro s@(S.Long (Just S.TimestampMicros)) = toAvro @Int64 s . fromIntegral . diffTimeToMicros
   toAvro s@(S.Long (Just S.TimestampMillis)) = toAvro @Int64 s . fromIntegral . diffTimeToMillis
   toAvro s@(S.Int  (Just S.TimeMillis))      = toAvro @Int32 s . fromIntegral . diffTimeToMillis
-  toAvro s                                   = error ("Unble to decode DiffTime from " <> show s)
+  toAvro s                                   = error ("Unble to encode DiffTime as " <> show s)
 
 instance ToAvro Time.UTCTime where
   toAvro s@(S.Long (Just S.TimestampMicros)) = toAvro @Int64 s . fromIntegral . utcTimeToMicros
   toAvro s@(S.Long (Just S.TimestampMillis)) = toAvro @Int64 s . fromIntegral . utcTimeToMillis
+  toAvro s                                   = error ("Unable to encode UTCTime as " <> show s)
+
+instance ToAvro Time.LocalTime where
+  toAvro s@(S.Long (Just S.LocalTimestampMicros)) =
+    toAvro @Int64 s . fromIntegral . localTimeToMicros
+  toAvro s@(S.Long (Just S.LocalTimestampMillis)) =
+    toAvro @Int64 s . fromIntegral . localTimeToMillis
+  toAvro s =
+    error ("Unable to encode LocalTime as " <> show s)
 
 instance ToAvro B.ByteString where
   toAvro s bs = case s of
