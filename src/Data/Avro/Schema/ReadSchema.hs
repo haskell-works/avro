@@ -199,4 +199,5 @@ extractBindings = \case
   f@Fixed{..}  -> HashMap.fromList $ (name : aliases) `zip` repeat f
   Array{..}    -> extractBindings item
   Map{..}      -> extractBindings values
+  FreeUnion {..} -> extractBindings ty
   _            -> HashMap.empty
