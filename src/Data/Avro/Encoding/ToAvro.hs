@@ -234,7 +234,7 @@ instance ToAvro a => ToAvro (Map.Map Text a) where
   toAvro (S.Map s) hm =
     if Map.null hm then long0 else putI (F.length hm) <> foldMap putKV (Map.toList hm) <> long0
     where putKV (k,v) = toAvro S.String' k <> toAvro s v
-  toAvro s _         = error ("Unable to encode HashMap as: " <> show s)
+  toAvro s _         = error ("Unable to encode Map as: " <> show s)
 
 instance ToAvro a => ToAvro (HashMap Text a) where
   toAvro (S.Map s) hm =
