@@ -1055,11 +1055,10 @@ overlay input supplement = overlayType input
     overlayType  m@Map{..}        = m { values  = overlayType values }
     overlayType  r@Record{..}     = r { fields  = map overlayField fields }
     overlayType  u@Union{..}      = Union (fmap overlayType options)
-    overlayType  nt@(NamedType _) = rebind nt
+    overlayType  (NamedType tn)   = HashMap.lookupDefault (NamedType tn) tn bindings
     overlayType  other            = other
 
-    rebind (NamedType tn) = HashMap.lookupDefault (NamedType tn) tn bindings
-    bindings              = extractBindings supplement
+    bindings = extractBindings supplement
 
 -- | Extract the named inner type definition as its own schema.
 subdefinition :: Schema -> Text -> Maybe Schema
