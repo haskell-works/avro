@@ -1,7 +1,8 @@
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Data.Avro.Schema.ReadSchema
 ( ReadSchema(..), ReadField(..)
 
@@ -9,6 +10,8 @@ module Data.Avro.Schema.ReadSchema
 , fromSchema, fromField
 
 , extractBindings
+, buildTypeEnvironment
+, typeName
 
 , S.Decimal(..)
 , S.LogicalTypeBytes(..), S.LogicalTypeFixed(..)
@@ -201,3 +204,69 @@ extractBindings = \case
   Map{..}      -> extractBindings values
   FreeUnion {..} -> extractBindings ty
   _            -> HashMap.empty
+
+-- | @buildTypeEnvironment schema@ builds a function mapping type names to
+-- the types declared in the traversed schema.
+--
+-- This mapping includes both the base type names and any aliases they
+-- have. Aliases and normal names are not differentiated in any way.
+buildTypeEnvironment :: Applicative m
+                     => (TypeName -> m ReadSchema)
+                        -- ^ Callback to handle type names not in the
+                        -- schema.
+                     -> ReadSchema
+                        -- ^ The schema that we're generating a lookup
+                        -- function for.
+                     -> (TypeName -> m ReadSchema)
+buildTypeEnvironment failure from forTy =
+  case HashMap.lookup forTy env of
+    Nothing  -> failure forTy
+    Just res -> pure res
+  where
+    env = extractBindings from
+
+-- |Get the name of the type.  In the case of unions, get the name of the
+-- first value in the union schema.
+typeName :: ReadSchema -> Text
+typeName bt =
+  case bt of
+    Null            -> "null"
+    Boolean         -> "boolean"
+    Int Nothing     -> "int"
+    Int (Just (S.DecimalI d))
+                    -> decimalName d
+    Int (Just S.Date) -> "date"
+    Int (Just S.TimeMillis)
+                    -> "time-millis"
+    Long _ Nothing  -> "long"
+    Long _ (Just (S.DecimalL d))
+                    -> decimalName d
+    Long _ (Just S.TimeMicros)
+                    -> "time-micros"
+    Long _ (Just S.TimestampMillis)
+                    -> "timestamp-millis"
+    Long _ (Just S.TimestampMicros)
+                    -> "timestamp-micros"
+    Long _ (Just S.LocalTimestampMillis)
+                    -> "local-timestamp-millis"
+    Long _ (Just S.LocalTimestampMicros)
+                    -> "local-timestamp-micros"
+    Float _         -> "float"
+    Double _        -> "double"
+    Bytes Nothing   -> "bytes"
+    Bytes (Just (S.DecimalB d))
+                    -> decimalName d
+    String Nothing  -> "string"
+    String (Just S.UUID)
+                    -> "uuid"
+    Array _         -> "array"
+    Map   _         -> "map"
+    NamedType name  -> S.renderFullname name
+    Union ts        -> typeName $ snd $ V.head ts
+    Fixed _ _ _ (Just (S.DecimalF d))
+                    -> decimalName d
+    Fixed _ _ _ (Just S.Duration)
+                    -> "duration"
+    _               -> S.renderFullname $ name bt
+  where
+    decimalName (S.Decimal prec sc) = "decimal(" <> T.pack (show prec) <> "," <> T.pack (show sc) <> ")"

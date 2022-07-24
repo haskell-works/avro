@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TupleSections       #-}
 -- | Avro supports a JSON representation of Avro objects alongside the
 -- Avro binary format. An Avro schema can be used to generate and
 -- validate JSON representations of Avro objects.
@@ -61,6 +63,7 @@
 -- @
 module Data.Avro.JSON where
 
+import           Control.Monad                (forM, when)
 import           Control.Monad.Identity       (Identity (..))
 import qualified Data.Aeson           as Aeson
 import qualified Data.Aeson.Key       as K
@@ -83,10 +86,13 @@ import qualified Data.Time            as Time
 
 import qualified Data.Avro.HasAvroSchema as Schema
 import           Data.Avro.EitherN
+import           Data.Avro.Encoding.FromAvro       as FromAvro
 import           Data.Avro.Internal.Time
 import           Data.Avro.Schema.Decimal as D
-import           Data.Avro.Schema.Schema  (DefaultValue (..), Result (..), Schema, parseAvroJSON)
+import           Data.Avro.Schema.Schema  (DefaultValue (..), Schema)
 import qualified Data.Avro.Schema.Schema  as Schema
+import           Data.Avro.Schema.ReadSchema (ReadSchema)
+import qualified Data.Avro.Schema.ReadSchema as ReadSchema
 import qualified Data.Vector              as V
 import qualified Data.Vector.Unboxed      as U
 import           Data.Int
@@ -94,9 +100,10 @@ import           Data.Word
 import qualified Data.UUID                as UUID
 import           GHC.TypeLits
 
-decodeAvroJSON :: Schema -> Aeson.Value -> Result DefaultValue
+-- deprecate
+decodeAvroJSON :: Schema -> Aeson.Value -> Schema.Result DefaultValue
 decodeAvroJSON schema json =
-  parseAvroJSON union env schema json
+  Schema.parseAvroJSON union env schema json
   where
     env =
       Schema.buildTypeEnvironment missing schema
@@ -124,7 +131,7 @@ decodeAvroJSON schema json =
               HashMap.fromList [(Schema.typeName t, t) | t <- Foldable.toList schemas]
           in case HashMap.lookup (canonicalize branch) names of
             Just t  -> do
-              nested <- parseAvroJSON union env t $ case KM.lookup (K.fromText branch) obj of
+              nested <- Schema.parseAvroJSON union env t $ case KM.lookup (K.fromText branch) obj of
                 Just val -> val
                 Nothing -> error "impossible"
               return (Schema.DUnion schemas t nested)
@@ -291,8 +298,8 @@ instance (ToAvroJSON a) => ToAvroJSON (Identity a) where
 instance ToAvroJSON a => ToAvroJSON (Maybe a) where
   toAvroJSON (Schema.Union opts) v =
     case Foldable.toList opts of
-      [Schema.Null, s] -> maybe (toAvroJSON Schema.Null ()) (toAvroJSON s) v
-      [s, Schema.Null] -> maybe (toAvroJSON Schema.Null ()) (toAvroJSON s) v
+      [Schema.Null, s] -> maybe (toAvroJSON Schema.Null ()) (toAvroUnionJSON s) v
+      [s, Schema.Null] -> maybe (toAvroJSON Schema.Null ()) (toAvroUnionJSON s) v
       wrongOpts   -> error ("Unable to encode Maybe as " <> show wrongOpts)
   toAvroJSON s _ = error ("Unable to encode Maybe as " <> show s)
 
@@ -422,7 +429,7 @@ instance (ToAvroJSON a, ToAvroJSON b, ToAvroJSON c, ToAvroJSON d, ToAvroJSON e, 
 
 instance (ToAvroJSON a, ToAvroJSON b, ToAvroJSON c, ToAvroJSON d, ToAvroJSON e, ToAvroJSON f, ToAvroJSON g, ToAvroJSON h, ToAvroJSON i, ToAvroJSON j) => ToAvroJSON (Either10 a b c d e f g h i j) where
   toAvroJSON (Schema.Union opts) v =
-    if V.length opts == 9
+    if V.length opts == 10
       then case v of
         E10_1 x -> toAvroUnionJSON (V.unsafeIndex opts 0) x
         E10_2 x -> toAvroUnionJSON (V.unsafeIndex opts 1) x
@@ -437,6 +444,9 @@ instance (ToAvroJSON a, ToAvroJSON b, ToAvroJSON c, ToAvroJSON d, ToAvroJSON e, 
       else error ("Unable to encode Either10 as " <> show opts)
   toAvroJSON s _ = error ("Unable to encode Either10 as " <> show s)
 
+-- | Unions in Avro JSON serialization are encoded as a map with a single key
+-- that is the name of the type. This function can be used to serialize union
+-- values properly when writing instances of 'ToAvroJSON' for union fields.
 toAvroUnionJSON :: ToAvroJSON a => Schema -> a -> Aeson.Value
 toAvroUnionJSON s x = case s of
   Schema.Null -> toAvroJSON s x
@@ -454,17 +464,54 @@ toEncoding = toAvroEncoding schema
   where
     schema = untag (Schema.schema :: Tagged a Schema)
 
-class FromAvroJSON a where
-  -- | Convert a 'Aeson.Value' into a type that has an Avro schema. The
-  -- schema is used to validate the JSON and will return an 'Error' if
-  -- the JSON object is not encoded correctly or does not match the schema.
-  fromAvroJSON :: Schema -> Aeson.Value -> Result a
-
-fromJSON :: forall a. (Schema.HasAvroSchema a, FromAvroJSON a) => Aeson.Value -> Result a
-fromJSON = fromAvroJSON schema 
+fromJSON :: (FromAvro a) => ReadSchema -> Aeson.Value -> Either String a
+fromJSON schema json = do
+  intermediateValue <- parseAvroJSON union env schema json
+  FromAvro.fromAvro intermediateValue
   where
-    schema = untag (Schema.schema :: Tagged a Schema)
+    env =
+      ReadSchema.buildTypeEnvironment missing schema
+    missing name =
+      fail ("Type " <> show name <> " not in schema")
 
+    union :: ReadSchema -> Aeson.Value -> Either String FromAvro.Value
+    union (ReadSchema.Union schemas) Aeson.Null =
+      case V.find ((== ReadSchema.Null) . snd) schemas of
+        Nothing -> Left "Null not in union."
+        Just (ix, _) -> pure $ FromAvro.Union (ReadSchema.Union schemas) ix FromAvro.Null
+          
+    union (ReadSchema.Union schemas) (Aeson.Object obj)
+      | null obj =
+          Left "Invalid encoding of union: empty object ({})."
+      | length obj > 1 =
+          Left "Invalid encoding of union: object with too many fields."
+      | otherwise      =
+          let
+            canonicalize name
+              | isBuiltIn name = name
+              | otherwise      = Schema.renderFullname $ Schema.parseFullname name
+            branch =
+              K.toText $ head (KM.keys obj)
+            names =
+              HashMap.fromList [(ReadSchema.typeName t, ixed) | ixed@(_, t) <- Foldable.toList schemas]
+          in case HashMap.lookup (canonicalize branch) names of
+            Just (ix, t) -> do
+              nested <- parseAvroJSON union env t $ case KM.lookup (K.fromText branch) obj of
+                Just val -> val
+                Nothing -> error "impossible"
+              return (FromAvro.Union (ReadSchema.Union schemas) ix nested)
+            Nothing -> Left ("Type '" <> Text.unpack branch <> "' not in union: " <> show schemas)
+    union ReadSchema.Union{} _ =
+      Left "Invalid JSON representation for union: has to be a JSON object with exactly one field."
+    -- TODO, not sure what to do with val here
+    union (ReadSchema.FreeUnion ix ty) val =  do
+      nested <- parseAvroJSON union env ty val
+      pure $ FromAvro.Union (ReadSchema.FreeUnion ix ty) ix nested
+    union _ _ =
+      error "Impossible: function given non-union schema."
+
+    isBuiltIn name = name `elem` [ "null", "boolean", "int", "long", "float"
+                                 , "double", "bytes", "string", "array", "map" ]
 -- -- | Parse a 'ByteString' as JSON and convert it to a type with an
 -- -- Avro schema. Will return 'Error' if the input is not valid JSON or
 -- -- the JSON does not convert with the specified schema.
@@ -472,3 +519,75 @@ fromJSON = fromAvroJSON schema
 -- parseJSON input = case Aeson.eitherDecode input of
 --   Left msg    -> Error msg
 --   Right value -> fromJSON value
+-- | Parse JSON-encoded avro data.
+parseAvroJSON :: (ReadSchema -> Aeson.Value -> Either String FromAvro.Value)
+                 -- ^ How to handle unions. The way unions are
+                 -- formatted in JSON depends on whether we're parsing
+                 -- a normal Avro object or we're parsing a default
+                 -- declaration in a schema.
+                 --
+                 -- This function will only ever be passed 'Union'
+                 -- schemas. It /should/ error out if this is not the
+                 -- case—it represents a bug in this code.
+              -> (Schema.TypeName -> Maybe ReadSchema)
+              -> ReadSchema
+              -> Aeson.Value
+              -> Either String FromAvro.Value
+parseAvroJSON union env (ReadSchema.NamedType name) av =
+  case env name of
+    Nothing -> Left $ "Could not resolve type name for " <> Text.unpack (Schema.renderFullname name)
+    Just t  -> parseAvroJSON union env t av
+parseAvroJSON union _ u@ReadSchema.Union{} av = u `union` av
+parseAvroJSON union env ty av =
+  case av of
+    Aeson.String s ->
+      case ty of
+        ReadSchema.String _    -> return $ FromAvro.String ty s
+        ReadSchema.Enum {..}   ->
+            case s `V.elemIndex` symbols of
+              Just i  -> pure $ FromAvro.Enum ty i s
+              Nothing -> Left $ "JSON string is not one of the expected symbols for enum '" <> show name <> "': " <> Text.unpack s
+        ReadSchema.Bytes _     -> FromAvro.Bytes ty <$> (Schema.resultToEither $ Schema.parseBytes s)
+        ReadSchema.Fixed {..}  -> do
+          bytes <- Schema.resultToEither $ Schema.parseBytes s
+          let len = BS.length bytes
+          when (len /= size) $
+            Left $ "Fixed string wrong size. Expected " <> show size <> " but got " <> show len
+          return $ FromAvro.Fixed ty bytes
+        _ -> Left $ "Expected type String, Enum, Bytes, or Fixed, but found (Type,Value)="
+                <> show (ty, av)
+    Aeson.Bool b   -> 
+      case ty of
+        ReadSchema.Boolean -> return $ FromAvro.Boolean b
+        _                  -> avroTypeMismatch ty "boolean"
+    Aeson.Number i ->
+      case ty of
+        ReadSchema.Int _    -> return $ FromAvro.Int    ty (floor i)
+        ReadSchema.Long _ _ -> return $ FromAvro.Long   ty (floor i)
+        ReadSchema.Float _  -> return $ FromAvro.Float  ty (realToFrac i)
+        ReadSchema.Double _ -> return $ FromAvro.Double ty (realToFrac i)
+        _      -> avroTypeMismatch ty "number"
+    Aeson.Array vec ->
+      case ty of
+        ReadSchema.Array t -> FromAvro.Array <$> V.mapM (parseAvroJSON union env t) vec
+        _       -> avroTypeMismatch ty "array"
+    Aeson.Object obj ->
+      case ty of
+        ReadSchema.Map mTy     -> FromAvro.Map <$> mapM (parseAvroJSON union env mTy) (KM.toHashMapText obj)
+        ReadSchema.Record {..} -> do 
+          values <- forM (filter ((/= ReadSchema.Ignored) . ReadSchema.fldStatus) fields) $ \ReadSchema.ReadField{..} -> do
+            case KM.lookup (K.fromText fldName) obj of
+              Nothing ->
+                case fldDefault of
+                  Just v  -> pure $ FromAvro.convertValue v
+                  Nothing -> Left $ "Decode failure: No record field '" <> Text.unpack fldName <> "' and no default in schema."
+              Just v  -> parseAvroJSON union env fldType v
+          pure $ FromAvro.Record ty $ V.fromList values
+        _ -> avroTypeMismatch ty "object"
+    Aeson.Null -> case ty of
+      ReadSchema.Null -> return FromAvro.Null
+      _    -> avroTypeMismatch ty "null"
+
+avroTypeMismatch :: ReadSchema -> Text.Text -> Either String a
+avroTypeMismatch expected actual =
+  Left $ "Could not resolve type '" <> Text.unpack actual <> "' with expected type: " <> show expected

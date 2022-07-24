@@ -849,6 +849,7 @@ parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
   where defaultUnion (Union ts) val = DUnion ts (V.head ts) <$> parseFieldDefault env (V.head ts) val
         defaultUnion _ _            = error "Impossible: not Union."
 
+-- TODO deprecate this function in favor of JSON module
 -- | Parse JSON-encoded avro data.
 parseAvroJSON :: (Schema -> A.Value -> Result DefaultValue)
                  -- ^ How to handle unions. The way unions are
