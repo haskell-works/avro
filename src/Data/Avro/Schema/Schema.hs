@@ -37,6 +37,7 @@ module Data.Avro.Schema.Schema
   , validateSchema
   -- * Lower level utilities
   , typeName
+  , typeAliases
   , buildTypeEnvironment
   , extractBindings
 
@@ -495,6 +496,15 @@ typeName bt =
     _               -> renderFullname $ name bt
   where
     decimalName (Decimal prec sc) = "decimal(" <> T.pack (show prec) <> "," <> T.pack (show sc) <> ")"
+
+-- |Get the aliases of the type.
+typeAliases :: Schema -> [TypeName]
+typeAliases bt =
+  case bt of
+    Record { aliases } -> aliases
+    Enum { aliases} -> aliases
+    Fixed { aliases } -> aliases
+    _ -> []
 
 instance FromJSON Schema where
   parseJSON = parseSchemaJSON Nothing
