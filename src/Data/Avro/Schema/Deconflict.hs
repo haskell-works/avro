@@ -76,7 +76,7 @@ deconflict w@S.Fixed {} r@S.Fixed {}
     }
 
 deconflict w@S.Record {} r@S.Record {}
-  | name w == name r = do
+  | name w == name r || name w `elem` aliases r = do
     fields' <- deconflictFields (fields w) (fields r)
     pure Read.Record
       { Read.name    = name r
