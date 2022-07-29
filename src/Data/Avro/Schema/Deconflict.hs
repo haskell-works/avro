@@ -138,6 +138,7 @@ findField w rs =
 findTypeV :: Schema -> Vector Schema -> Maybe (Int, Schema)
 findTypeV schema schemas =
   let tn = typeName schema
-      allNames typ = typeName typ : map renderFullname (aliases typ)
-  in ((,) <$> id <*> V.unsafeIndex schemas) <$> 
+      allNames typ =
+        typeName typ : map renderFullname (typeAliases typ)
+  in ((,) <$> id <*> V.unsafeIndex schemas) <$>
         V.findIndex ((tn `elem`) . allNames) schemas
