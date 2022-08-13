@@ -29,7 +29,7 @@ deriveAvroFromByteString [r|
     { "name": "fullName", "type": "string" },
     { "name": "age", "type": "int" },
     { "name": "gender",
-      "type": { "type": "enum", "symbols": ["Male", "Female"] }
+      "type": { "name": "Gender", "type": "enum", "symbols": ["Male", "Female"] }
     },
     { "name": "ssn", "type": ["null", "string"] }
   ]
