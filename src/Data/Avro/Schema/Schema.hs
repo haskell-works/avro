@@ -859,6 +859,7 @@ parseFieldDefault env schema value = parseAvroJSON defaultUnion env schema value
   where defaultUnion (Union ts) val = DUnion ts (V.head ts) <$> parseFieldDefault env (V.head ts) val
         defaultUnion _ _            = error "Impossible: not Union."
 
+-- TODO deprecate this function in favor of JSON module
 -- | Parse JSON-encoded avro data.
 parseAvroJSON :: (Schema -> A.Value -> Result DefaultValue)
                  -- ^ How to handle unions. The way unions are
@@ -1065,11 +1066,10 @@ overlay input supplement = overlayType input
     overlayType  m@Map{..}        = m { values  = overlayType values }
     overlayType  r@Record{..}     = r { fields  = map overlayField fields }
     overlayType  u@Union{..}      = Union (fmap overlayType options)
-    overlayType  nt@(NamedType _) = rebind nt
+    overlayType  (NamedType tn)   = HashMap.lookupDefault (NamedType tn) tn bindings
     overlayType  other            = other
 
-    rebind (NamedType tn) = HashMap.lookupDefault (NamedType tn) tn bindings
-    bindings              = extractBindings supplement
+    bindings = extractBindings supplement
 
 -- | Extract the named inner type definition as its own schema.
 subdefinition :: Schema -> Text -> Maybe Schema

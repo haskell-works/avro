@@ -3,10 +3,8 @@ module Data.Avro.Internal.Time where
 
 -- Utility functions to work with times
 
-import Data.Fixed            (Fixed (..))
 import Data.Maybe            (fromJust)
 import Data.Time
-import Data.Time.Clock
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 #if MIN_VERSION_time(1,9,0)
 import Data.Time.Format.Internal

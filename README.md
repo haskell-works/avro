@@ -128,7 +128,7 @@ When working with `FromAvro` directly it is important to understand the differen
 
 `Schema` (as in the example above) is just a regular data schema for an Avro type.
 
-`ReadSchema` is a similar type, but it is capable of captuting and resolving differences between "_writer_ schema" and "_reader_ schema". See [Specification](https://avro.apache.org/docs/current/spec.html#Schema+Resolution) to learn more about schema resolution and de-conflicting.
+`ReadSchema` is a similar type, but it is capable of capturing and resolving differences between "_writer_ schema" and "_reader_ schema". See [Specification](https://avro.apache.org/docs/current/spec.html#Schema+Resolution) to learn more about schema resolution and de-conflicting.
 
 `FromAvro` class requires `ReaderSchema` because with Avro it is possible to read data with a different schema compared to the schema that was used for writing this data.
 

@@ -443,6 +443,7 @@ instance (FromAvro a, FromAvro b, FromAvro c) => FromAvro (Either3 a b c) where
   fromAvro (AV.Union _ 1 b) = E3_2 <$> fromAvro b
   fromAvro (AV.Union _ 2 c) = E3_3 <$> fromAvro c
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either3 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either3 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d) => FromAvro (Either4 a b c d) where
   fromAvro (AV.Union _ 0 a) = E4_1 <$> fromAvro a
@@ -450,6 +451,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d) => FromAvro (Either4 a
   fromAvro (AV.Union _ 2 c) = E4_3 <$> fromAvro c
   fromAvro (AV.Union _ 3 d) = E4_4 <$> fromAvro d
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either4 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either4 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e) => FromAvro (Either5 a b c d e) where
   fromAvro (AV.Union _ 0 a) = E5_1 <$> fromAvro a
@@ -458,6 +460,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e) => FromAvr
   fromAvro (AV.Union _ 3 d) = E5_4 <$> fromAvro d
   fromAvro (AV.Union _ 4 e) = E5_5 <$> fromAvro e
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either5 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either5 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f) => FromAvro (Either6 a b c d e f) where
   fromAvro (AV.Union _ 0 a) = E6_1 <$> fromAvro a
@@ -467,6 +470,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f
   fromAvro (AV.Union _ 4 e) = E6_5 <$> fromAvro e
   fromAvro (AV.Union _ 5 f) = E6_6 <$> fromAvro f
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either6 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either6 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g) => FromAvro (Either7 a b c d e f g) where
   fromAvro (AV.Union _ 0 a) = E7_1 <$> fromAvro a
@@ -477,6 +481,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f
   fromAvro (AV.Union _ 5 f) = E7_6 <$> fromAvro f
   fromAvro (AV.Union _ 6 g) = E7_7 <$> fromAvro g
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either7 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either7 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h) => FromAvro (Either8 a b c d e f g h) where
   fromAvro (AV.Union _ 0 a) = E8_1 <$> fromAvro a
@@ -488,6 +493,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f
   fromAvro (AV.Union _ 6 g) = E8_7 <$> fromAvro g
   fromAvro (AV.Union _ 7 h) = E8_8 <$> fromAvro h
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either8 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either8 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h, FromAvro i) => FromAvro (Either9 a b c d e f g h i) where
   fromAvro (AV.Union _ 0 a) = E9_1 <$> fromAvro a
@@ -500,6 +506,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f
   fromAvro (AV.Union _ 7 h) = E9_8 <$> fromAvro h
   fromAvro (AV.Union _ 8 i) = E9_9 <$> fromAvro i
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either9 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either9 from a non-union"
 
 instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f, FromAvro g, FromAvro h, FromAvro i, FromAvro j) => FromAvro (Either10 a b c d e f g h i j) where
   fromAvro (AV.Union _ 0 a) = E10_1  <$> fromAvro a
@@ -513,6 +520,7 @@ instance (FromAvro a, FromAvro b, FromAvro c, FromAvro d, FromAvro e, FromAvro f
   fromAvro (AV.Union _ 8 i) = E10_9  <$> fromAvro i
   fromAvro (AV.Union _ 9 j) = E10_10 <$> fromAvro j
   fromAvro (AV.Union _ n _) = Left ("Unable to decode Either10 from a position #" <> show n)
+  fromAvro _                = Left "Unable to decode Either10 from a non-union"
 
 putIndexedValue :: ToAvro a => Int -> V.Vector Schema -> a -> Builder
 putIndexedValue i opts x = putI i <> toAvro (V.unsafeIndex opts i) x

@@ -30,7 +30,12 @@ import Debug.Trace
 -- with the writer's schema into the form specified by the reader's schema.
 --
 -- Schema resolution rules are described by the specification: <https://avro.apache.org/docs/current/spec.html#Schema+Resolution>
-deconflict :: Schema -> Schema -> Either String ReadSchema
+deconflict 
+  :: Schema 
+  -- ^ The writer's schema.
+  -> Schema 
+  -- ^ The reader's schema.
+  -> Either String ReadSchema
 deconflict writerSchema readerSchema | writerSchema == readerSchema = pure (Read.fromSchema readerSchema)
 deconflict S.Null S.Null             = pure Read.Null
 deconflict S.Boolean S.Boolean       = pure Read.Boolean

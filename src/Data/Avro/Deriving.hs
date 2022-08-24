@@ -45,6 +45,7 @@ import qualified Data.Aeson                   as J
 import           Data.Avro                    hiding (decode, encode)
 import           Data.Avro.Encoding.ToAvro    (ToAvro (..))
 import           Data.Avro.Internal.EncodeRaw (putI)
+import           Data.Avro.JSON
 import           Data.Avro.Schema.Schema      as S
 import           Data.ByteString              (ByteString)
 import qualified Data.ByteString              as B
@@ -56,6 +57,7 @@ import qualified Data.List.NonEmpty           as NE
 import           Data.Map                     (Map)
 import           Data.Maybe                   (fromMaybe)
 import           Data.Semigroup               ((<>))
+import           Data.String                  (IsString (..))
 import qualified Data.Text                    as Text
 import           Data.Time                    (Day, DiffTime, LocalTime, UTCTime)
 import           Data.UUID                    (UUID)
@@ -366,16 +368,27 @@ newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 ------------------------- ToAvro ------------------------------------------------
 
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
-genToAvro opts s@(S.Enum n _ _ _) =
-  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genToAvro opts s@(S.Enum n _ _ _) = do
+  baseInstance <- encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  jsonInstance <- encodeAvroJsonInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  pure (baseInstance ++ jsonInstance)
   where
     encodeAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $([| \_ x -> putI (fromEnum x) |])
       |]
+    encodeAvroJsonInstance sname =
+      [d| instance ToAvroJSON $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toAvroJSON (S.Enum _ _ _ vs) x = case vs V.!? fromEnum x of
+              Nothing -> error "toAvroJson: unable to find equivalent enum value in new schema"
+              Just _ -> toJSON originalName
+            toAvroJSON _ _ = error "ToAvroJson for enum only works for Enum schema values"
+      |]
 
-genToAvro opts s@(S.Record n _ _ fs) =
-  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+genToAvro opts s@(S.Record n _ _ fs) = do
+  baseInstance <- encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  jsonInstance <- encodeAvroJsonInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  pure (baseInstance ++ jsonInstance)
   where
     encodeAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
@@ -390,9 +403,26 @@ genToAvro opts s@(S.Record n _ _ fs) =
                           in listE $ build <$> zip fs names
                         )
             |]
+    encodeAvroJsonInstance sname =
+      [d| instance ToAvroJSON $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toAvroJSON = $(encodeAvroJsonFieldsExp sname)
+      |]
+    encodeAvroJsonFieldsExp sname = do
+      names <- newNames "p_" (length fs)
+      wn <- varP <$> newName "_"
+      let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
+      lamE [wn, con]
+            [| J.object 
+                $( let build (fld, n) = [| fromString $(stringE $ Text.unpack $ fldName fld) J..= toAvroJSON (fldType fld) $(varE n) |]
+                    in listE $ build <$> zip fs names
+                )
+            |]
 
-genToAvro opts s@(S.Fixed n _ _ _) =
-  encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+
+genToAvro opts s@(S.Fixed n _ _ _) = do
+  baseInstance <- encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  jsonInstance <- encodeAvroJsonInstance (mkSchemaValueName (namespaceBehavior opts) n)
+  pure (baseInstance ++ jsonInstance)
   where
     encodeAvroInstance sname =
       [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
@@ -400,6 +430,13 @@ genToAvro opts s@(S.Fixed n _ _ _) =
               x <- newName "x"
               wc <- newName "_"
               lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toAvro $(varE sname) $(varE x) |])
+      |]
+    encodeAvroJsonInstance sname =
+      [d| instance ToAvroJSON $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+            toAvroJSON = $(do
+              x <- newName "x"
+              wc <- newName "_"
+              lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toAvroJSON $(varE sname) $(varE x) |])
       |]
 genToAvro _ _ = pure []
 
