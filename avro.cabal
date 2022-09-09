@@ -127,7 +127,6 @@ library
                         Data.Avro.Deriving
                         Data.Avro.Deriving.Lift
                         Data.Avro.Deriving.NormSchema
-                        Data.Avro.EitherN
                         Data.Avro.Encoding.FromAvro
                         Data.Avro.Encoding.ToAvro
                         Data.Avro.HasAvroSchema
@@ -143,6 +142,7 @@ library
                         Data.Avro.Schema.Deconflict
                         Data.Avro.Schema.ReadSchema
                         Data.Avro.Schema.Schema
+                        Data.Avro.Sum
   other-modules:
   hs-source-dirs:       src
   other-extensions:     OverloadedStrings

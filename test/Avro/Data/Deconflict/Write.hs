@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
@@ -11,11 +12,12 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# options -fprint-potential-instances #-}
 
 module Avro.Data.Deconflict.Write where
 
 import Data.Avro.Deriving
-import Data.Avro.EitherN
+import Data.Avro.Sum
 
 import           Hedgehog       (Gen, MonadGen)
 import qualified Hedgehog.Gen   as Gen
@@ -54,8 +56,8 @@ genBar = Bar
   <*> Gen.int64 Range.linearBounded
   <*> Gen.text (Range.linear 0 256) Gen.unicode
   <*> Gen.choice
-        [ Right <$> Gen.int64 Range.linearBounded
-        , Left  <$> Gen.text (Range.linear 0 256) Gen.unicode
+        [ makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> Gen.text (Range.linear 0 256) Gen.unicode
         ]
 
 genFoo :: MonadGen m => m Foo
@@ -63,7 +65,7 @@ genFoo = Foo
   <$> genBar
   <*> Gen.maybe (Gen.text (Range.linear 0 256) Gen.unicode)
   <*> Gen.choice
-        [ E3_1 <$> Gen.int32  Range.linearBounded
-        , E3_2 <$> Gen.text  (Range.linear 0 256) Gen.unicode
-        , E3_3 <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
+        [ makeNSum <$> Gen.int32  Range.linearBounded
+        , makeNSum <$> Gen.text  (Range.linear 0 256) Gen.unicode
+        , makeNSum <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
         ]

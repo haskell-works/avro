@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
@@ -16,7 +17,7 @@ module Avro.Data.Unions
 where
 
 import Data.Avro.Deriving    (deriveAvroFromByteString, r)
-import Data.Avro.EitherN
+import Data.Avro.Sum
 import Data.Functor.Identity
 
 import           Hedgehog       (Gen, MonadGen)
@@ -97,82 +98,82 @@ deriveAvroFromByteString [r|
 unionsGen :: MonadGen m => m Unions
 unionsGen = do
   let txtGen = Gen.text (Range.linear 0 100) Gen.alphaNum
-  a <- Gen.choice [Left <$> txtGen, Right <$> Gen.int64 Range.linearBounded]
+  a <- Gen.choice [makeNSum <$> txtGen, makeNSum <$> Gen.int64 Range.linearBounded]
   b <- Gen.maybe (Gen.int32 Range.linearBounded)
-  c <- Gen.choice [Left <$> fooGen, Right <$> barGen]
-  d <- Gen.choice [Left <$> fooGen, Right <$> notFooGen]
+  c <- Gen.choice [makeNSum <$> fooGen, makeNSum <$> barGen]
+  d <- Gen.choice [makeNSum <$> fooGen, makeNSum <$> notFooGen]
   e <- Gen.choice
-        [ Left  <$> Gen.list (Range.linear 0 10) txtGen
-        , Right <$> Gen.map (Range.linear 0 10) (tupleGen txtGen (Gen.int64 Range.linearBounded))
+        [ makeNSum <$> Gen.list (Range.linear 0 10) txtGen
+        , makeNSum <$> Gen.map (Range.linear 0 10) (tupleGen txtGen (Gen.int64 Range.linearBounded))
         ]
-  f <- Identity <$> Gen.int32 Range.linearBounded
+  f <- makeNSum <$> Gen.int32 Range.linearBounded
   g <- Gen.choice
-        [ E3_1 <$> Gen.int32 Range.linearBounded
-        , E3_2 <$> txtGen
-        , E3_3 <$> Gen.int64 Range.linearBounded
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
         ]
   h <- Gen.choice
-        [ E4_1 <$> Gen.int32 Range.linearBounded
-        , E4_2 <$> txtGen
-        , E4_3 <$> Gen.int64 Range.linearBounded
-        , E4_4 <$> fooGen
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> fooGen
         ]
   i <- Gen.choice
-        [ E5_1 <$> Gen.int32 Range.linearBounded
-        , E5_2 <$> txtGen
-        , E5_3 <$> Gen.int64 Range.linearBounded
-        , E5_4 <$> fooGen
-        , E5_5 <$> notFooGen
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> fooGen
+        , makeNSum <$> notFooGen
         ]
   j <- Gen.choice
-        [ E6_1 <$> Gen.int32 Range.linearBounded
-        , E6_2 <$> txtGen
-        , E6_3 <$> Gen.int64 Range.linearBounded
-        , E6_4 <$> fooGen
-        , E6_5 <$> notFooGen
-        , E6_6 <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> fooGen
+        , makeNSum <$> notFooGen
+        , makeNSum <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
         ]
   k <- Gen.choice
-        [ E7_1 <$> Gen.int32 Range.linearBounded
-        , E7_2 <$> txtGen
-        , E7_3 <$> Gen.int64 Range.linearBounded
-        , E7_4 <$> fooGen
-        , E7_5 <$> notFooGen
-        , E7_6 <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
-        , E7_7 <$> Gen.bool
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> fooGen
+        , makeNSum <$> notFooGen
+        , makeNSum <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
+        , makeNSum <$> Gen.bool
         ]
   l <- Gen.choice
-        [ E8_1 <$> Gen.int32 Range.linearBounded
-        , E8_2 <$> txtGen
-        , E8_3 <$> Gen.int64 Range.linearBounded
-        , E8_4 <$> fooGen
-        , E8_5 <$> notFooGen
-        , E8_6 <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
-        , E8_7 <$> Gen.bool
-        , E8_8 <$> Gen.double (Range.linearFrac (-27000.0) 27000.0)
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> fooGen
+        , makeNSum <$> notFooGen
+        , makeNSum <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
+        , makeNSum <$> Gen.bool
+        , makeNSum <$> Gen.double (Range.linearFrac (-27000.0) 27000.0)
         ]
   m <- Gen.choice
-        [ E9_1 <$> Gen.int32 Range.linearBounded
-        , E9_2 <$> txtGen
-        , E9_3 <$> Gen.int64 Range.linearBounded
-        , E9_4 <$> fooGen
-        , E9_5 <$> notFooGen
-        , E9_6 <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
-        , E9_7 <$> Gen.bool
-        , E9_8 <$> Gen.double (Range.linearFrac (-27000.0) 27000.0)
-        , E9_9 <$> Gen.bytes (Range.linear 0 50)
+        [ makeNSum <$> Gen.int32 Range.linearBounded
+        , makeNSum <$> txtGen
+        , makeNSum <$> Gen.int64 Range.linearBounded
+        , makeNSum <$> fooGen
+        , makeNSum <$> notFooGen
+        , makeNSum <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
+        , makeNSum <$> Gen.bool
+        , makeNSum <$> Gen.double (Range.linearFrac (-27000.0) 27000.0)
+        , makeNSum <$> Gen.bytes (Range.linear 0 50)
         ]
   n <- Gen.choice
-        [ E10_1   <$> Gen.int32 Range.linearBounded
-        , E10_2   <$> txtGen
-        , E10_3   <$> Gen.int64 Range.linearBounded
-        , E10_4   <$> fooGen
-        , E10_5   <$> notFooGen
-        , E10_6   <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
-        , E10_7   <$> Gen.bool
-        , E10_8   <$> Gen.double (Range.linearFrac (-27000.0) 27000.0)
-        , E10_9   <$> Gen.bytes (Range.linear 0 50)
-        , E10_10  <$> barGen
+        [ makeNSum   <$> Gen.int32 Range.linearBounded
+        , makeNSum   <$> txtGen
+        , makeNSum   <$> Gen.int64 Range.linearBounded
+        , makeNSum   <$> fooGen
+        , makeNSum   <$> notFooGen
+        , makeNSum   <$> Gen.float (Range.linearFrac (-27000.0) 27000.0)
+        , makeNSum   <$> Gen.bool
+        , makeNSum   <$> Gen.double (Range.linearFrac (-27000.0) 27000.0)
+        , makeNSum   <$> Gen.bytes (Range.linear 0 50)
+        , makeNSum  <$> barGen
         ]
   pure $ Unions a b c d e f g h i j k l m n
 

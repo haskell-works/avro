@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
@@ -6,6 +7,7 @@
 module Avro.Deconflict.D.Writer where
 
 import Data.Avro.Deriving
+import Data.Avro.Sum
 
 deriveAvroFromByteString [r|
 [
@@ -35,4 +37,4 @@ deriveAvroFromByteString [r|
 
 sampleValue :: Foo
 sampleValue =
-  Foo (Right (Baz (Foo (Right (Baz (Foo (Left $ Bar 12)))))))
+  Foo (makeNSum (Baz (Foo (makeNSum (Baz (Foo (makeNSum $ Bar 12)))))))
