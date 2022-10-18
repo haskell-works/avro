@@ -50,7 +50,7 @@ common aeson                    { build-depends: aeson                    >= 2.0
 common array                    { build-depends: array                                                              }
 common base16-bytestring        { build-depends: base16-bytestring                                                  }
 common bifunctors               { build-depends: bifunctors                                                         }
-common big-decimal              { build-depends: HasBigDecimal                                                      }
+common big-decimal              { build-depends: HasBigDecimal            >= 0.2        && < 0.3                    }
 common binary                   { build-depends: binary                                                             }
 common bytestring               { build-depends: bytestring                                                         }
 common containers               { build-depends: containers                                                         }
