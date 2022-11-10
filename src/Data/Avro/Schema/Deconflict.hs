@@ -60,7 +60,7 @@ deconflict (S.Array w) (S.Array r)   = Read.Array <$> deconflict w r
 deconflict (S.Map w) (S.Map r)       = Read.Map <$> deconflict w r
 
 deconflict w@S.Enum{} r@S.Enum{}
-  | name w == name r && symbols w `contains` symbols r = pure Read.Enum
+  | name w == name r && symbols r `contains` symbols w = pure Read.Enum
     { Read.name    = name r
     , Read.aliases = aliases w <> aliases r
     , Read.doc     = doc r
