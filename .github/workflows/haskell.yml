@@ -17,24 +17,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["9.2.2", "9.0.2", "8.10.7", "8.8.4", "8.6.5"]
+        ghc: ["9.4.4", "9.2.5", "9.0.2", "8.10.7"]
         os: [ubuntu-latest, macOS-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v2
 
-      - uses: haskell/actions/setup@v1
+      - uses: input-output-hk/setup-haskell@v1
         id: setup-haskell
         with:
           ghc-version: ${{ matrix.ghc }}
-          cabal-version: 3.6.2.0
+          cabal-version: 3.8.1.0
 
       - name: Set some window specific things
         if: matrix.os == 'windows-latest'
         run: echo 'EXE_EXT=.exe' >> $GITHUB_ENV
 
       - name: Configure project
-        run: cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+
+        run: |
+          cabal update
+          cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+
+          cabal build all --dry-run
 
       - name: Cabal cache over S3
         uses: action-works/cabal-cache-s3@v1
