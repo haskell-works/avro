@@ -8,6 +8,8 @@ module Data.Avro.Encoding.FromAvro
   -- ** For internal use
 , Value(..)
 , getValue
+
+, describeValue
 )
 where
 
