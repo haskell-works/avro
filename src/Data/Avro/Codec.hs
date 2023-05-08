@@ -12,11 +12,10 @@ module Data.Avro.Codec (
 import           Codec.Compression.Zlib.Internal as Zlib
 import qualified Data.Binary.Get                 as G
 import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as BS
-import qualified Data.ByteString.Lazy            as LBS
+import qualified Data.ByteString.Lazy            as Lazy
 
 -- | Block decompression function for blocks of Avro.
-type Decompress a = LBS.ByteString -> G.Get a -> Either String a
+type Decompress a = Lazy.ByteString -> G.Get a -> Either String a
 
 -- | A `Codec` allows for compression/decompression of a block in an
 -- Avro container according to the Avro spec.
@@ -33,7 +32,7 @@ data Codec = Codec
   , codecDecompress :: forall a. Decompress a
 
     -- | Compresses a lazy stream of bytes.
-  , codecCompress   :: LBS.ByteString -> LBS.ByteString
+  , codecCompress   :: Lazy.ByteString -> Lazy.ByteString
   }
 
 -- | `nullCodec` specifies @null@ required by Avro spec.
@@ -61,7 +60,7 @@ deflateCodec =
     , codecCompress   = deflateCompress
     }
 
-deflateCompress :: LBS.ByteString -> LBS.ByteString
+deflateCompress :: Lazy.ByteString -> Lazy.ByteString
 deflateCompress =
   Zlib.compress Zlib.rawFormat Zlib.defaultCompressParams
 
@@ -69,12 +68,12 @@ deflateCompress =
 -- | Internal type to help construct a lazy list of
 -- decompressed bytes interleaved with errors if any.
 data Chunk
-  = ChunkRest LBS.ByteString
+  = ChunkRest Lazy.ByteString
   | ChunkBytes ByteString
   | ChunkError Zlib.DecompressError
 
 
-deflateDecompress :: forall a. LBS.ByteString -> G.Get a -> Either String a
+deflateDecompress :: forall a. Lazy.ByteString -> G.Get a -> Either String a
 deflateDecompress bytes parser = do
   let
     -- N.B. this list is lazily created which allows us to

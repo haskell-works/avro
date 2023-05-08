@@ -1,6 +1,5 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DeriveFunctor       #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -23,15 +22,12 @@ import qualified Data.Avro.Schema.Schema      as Schema
 import           Data.Binary.Get              (Get)
 import qualified Data.Binary.Get              as Get
 import           Data.ByteString              (ByteString)
-import qualified Data.ByteString              as B
 import           Data.ByteString.Builder      (Builder, lazyByteString, toLazyByteString)
 import qualified Data.ByteString.Lazy         as BL
 import qualified Data.ByteString.Lazy.Char8   as BLC
-import           Data.Either                  (isRight)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.Int                     (Int32, Int64)
-import           Data.List                    (foldl', unfoldr)
 import qualified Data.Map.Strict              as Map
 import           Data.Text                    (Text)
 import           System.Random.TF.Init        (initTFGen)
@@ -97,7 +93,7 @@ getContainerHeader = do
 decodeRawBlocks :: BL.ByteString -> Either String (Schema, [Either String (Int, BL.ByteString)])
 decodeRawBlocks bs =
   case Get.runGetOrFail getContainerHeader bs of
-    Left (bs', _, err) -> Left err
+    Left (_, _, err) -> Left err
     Right (bs', _, containerHeader@ContainerHeader {..}) ->
       let blocks = allBlocks containerHeader bs'
       in Right (containedSchema, blocks)

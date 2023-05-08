@@ -8,9 +8,8 @@ import           Control.Monad.Identity   (Identity)
 import qualified Data.Array               as Ar
 import           Data.Avro.Schema.Decimal as D
 import           Data.Avro.Schema.Schema  as S
-import qualified Data.ByteString          as B
-import           Data.ByteString.Lazy     (ByteString)
-import qualified Data.ByteString.Lazy     as BL
+import qualified Data.ByteString          as Strict
+import qualified Data.ByteString.Lazy     as Lazy
 import qualified Data.HashMap.Strict      as HashMap
 import           Data.Int
 import           Data.Ix                  (Ix)
@@ -81,10 +80,10 @@ instance HasAvroSchema Text.Text where
 instance HasAvroSchema TL.Text where
   schema = Tagged S.String'
 
-instance HasAvroSchema B.ByteString where
+instance HasAvroSchema Strict.ByteString where
   schema = Tagged S.Bytes'
 
-instance HasAvroSchema BL.ByteString where
+instance HasAvroSchema Lazy.ByteString where
   schema = Tagged S.Bytes'
 
 instance (KnownNat p, KnownNat s) => HasAvroSchema (D.Decimal p s) where
