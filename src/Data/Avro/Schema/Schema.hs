@@ -70,25 +70,19 @@ import qualified Data.Aeson.Key         as A
 import qualified Data.Aeson.KeyMap      as KM
 import           Data.Aeson.Types       (Parser, typeMismatch)
 import qualified Data.ByteString        as B
-import qualified Data.ByteString.Base16 as Base16
 import qualified Data.Char              as Char
 import           Data.Function          (on)
 import           Data.HashMap.Strict    (HashMap)
 import qualified Data.HashMap.Strict    as HashMap
 import           Data.Hashable
 import           Data.Int
-import qualified Data.IntMap            as IM
-import qualified Data.List              as L
 import           Data.List.NonEmpty     (NonEmpty (..))
 import qualified Data.List.NonEmpty     as NE
 import           Data.Maybe             (catMaybes, fromMaybe, isJust)
-import           Data.Monoid            (First (..))
 import           Data.Semigroup
-import qualified Data.Set               as S
 import           Data.String
 import           Data.Text              (Text)
 import qualified Data.Text              as T
-import           Data.Text.Encoding     as T
 import qualified Data.Vector            as V
 import           Prelude                as P
 
@@ -150,9 +144,13 @@ data Schema
               }
     deriving (Ord, Show, Generic, NFData)
 
+pattern Int' :: Schema
 pattern Int'    = Int    Nothing
+pattern Long' :: Schema
 pattern Long'   = Long   Nothing
+pattern Bytes' :: Schema
 pattern Bytes'  = Bytes  Nothing
+pattern String' :: Schema
 pattern String' = String Nothing
 
 data Field = Field { fldName    :: Text
@@ -433,9 +431,9 @@ mkTypeName :: Maybe TypeName
            -> TypeName
               -- ^ The resulting /fullname/ of the generated type,
               -- according to the rules laid out above.
-mkTypeName context name ns
+mkTypeName context name namespace_
   | isFullName name = parseFullname name
-  | otherwise       = case ns of
+  | otherwise       = case namespace_ of
       Just ns -> TN name $ filter (/= "") (T.splitOn "." ns)
       Nothing -> TN name $ maybe [] namespace context
   where isFullName = isJust . T.find (== '.')
@@ -589,23 +587,21 @@ parseSchemaJSON context = \case
         "map"    -> Map <$> (parseSchemaJSON context =<< o .: "values")
         "array"  -> Array <$> (parseSchemaJSON context =<< o .: "items")
         "record" -> do
-          name      <- o .: "name"
-          namespace <- o .:? "namespace"
-          let typeName = mkTypeName context name namespace
-              mkAlias name = mkTypeName (Just typeName) name Nothing
-          aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-          doc     <- o .:? "doc"
-          fields  <- mapM (parseField typeName) =<< (o .: "fields")
-          pure $ Record typeName aliases doc fields
+          name       <- o .: "name"
+          namespace  <- o .:? "namespace"
+          let recName = mkTypeName context name namespace
+          aliases    <- mkAliases recName <$> (o .:? "aliases" .!= [])
+          doc        <- o .:? "doc"
+          fields     <- mapM (parseField recName) =<< (o .: "fields")
+          pure $ Record recName aliases doc fields
         "enum"   -> do
-          name      <- o .: "name"
-          namespace <- o .:? "namespace"
-          let typeName = mkTypeName context name namespace
-              mkAlias name = mkTypeName (Just typeName) name Nothing
-          aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-          doc     <- o .:? "doc"
-          symbols <- o .: "symbols"
-          pure $ mkEnum typeName aliases doc symbols
+          name        <- o .: "name"
+          namespace   <- o .:? "namespace"
+          let enumName = mkTypeName context name namespace
+          aliases     <- mkAliases enumName <$> (o .:? "aliases" .!= [])
+          doc         <- o .:? "doc"
+          symbols     <- o .: "symbols"
+          pure $ mkEnum enumName aliases doc symbols
         "fixed"   -> parseFixed o
         "null"    -> pure Null
         "boolean" -> pure Boolean
@@ -621,13 +617,12 @@ parseSchemaJSON context = \case
 
   where
     parseFixed o = do
-      name      <- o .: "name"
-      namespace <- o .:? "namespace"
-      let typeName = mkTypeName context name namespace
-          mkAlias name = mkTypeName (Just typeName) name Nothing
-      aliases <- mkAliases typeName <$> (o .:? "aliases" .!= [])
-      size    <- o .: "size"
-      pure $ Fixed typeName aliases size Nothing
+      name         <- o .: "name"
+      namespace    <- o .:? "namespace"
+      let fixedName = mkTypeName context name namespace
+      aliases      <- mkAliases fixedName <$> (o .:? "aliases" .!= [])
+      size         <- o .: "size"
+      pure $ Fixed fixedName aliases size Nothing
 
 -- | Parse aliases, inferring the namespace based on the type being aliases.
 mkAliases :: TypeName
@@ -658,8 +653,6 @@ parseField record = \case
       Just (Error e)   -> fail e
       Nothing          -> return Nothing
     order <- o .:? "order" .!= Just Ascending
-
-    let mkAlias name = mkTypeName (Just record) name Nothing
     aliases  <- o .:? "aliases"  .!= []
     return $ Field name aliases doc order ty def
   invalid    -> typeMismatch "Field" invalid
@@ -751,12 +744,12 @@ schemaToJSON context = \case
                    -> [ "logicalType" .= ("decimal" :: Text)
                       , "precision" .= prec, "scale" .= sc ]
     in object (basic ++ extended)
-  where render context typeName
-          | Just ctx <- context
-          , namespace ctx == namespace typeName = baseName typeName
-          | otherwise                           = renderFullname typeName
+  where render context1 typeName1
+          | Just ctx <- context1
+          , namespace ctx == namespace typeName1 = baseName typeName1
+          | otherwise                            = renderFullname typeName1
 
-        fieldToJSON context Field {..} =
+        fieldToJSON context1 Field {..} =
           let opts = catMaybes
                 [ ("order" .=)     <$> fldOrder
                 , ("doc" .=)       <$> fldDoc
@@ -764,7 +757,7 @@ schemaToJSON context = \case
                 ]
           in object $ opts ++
              [ "name"    .= fldName
-             , "type"    .= schemaToJSON (Just context) fldType
+             , "type"    .= schemaToJSON (Just context1) fldType
              , "aliases" .= fldAliases
              ]
 
@@ -1041,7 +1034,7 @@ expandNamedTypes =
       t@(NamedType n)   -> fromMaybe t <$> gets (HashMap.lookup n)
       a@Array{item}     -> (\x -> a { item = x })   <$> go item
       m@Map{values}     -> (\x -> m { values = x }) <$> go values
-      u@Union{options}  -> Union <$> traverse go options
+      Union{options}    -> Union <$> traverse go options
 
       r@Record{name, fields}  -> do
         fields' <- traverse expandField fields
@@ -1064,11 +1057,11 @@ overlay input supplement = overlayType input
     overlayType  a@Array{..}      = a { item    = overlayType item }
     overlayType  m@Map{..}        = m { values  = overlayType values }
     overlayType  r@Record{..}     = r { fields  = map overlayField fields }
-    overlayType  u@Union{..}      = Union (fmap overlayType options)
-    overlayType  nt@(NamedType _) = rebind nt
+    overlayType  Union{..}        = Union (fmap overlayType options)
+    overlayType  (NamedType nt)   = rebind nt
     overlayType  other            = other
 
-    rebind (NamedType tn) = HashMap.lookupDefault (NamedType tn) tn bindings
+    rebind tn             = HashMap.lookupDefault (NamedType tn) tn bindings
     bindings              = extractBindings supplement
 
 -- | Extract the named inner type definition as its own schema.

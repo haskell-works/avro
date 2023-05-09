@@ -6,25 +6,16 @@ module Data.Avro.Schema.Deconflict
 import           Control.Applicative     ((<|>))
 import           Data.Avro.Schema.Schema as S
 import qualified Data.Foldable           as Foldable
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (find)
-import           Data.List.NonEmpty      (NonEmpty (..))
-import qualified Data.List.NonEmpty      as NE
-import qualified Data.Map                as M
 import           Data.Maybe              (isNothing)
-import           Data.Semigroup          ((<>))
 import qualified Data.Set                as Set
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
-import qualified Data.Text.Encoding      as Text
 import           Data.Vector             (Vector)
 import qualified Data.Vector             as V
 
 import           Data.Avro.Schema.ReadSchema (FieldStatus (..), ReadField, ReadSchema)
 import qualified Data.Avro.Schema.ReadSchema as Read
-
-import Debug.Trace
 
 -- | @deconflict writer reader@ will produce a schema that can decode
 -- with the writer's schema into the form specified by the reader's schema.

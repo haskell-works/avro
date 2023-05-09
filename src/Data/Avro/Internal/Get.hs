@@ -11,24 +11,16 @@
 module Data.Avro.Internal.Get
 where
 
-import qualified Codec.Compression.Zlib     as Z
-import           Control.Monad              (replicateM, when)
+import           Control.Monad              (replicateM)
 import           Data.Binary.Get            (Get)
 import qualified Data.Binary.Get            as G
 import           Data.Binary.IEEE754        as IEEE
 import           Data.Bits
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Lazy       as BL
-import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
-import qualified Data.Map                   as Map
-import           Data.Maybe
-import           Data.Monoid                ((<>))
-import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
-import qualified Data.Vector                as V
 import           Prelude                    as P
 
 import Data.Avro.Internal.DecodeRaw

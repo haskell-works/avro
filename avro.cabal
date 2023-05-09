@@ -90,6 +90,8 @@ common gauge                    { if arch(x86_64) || arch(i386) { build-depends:
 
 common config
   default-language:     Haskell2010
+  ghc-options:          -Wall
+
   if flag(dev)
     ghc-options:        -Wall -Werror
 

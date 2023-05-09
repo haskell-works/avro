@@ -7,8 +7,7 @@
 {-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeFamilies              #-}
 
-module Data.Avro.Encoding.ToAvro
-where
+module Data.Avro.Encoding.ToAvro where
 
 import           Control.Monad.Identity       (Identity (..))
 import qualified Data.Array                   as Ar
@@ -29,13 +28,11 @@ import           Data.List                    as DL
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromJust)
 import           Data.Text                    (Text)
-import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
 #if MIN_VERSION_text(2,0,0)
 import qualified Data.Text.Foreign            as T
 #endif
 import qualified Data.Text.Lazy               as TL
-import qualified Data.Text.Lazy.Encoding      as TL
 import qualified Data.Time                    as Time
 import qualified Data.UUID                    as UUID
 import qualified Data.Vector                  as V
@@ -52,7 +49,7 @@ newtype Encoder = Encoder { runEncoder :: Schema -> Builder }
 
 record :: Schema -> [(Text, Encoder)] -> Builder
 record (S.Record _ _ _ fs) vs =
-  foldMap (mapField provided) fs
+    foldMap (mapField provided) fs
   where
     provided :: HashMap Text Encoder
     provided = HashMap.fromList vs
@@ -65,6 +62,8 @@ record (S.Record _ _ _ fs) vs =
     mapField :: HashMap Text Encoder -> S.Field -> Builder
     mapField env fld =
       maybe (failField fld) (flip runEncoder (S.fldType fld)) (HashMap.lookup (S.fldName fld) env)
+record _ _ =
+  error "Error in Schema passed to record. It was not of type Record."
 
 -- | Describes how to encode Haskell data types into Avro bytes
 class ToAvro a where
@@ -251,7 +250,7 @@ instance ToAvro a => ToAvro (Maybe a) where
   toAvro s _ = error ("Unable to encode Maybe as " <> show s)
 
 instance (ToAvro a) => ToAvro (Identity a) where
-  toAvro (S.Union opts) e@(Identity a) =
+  toAvro (S.Union opts) (Identity a) =
     if V.length opts == 1
       then putI 0 <> toAvro (V.unsafeIndex opts 0) a
       else error ("Unable to encode Identity as a single-value union: " <> show opts)

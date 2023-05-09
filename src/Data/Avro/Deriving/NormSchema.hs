@@ -6,15 +6,7 @@ where
 import           Control.Monad.State.Strict
 import           Data.Avro.Schema.Schema
 import qualified Data.Foldable              as Foldable
-import qualified Data.List                  as L
-import           Data.List.NonEmpty         (NonEmpty ((:|)))
 import qualified Data.Map.Strict            as M
-import           Data.Maybe                 (catMaybes, fromMaybe)
-import           Data.Semigroup             ((<>))
-import qualified Data.Set                   as S
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import qualified Data.Vector                as V
 
 -- | Extracts all the records from the schema (flattens the schema)
 -- Named types get resolved when needed to include at least one "inlined"
@@ -23,10 +15,10 @@ import qualified Data.Vector                as V
 -- namespaces (including inlined into full names) will be ignored
 -- during names resolution.
 extractDerivables :: Schema -> [Schema]
-extractDerivables s = flip evalState state . normSchema . snd <$> rawRecs
+extractDerivables s = flip evalState initial . normSchema . snd <$> rawRecs
   where
     rawRecs = getTypes s
-    state = M.fromList rawRecs
+    initial = M.fromList rawRecs
 
 getTypes :: Schema -> [(TypeName, Schema)]
 getTypes rec = case rec of
@@ -60,15 +52,15 @@ normSchema r = case r of
   Array s -> Array <$> normSchema s
   Map s   -> Map <$> normSchema s
   Union l -> Union <$> traverse normSchema l
-  r@Record{name = tn}  -> do
-    modify' (M.insert tn (NamedType tn))
+  Record { name }  -> do
+    modify' (M.insert name (NamedType name))
     flds <- mapM (\fld -> setType fld <$> normSchema (fldType fld)) (fields r)
     pure $ r { fields = flds }
-  r@Fixed{name = tn} -> do
-    modify' (M.insert tn (NamedType tn))
+  Fixed { name } -> do
+    modify' (M.insert name (NamedType name))
     pure r
-  r@Enum{name = tn} -> do
-    modify' (M.insert tn (NamedType tn))
+  Enum { name } -> do
+    modify' (M.insert name (NamedType name))
     pure r
   s         -> pure s
   where

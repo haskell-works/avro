@@ -8,34 +8,29 @@ module Data.Avro.Encoding.FromAvro
   -- ** For internal use
 , Value(..)
 , getValue
+
+, describeValue
 )
 where
 
 import           Control.DeepSeq             (NFData)
 import           Control.Monad               (forM, replicateM)
 import           Control.Monad.Identity      (Identity (..))
-import           Control.Monad.ST            (ST)
-import qualified Data.Aeson                  as A
 import qualified Data.Avro.Internal.Get      as Get
 import           Data.Avro.Internal.Time
 import           Data.Avro.Schema.Decimal    as D
 import           Data.Avro.Schema.ReadSchema (ReadSchema)
 import qualified Data.Avro.Schema.ReadSchema as ReadSchema
 import qualified Data.Avro.Schema.Schema     as Schema
-import           Data.Binary.Get             (Get, getByteString, runGetOrFail)
-import qualified Data.ByteString             as B
+import           Data.Binary.Get             (Get, getByteString)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
-import qualified Data.Char                   as Char
 import           Data.Foldable               (traverse_)
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Int
-import           Data.List.NonEmpty          (NonEmpty)
 import qualified Data.Map                    as Map
 import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import qualified Data.Text                   as Text
 import qualified Data.Text.Encoding          as Text
 import qualified Data.Time                   as Time
 import qualified Data.UUID                   as UUID
@@ -76,7 +71,7 @@ data Value
 describeValue :: Value -> String
 describeValue = \case
   Null         -> "Null"
-  Boolean b    -> "Boolean"
+  Boolean _    -> "Boolean"
   Int s _      -> "Int (" <> show s <> ")"
   Long s _     -> "Long (" <> show s <> ")"
   Float s _    -> "Float (" <> show s <> ")"
@@ -309,17 +304,18 @@ getField env sch = case sch of
 getKVBlocks :: HashMap Schema.TypeName ReadSchema -> ReadSchema -> Get [[(Text, Value)]]
 getKVBlocks env t = do
   blockLength <- abs <$> Get.getLong
-  if blockLength == 0
-  then return []
-  else do vs <- replicateM (fromIntegral blockLength) ((,) <$> Get.getString <*> getField env t)
-          (vs:) <$> getKVBlocks env t
+  if blockLength == 0 then
+    return []
+  else do
+    vs <- replicateM (fromIntegral blockLength) ((,) <$> Get.getString <*> getField env t)
+    (vs:) <$> getKVBlocks env t
 {-# INLINE getKVBlocks #-}
 
 getBlocksOf :: HashMap Schema.TypeName ReadSchema -> ReadSchema -> Get [[Value]]
 getBlocksOf env t = do
   blockLength <- abs <$> Get.getLong
-  if blockLength == 0
-  then return []
+  if blockLength == 0 then
+    return []
   else do
     vs <- replicateM (fromIntegral blockLength) (getField env t)
     (vs:) <$> getBlocksOf env t
@@ -329,7 +325,7 @@ getRecord env fs = do
   moos <- fmap concat . forM fs $ \f ->
     case ReadSchema.fldStatus f of
       ReadSchema.Ignored       -> [] <$ getField env (ReadSchema.fldType f)
-      ReadSchema.AsIs i        -> (\f -> [(i,f)]) <$> getField env (ReadSchema.fldType f)
+      ReadSchema.AsIs i        -> (\fld -> [(i,fld)]) <$> getField env (ReadSchema.fldType f)
       ReadSchema.Defaulted i v -> pure [(i, convertValue v)] --undefined
 
   return $ V.create $ do

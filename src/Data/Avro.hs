@@ -68,7 +68,7 @@ import           Data.Avro.Schema.Schema      (Schema)
 import qualified Data.Avro.Schema.Schema      as Schema
 import           Data.Binary.Get              (runGetOrFail)
 import           Data.ByteString.Builder      (toLazyByteString)
-import qualified Data.ByteString.Lazy         as BL
+import qualified Data.ByteString.Lazy         as Lazy
 import           Data.Tagged                  (untag)
 
 {- HLINT ignore "Use section"         -}
@@ -80,21 +80,21 @@ readSchemaFromSchema = fromSchema
 {-# INLINE readSchemaFromSchema #-}
 
 -- | Serialises an individual value into Avro with the schema provided.
-encodeValueWithSchema :: ToAvro a => Schema -> a -> BL.ByteString
+encodeValueWithSchema :: ToAvro a => Schema -> a -> Lazy.ByteString
 encodeValueWithSchema s = toLazyByteString . toAvro s
 {-# INLINE encodeValueWithSchema #-}
 
 -- | Serialises an individual value into Avro using the schema
 -- from its coresponding 'HasAvroSchema' instance.
-encodeValue :: (HasAvroSchema a, ToAvro a) => a -> BL.ByteString
+encodeValue :: (HasAvroSchema a, ToAvro a) => a -> Lazy.ByteString
 encodeValue a = encodeValueWithSchema (schemaOf a) a
 {-# INLINE encodeValue #-}
 
 -- | Deserialises an individual value from Avro.
-decodeValueWithSchema :: FromAvro a => ReadSchema -> BL.ByteString -> Either String a
-decodeValueWithSchema schema payload =
-  case runGetOrFail (getValue schema) payload of
-    Right (bs, _, v) -> fromAvro v
+decodeValueWithSchema :: FromAvro a => ReadSchema -> Lazy.ByteString -> Either String a
+decodeValueWithSchema readSchema payload =
+  case runGetOrFail (getValue readSchema) payload of
+    Right (_, _, v) -> fromAvro v
     Left (_, _, e)   -> Left e
 
 -- | Deserialises an individual value from Avro using the schema from its coresponding 'HasAvroSchema'.
@@ -102,7 +102,7 @@ decodeValueWithSchema schema payload =
 -- __NOTE__: __This function is only to be used when reader and writes schemas are known to be the same.__
 -- Because only one schema is known at this point, and it is the reader schema,
 -- /no decondlicting/ can be performed.
-decodeValue :: forall a. (HasAvroSchema a, FromAvro a) => BL.ByteString -> Either String a
+decodeValue :: forall a. (HasAvroSchema a, FromAvro a) => Lazy.ByteString -> Either String a
 decodeValue = decodeValueWithSchema (fromSchema (untag @a schema))
 {-# INLINE decodeValue #-}
 
@@ -112,7 +112,7 @@ decodeValue = decodeValueWithSchema (fromSchema (untag @a schema))
 -- error. This means that the consumer will get all the "good" content from
 -- the container until the error is detected, then this error and then the list
 -- is finished.
-decodeContainer :: forall a. (HasAvroSchema a, FromAvro a) => BL.ByteString -> [Either String a]
+decodeContainer :: forall a. (HasAvroSchema a, FromAvro a) => Lazy.ByteString -> [Either String a]
 decodeContainer = decodeContainerWithReaderSchema (untag @a schema)
 {-# INLINE decodeContainer #-}
 
@@ -122,7 +122,7 @@ decodeContainer = decodeContainerWithReaderSchema (untag @a schema)
 -- error. This means that the consumer will get all the "good" content from
 -- the container until the error is detected, then this error and then the list
 -- is finished.
-decodeContainerWithEmbeddedSchema :: forall a. FromAvro a => BL.ByteString -> [Either String a]
+decodeContainerWithEmbeddedSchema :: forall a. FromAvro a => Lazy.ByteString -> [Either String a]
 decodeContainerWithEmbeddedSchema payload =
   case Container.extractContainerValues (pure . fromSchema) (getValue >=> (either fail pure . fromAvro)) payload of
     Left err          -> [Left err]
@@ -137,7 +137,7 @@ decodeContainerWithEmbeddedSchema payload =
 -- error. This means that the consumer will get all the "good" content from
 -- the container until the error is detected, then this error and then the list
 -- is finished.
-decodeContainerWithReaderSchema :: forall a. FromAvro a => Schema -> BL.ByteString -> [Either String a]
+decodeContainerWithReaderSchema :: forall a. FromAvro a => Schema -> Lazy.ByteString -> [Either String a]
 decodeContainerWithReaderSchema readerSchema payload =
   case Container.extractContainerValues (flip deconflict readerSchema) (getValue >=> (either fail pure . fromAvro)) payload of
     Left err          -> [Left err]
@@ -148,7 +148,7 @@ decodeContainerWithReaderSchema readerSchema payload =
 -- This is particularly useful when slicing up containers into one or more
 -- smaller files.  By extracting the original bytestring it is possible to
 -- avoid re-encoding data.
-extractContainerValuesBytes :: BL.ByteString -> Either String (Schema, [Either String BL.ByteString])
+extractContainerValuesBytes :: Lazy.ByteString -> Either String (Schema, [Either String Lazy.ByteString])
 extractContainerValuesBytes =
   (fmap . fmap . fmap . fmap) snd . Container.extractContainerValuesBytes (pure . fromSchema) getValue
 {-# INLINE extractContainerValuesBytes #-}
@@ -161,8 +161,8 @@ extractContainerValuesBytes =
 -- avoid re-encoding data.
 decodeContainerValuesBytes :: forall a. FromAvro a
   => Schema
-  -> BL.ByteString
-  -> Either String (Schema, [Either String (a, BL.ByteString)])
+  -> Lazy.ByteString
+  -> Either String (Schema, [Either String (a, Lazy.ByteString)])
 decodeContainerValuesBytes readerSchema =
   Container.extractContainerValuesBytes (flip deconflict readerSchema) (getValue >=> (either fail pure . fromAvro))
 {-# INLINE decodeContainerValuesBytes #-}
@@ -170,19 +170,19 @@ decodeContainerValuesBytes readerSchema =
 -- | Encode chunks of values into a container, using 16 random bytes for
 -- the synchronization markers and a corresponding 'HasAvroSchema' schema.
 -- Blocks are compressed (or not) according to the given 'Codec' ('nullCodec' or 'deflateCodec').
-encodeContainer :: forall a. (HasAvroSchema a, ToAvro a) => Codec -> [[a]] -> IO BL.ByteString
+encodeContainer :: forall a. (HasAvroSchema a, ToAvro a) => Codec -> [[a]] -> IO Lazy.ByteString
 encodeContainer codec = encodeContainerWithSchema codec (untag @a schema)
 
 -- | Encode chunks of values into a container, using 16 random bytes for
 -- the synchronization markers. Blocks are compressed (or not) according
 -- to the given 'Codec' ('nullCodec' or 'deflateCodec').
-encodeContainerWithSchema :: ToAvro a => Codec -> Schema -> [[a]] -> IO BL.ByteString
+encodeContainerWithSchema :: ToAvro a => Codec -> Schema -> [[a]] -> IO Lazy.ByteString
 encodeContainerWithSchema codec sch xss =
   do sync <- Container.newSyncBytes
      return $ encodeContainerWithSync codec sch sync xss
 
 -- |Encode chunks of objects into a container, using the provided
 -- ByteString as the synchronization markers.
-encodeContainerWithSync :: ToAvro a => Codec -> Schema -> BL.ByteString -> [[a]] -> BL.ByteString
+encodeContainerWithSync :: ToAvro a => Codec -> Schema -> Lazy.ByteString -> [[a]] -> Lazy.ByteString
 encodeContainerWithSync = Container.packContainerValuesWithSync' toAvro
 {-# INLINE encodeContainerWithSync #-}

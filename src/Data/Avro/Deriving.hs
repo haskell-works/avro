@@ -7,10 +7,8 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TypeApplications   #-}
 
-{- HLINT ignore "Avoid lambda using `infix`" -}
-
 -- | This module lets us derive Haskell types from an Avro schema that
--- can be serialized/deserialzed to Avro.
+-- can be serialized/deserialized to Avro.
 module Data.Avro.Deriving
   ( -- * Deriving options
     DeriveOptions(..)
@@ -34,54 +32,44 @@ module Data.Avro.Deriving
   , deriveAvro'
 
   -- * Re-exporting a quasiquoter for raw string literals
-  , r
+  , QQ.r
 )
 where
 
-import           Control.Monad                (join)
-import           Control.Monad.Identity       (Identity)
-import           Data.Aeson                   (eitherDecode)
-import qualified Data.Aeson                   as J
-import           Data.Avro                    hiding (decode, encode)
-import           Data.Avro.Encoding.ToAvro    (ToAvro (..))
-import           Data.Avro.Internal.EncodeRaw (putI)
-import           Data.Avro.Schema.Schema      as S
-import           Data.ByteString              (ByteString)
-import qualified Data.ByteString              as B
-import           Data.Char                    (isAlphaNum)
+import           Control.Monad                ( join )
+import           Control.Monad.Identity       ( Identity )
+
+import           Data.Aeson                   ( eitherDecode )
+import           Data.ByteString              ( ByteString )
+import qualified Data.ByteString              as Strict
+import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.Foldable                as Foldable
-import           Data.Int
-import           Data.List.NonEmpty           (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty           as NE
-import           Data.Map                     (Map)
-import           Data.Maybe                   (fromMaybe)
-import           Data.Semigroup               ((<>))
+import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Data.Time                    (Day, DiffTime, LocalTime, UTCTime)
-import           Data.UUID                    (UUID)
-import           Text.RawString.QQ            (r)
+import qualified Data.Vector                  as V
+import           Data.Char                    ( isAlphaNum )
+import           Data.Int                     ( Int32, Int64 )
+import           Data.Map                     ( Map )
+import           Data.Time                    ( Day, DiffTime, LocalTime, UTCTime )
+import           Data.UUID                    ( UUID )
+
+import           GHC.Generics                 ( Generic )
+import qualified Language.Haskell.TH as TH
+import           Language.Haskell.TH.Syntax
+import qualified Text.RawString.QQ           as QQ
+
 
 import qualified Data.Avro.Encoding.FromAvro as AV
+import           Data.Avro.Encoding.ToAvro    ( ToAvro(..) )
+import           Data.Avro.HasAvroSchema      ( HasAvroSchema )
+import qualified Data.Avro.HasAvroSchema
+import           Data.Avro.Internal.EncodeRaw ( putI )
+import           Data.Avro.Schema.Schema      ( Schema, TypeName, Field )
+import qualified Data.Avro.Schema.Schema      as Schema
+import           Data.Avro.Deriving.Lift ()
+import           Data.Avro.Deriving.NormSchema
+import           Data.Avro.EitherN
 
-import GHC.Generics (Generic)
-
-import Language.Haskell.TH        as TH hiding (notStrict)
-import Language.Haskell.TH.Lib    as TH hiding (notStrict)
-import Language.Haskell.TH.Syntax
-
-import Data.Avro.Deriving.NormSchema
-import Data.Avro.EitherN
-
-import qualified Data.ByteString            as BS
-import qualified Data.ByteString.Lazy       as LBS
-import qualified Data.ByteString.Lazy.Char8 as LBSC8
-import qualified Data.HashMap.Strict        as HM
-import qualified Data.Set                   as S
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import qualified Data.Vector                as V
-
-import Data.Avro.Deriving.Lift ()
 
 -- | How to treat Avro namespaces in the generated Haskell types.
 data NamespaceBehavior =
@@ -103,7 +91,7 @@ data NamespaceBehavior =
     -- @Com'example'Foo@. If @Foo@ had a field called @bar@, the
     -- generated Haskell record would have the field
     -- @com'example'FooBar@.
-  | Custom (T.Text -> [T.Text] -> T.Text)
+  | Custom (Text -> [Text] -> Text)
     -- ^ Provide a custom mapping from the name of the Avro type and
     -- its namespace that will be used to generate Haskell types and
     -- fields.
@@ -127,7 +115,7 @@ data DeriveOptions = DeriveOptions
   { -- | How to build field names for generated data types. The first
     -- argument is the type name to use as a prefix, rendered
     -- according to the 'namespaceBehavior' setting.
-    fieldNameBuilder    :: Text -> Field -> T.Text
+    fieldNameBuilder    :: Text -> Field -> Text
 
     -- | Determines field representation of generated data types
   , fieldRepresentation :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
@@ -146,6 +134,7 @@ data DeriveOptions = DeriveOptions
 --   , namespaceBehavior = 'IgnoreNamespaces'
 --   }
 -- @
+defaultDeriveOptions :: DeriveOptions
 defaultDeriveOptions = DeriveOptions
   { fieldNameBuilder    = mkPrefixedFieldName
   , fieldRepresentation = mkLazyField
@@ -160,9 +149,9 @@ defaultDeriveOptions = DeriveOptions
 -- @
 -- Person { personFirstName :: Text }
 -- @
-mkPrefixedFieldName :: Text -> Field -> T.Text
+mkPrefixedFieldName :: Text -> Field -> Text
 mkPrefixedFieldName prefix fld =
-  sanitiseName $ updateFirst T.toLower prefix <> updateFirst T.toUpper (fldName fld)
+  sanitiseName $ updateFirst Text.toLower prefix <> updateFirst Text.toUpper (Schema.fldName fld)
 
 -- | Marks any field as non-strict in the generated data types.
 mkLazyField :: TypeName -> Field -> (FieldStrictness, FieldUnpackedness)
@@ -180,19 +169,19 @@ mkStrictPrimitiveField _ field =
   else (LazyField, NonUnpackedField)
   where
     unpackedness =
-      case S.fldType field of
-        S.Null    -> NonUnpackedField
-        S.Boolean -> NonUnpackedField
+      case Schema.fldType field of
+        Schema.Null    -> NonUnpackedField
+        Schema.Boolean -> NonUnpackedField
         _         -> UnpackedField
 
     shouldStricten =
-      case S.fldType field of
-        S.Null    -> True
-        S.Boolean -> True
-        S.Int _   -> True
-        S.Long _  -> True
-        S.Float   -> True
-        S.Double  -> True
+      case Schema.fldType field of
+        Schema.Null    -> True
+        Schema.Boolean -> True
+        Schema.Int _   -> True
+        Schema.Long _  -> True
+        Schema.Float   -> True
+        Schema.Double  -> True
         _         -> False
 
 -- | Generates a field name that matches the field name in schema
@@ -206,7 +195,7 @@ mkStrictPrimitiveField _ field =
 -- @
 -- You may want to enable 'DuplicateRecordFields' if you want to use this method.
 mkAsIsFieldName :: Text -> Field -> Text
-mkAsIsFieldName _ = sanitiseName . updateFirst T.toLower . fldName
+mkAsIsFieldName _ = sanitiseName . updateFirst Text.toLower . Schema.fldName
 
 -- | Derives Haskell types from the given Avro schema file. These
 -- Haskell types support both reading and writing to Avro.
@@ -273,7 +262,7 @@ deriveAvro' :: Schema -> Q [Dec]
 deriveAvro' = deriveAvroWithOptions' defaultDeriveOptions
 
 -- | Same as 'deriveAvro' but takes a ByteString rather than FilePath
-deriveAvroFromByteString :: LBS.ByteString -> Q [Dec]
+deriveAvroFromByteString :: Lazy.ByteString -> Q [Dec]
 deriveAvroFromByteString bs = case eitherDecode bs of
     Right schema -> deriveAvroWithOptions' defaultDeriveOptions schema
     Left err     -> fail $ "Unable to generate Avro from bytestring: " <> err
@@ -288,7 +277,7 @@ deriveAvroFromByteString bs = case eitherDecode bs of
 makeSchema :: FilePath -> Q Exp
 makeSchema p = readSchema p >>= lift
 
-makeSchemaFromByteString :: LBS.ByteString -> Q Exp
+makeSchemaFromByteString :: Lazy.ByteString -> Q Exp
 makeSchemaFromByteString bs = case eitherDecode @Schema bs of
   Right schema -> lift schema
   Left err     -> fail $ "Unable to generate Avro Schema from bytestring: " <> err
@@ -296,9 +285,8 @@ makeSchemaFromByteString bs = case eitherDecode @Schema bs of
 makeSchemaFrom :: FilePath -> Text -> Q Exp
 makeSchemaFrom p name = do
   s <- readSchema p
-
-  case subdefinition s name of
-    Nothing -> fail $ "No such entity '" <> T.unpack name <> "' defined in " <> p
+  case Schema.subdefinition s name of
+    Nothing -> fail $ "No such entity '" <> Text.unpack name <> "' defined in " <> p
     Just ss -> lift ss
 
 readSchema :: FilePath -> Q Schema
@@ -315,29 +303,29 @@ badValueNew :: Show v => v -> String -> Either String a
 badValueNew v t = Left $ "Unexpected value for '" <> t <> "': " <> show v
 
 genFromValue :: NamespaceBehavior -> Schema -> Q [Dec]
-genFromValue namespaceBehavior (S.Enum n _ _ _ ) =
-  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+genFromValue namespaceBehavior (Schema.Enum n _ _ _ ) =
+  [d| instance AV.FromAvro $(TH.conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AV.Enum _ i _) = $([| pure . toEnum|]) i
-        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ Schema.renderFullname n)|] ) value
   |]
-genFromValue namespaceBehavior (S.Record n _ _ fs) =
-  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+genFromValue namespaceBehavior (Schema.Record n _ _ fs) =
+  [d| instance AV.FromAvro $(TH.conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AV.Record _ r) =
            $(genFromAvroNewFieldsExp (mkDataTypeName namespaceBehavior n) fs) r
-        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+        fromAvro value           = $( [|\v -> badValueNew v $(mkTextLit $ Schema.renderFullname n)|] ) value
   |]
-genFromValue namespaceBehavior (S.Fixed n _ s _) =
-  [d| instance AV.FromAvro $(conT $ mkDataTypeName namespaceBehavior n) where
+genFromValue namespaceBehavior (Schema.Fixed n _ s _) =
+  [d| instance AV.FromAvro $(TH.conT $ mkDataTypeName namespaceBehavior n) where
         fromAvro (AV.Fixed _ v)
-          | BS.length v == s = pure $ $(conE (mkDataTypeName namespaceBehavior n)) v
-        fromAvro value = $( [|\v -> badValueNew v $(mkTextLit $ S.renderFullname n)|] ) value
+          | Strict.length v == s = pure $ $(TH.conE (mkDataTypeName namespaceBehavior n)) v
+        fromAvro value = $( [|\v -> badValueNew v $(mkTextLit $ Schema.renderFullname n)|] ) value
   |]
 genFromValue _ _                             = pure []
 
 genFromAvroNewFieldsExp :: Name -> [Field] -> Q Exp
 genFromAvroNewFieldsExp n xs =
   [| \r ->
-    $(let ctor = [| pure $(conE n) |]
+    $(let ctor = [| pure $(TH.conE n) |]
       in foldl (\expr (i, _) -> [| $expr <*> AV.fromAvro (r V.! i) |]) ctor (zip [(0 :: Int)..] xs)
     )
   |]
@@ -346,14 +334,14 @@ genFromAvroNewFieldsExp n xs =
 
 genHasAvroSchema :: NamespaceBehavior -> Schema -> Q [Dec]
 genHasAvroSchema namespaceBehavior s = do
-  let sname = mkSchemaValueName namespaceBehavior (name s)
+  let sname = mkSchemaValueName namespaceBehavior (Schema.name s)
   sdef <- schemaDef sname s
   idef <- hasAvroSchema sname
   pure (sdef <> idef)
   where
     hasAvroSchema sname =
-      [d| instance HasAvroSchema $(conT $ mkDataTypeName namespaceBehavior (name s)) where
-            schema = pure $(varE sname)
+      [d| instance HasAvroSchema $(TH.conT $ mkDataTypeName namespaceBehavior (Schema.name s)) where
+            schema = pure $(TH.varE sname)
       |]
 
 newNames :: String
@@ -366,40 +354,40 @@ newNames base n = sequence [newName (base ++ show i) | i <- [1..n]]
 ------------------------- ToAvro ------------------------------------------------
 
 genToAvro :: DeriveOptions -> Schema -> Q [Dec]
-genToAvro opts s@(S.Enum n _ _ _) =
+genToAvro opts (Schema.Enum n _ _ _) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
-    encodeAvroInstance sname =
-      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+    encodeAvroInstance _ =
+      [d| instance ToAvro $(TH.conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $([| \_ x -> putI (fromEnum x) |])
       |]
 
-genToAvro opts s@(S.Record n _ _ fs) =
+genToAvro opts (Schema.Record n _ _ fs) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     encodeAvroInstance sname =
-      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+      [d| instance ToAvro $(TH.conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $(encodeAvroFieldsExp sname)
       |]
-    encodeAvroFieldsExp sname = do
+    encodeAvroFieldsExp _ = do
       names <- newNames "p_" (length fs)
-      wn <- varP <$> newName "_"
-      let con = conP (mkDataTypeName (namespaceBehavior opts) n) (varP <$> names)
-      lamE [wn, con]
-            [| mconcat $( let build (fld, n) = [| toAvro (fldType fld) $(varE n) |]
-                          in listE $ build <$> zip fs names
+      wn <- TH.varP <$> newName "_"
+      let con = TH.conP (mkDataTypeName (namespaceBehavior opts) n) (TH.varP <$> names)
+      TH.lamE [wn, con]
+            [| mconcat $( let build (fld, nm) = [| toAvro (Schema.fldType fld) $(TH.varE nm) |]
+                          in TH.listE $ build <$> zip fs names
                         )
             |]
 
-genToAvro opts s@(S.Fixed n _ _ _) =
+genToAvro opts (Schema.Fixed n _ _ _) =
   encodeAvroInstance (mkSchemaValueName (namespaceBehavior opts) n)
   where
     encodeAvroInstance sname =
-      [d| instance ToAvro $(conT $ mkDataTypeName (namespaceBehavior opts) n) where
+      [d| instance ToAvro $(TH.conT $ mkDataTypeName (namespaceBehavior opts) n) where
             toAvro = $(do
               x <- newName "x"
               wc <- newName "_"
-              lamE [varP wc, conP (mkDataTypeName (namespaceBehavior opts) n) [varP x]] [| toAvro $(varE sname) $(varE x) |])
+              TH.lamE [TH.varP wc, TH.conP (mkDataTypeName (namespaceBehavior opts) n) [TH.varP x]] [| toAvro $(TH.varE sname) $(TH.varE x) |])
       |]
 genToAvro _ _ = pure []
 
@@ -421,79 +409,98 @@ setName = fmap . map . sn
     sn _ d                   = d
 
 genType :: DeriveOptions -> Schema -> Q [Dec]
-genType opts (S.Record n _ _ fs) = do
+genType opts (Schema.Record n _ _ fs) = do
   flds <- traverse (mkField opts n) fs
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genDataType dname flds]
-genType opts (S.Enum n _ _ vs) = do
+genType opts (Schema.Enum n _ _ vs) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genEnum dname (mkAdtCtorName (namespaceBehavior opts) n <$> V.toList vs)]
-genType opts (S.Fixed n _ s _) = do
+genType opts (Schema.Fixed n _ _ _) = do
   let dname = mkDataTypeName (namespaceBehavior opts) n
   sequenceA [genNewtype dname]
 genType _ _ = pure []
 
-mkFieldTypeName :: NamespaceBehavior -> S.Schema -> Q TH.Type
+mkFieldTypeName :: NamespaceBehavior -> Schema -> Q TH.Type
 mkFieldTypeName namespaceBehavior = \case
-  S.Null             -> [t| () |]
-  S.Boolean          -> [t| Bool |]
+  Schema.Null             -> [t| () |]
+  Schema.Boolean          -> [t| Bool |]
 
-  S.Long (Just (DecimalL (Decimal p s)))
-                     -> [t| Decimal $(litT $ numTyLit p) $(litT $ numTyLit s) |]
-  S.Long (Just TimeMicros)
-                     -> [t| DiffTime |]
-  S.Long (Just TimestampMicros)
-                     -> [t| UTCTime |]
-  S.Long (Just TimestampMillis)
-                     -> [t| UTCTime |]
-  S.Long (Just LocalTimestampMillis)
-                     -> [t| LocalTime |]
-  S.Long (Just LocalTimestampMicros)
-                     -> [t| LocalTime |]
-  S.Long Nothing     -> [t| Int64 |]
+  Schema.Long (Just (Schema.DecimalL (Schema.Decimal p s)))
+    -> [t| Schema.Decimal $(TH.litT $ TH.numTyLit p) $(TH.litT $ TH.numTyLit s) |]
+  Schema.Long (Just Schema.TimeMicros)
+    -> [t| DiffTime |]
+  Schema.Long (Just Schema.TimestampMicros)
+    -> [t| UTCTime |]
+  Schema.Long (Just Schema.TimestampMillis)
+    -> [t| UTCTime |]
+  Schema.Long (Just Schema.LocalTimestampMillis)
+    -> [t| LocalTime |]
+  Schema.Long (Just Schema.LocalTimestampMicros)
+    -> [t| LocalTime |]
+  Schema.Long Nothing
+    -> [t| Int64 |]
 
-  S.Int (Just Date)  -> [t| Day |]
-  S.Int (Just TimeMillis)
-                     -> [t| DiffTime |]
-  S.Int _            -> [t| Int32 |]
-  S.Float            -> [t| Float |]
-  S.Double           -> [t| Double |]
-  S.Bytes _          -> [t| ByteString |]
-  S.String Nothing   -> [t| Text |]
-  S.String (Just UUID) -> [t| UUID |]
-  S.Union branches   -> union (Foldable.toList branches)
-  S.Record n _ _ _   -> [t| $(conT $ mkDataTypeName namespaceBehavior n) |]
-  S.Map x            -> [t| Map Text $(go x) |]
-  S.Array x          -> [t| [$(go x)] |]
-  S.NamedType n      -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Fixed n _ _ _    -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  S.Enum n _ _ _     -> [t| $(conT $ mkDataTypeName namespaceBehavior n)|]
-  where go = mkFieldTypeName namespaceBehavior
-        union = \case
-          []              ->
-            error "Empty union types are not supported"
-          [x]             -> [t| Identity $(go x) |]
-          [Null, x]       -> [t| Maybe $(go x) |]
-          [x, Null]       -> [t| Maybe $(go x) |]
-          [x, y]          -> [t| Either $(go x) $(go y) |]
-          [a, b, c]       -> [t| Either3 $(go a) $(go b) $(go c) |]
-          [a, b, c, d]    -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
-          [a, b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
-          [a, b, c, d, e, f] -> [t| Either6 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) |]
-          [a, b, c, d, e, f, g] -> [t| Either7 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g)|]
-          [a, b, c, d, e, f, g, h] -> [t| Either8 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h)|]
-          [a, b, c, d, e, f, g, h, i] -> [t| Either9 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h) $(go i)|]
-          [a, b, c, d, e, f, g, h, i, j] -> [t| Either10 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h) $(go i) $(go j)|]
-          ls              ->
-            error $ "Unions with more than 10 elements are not yet supported: Union has " <> (show . length) ls <> " elements"
+  Schema.Int (Just Schema.Date)
+    -> [t| Day |]
+  Schema.Int (Just Schema.TimeMillis)
+    -> [t| DiffTime |]
+  Schema.Int _
+    -> [t| Int32 |]
+  Schema.Float
+    -> [t| Float |]
+  Schema.Double
+    -> [t| Double |]
+  Schema.Bytes _
+    -> [t| ByteString |]
+  Schema.String Nothing
+    -> [t| Text |]
+  Schema.String (Just Schema.UUID) ->
+    [t| UUID |]
+  Schema.Union branches
+    -> union (Foldable.toList branches)
+  Schema.Record n _ _ _
+    -> [t| $(TH.conT $ mkDataTypeName namespaceBehavior n) |]
+  Schema.Map x
+    -> [t| Map Text $(go x) |]
+  Schema.Array x
+    -> [t| [$(go x)] |]
+  Schema.NamedType n
+    -> [t| $(TH.conT $ mkDataTypeName namespaceBehavior n)|]
+  Schema.Fixed n _ _ _
+    -> [t| $(TH.conT $ mkDataTypeName namespaceBehavior n)|]
+  Schema.Enum n _ _ _
+    -> [t| $(TH.conT $ mkDataTypeName namespaceBehavior n)|]
+  where
+    go = mkFieldTypeName namespaceBehavior
+    union = \case
+      []
+        -> error "Empty union types are not supported"
+      [x]
+        -> [t| Identity $(go x) |]
+      [Schema.Null, x]
+        -> [t| Maybe $(go x) |]
+      [x, Schema.Null]
+        -> [t| Maybe $(go x) |]
+      [x, y] -> [t| Either $(go x) $(go y) |]
+      [a, b, c] -> [t| Either3 $(go a) $(go b) $(go c) |]
+      [a, b, c, d] -> [t| Either4 $(go a) $(go b) $(go c) $(go d) |]
+      [a, b, c, d, e] -> [t| Either5 $(go a) $(go b) $(go c) $(go d) $(go e) |]
+      [a, b, c, d, e, f] -> [t| Either6 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) |]
+      [a, b, c, d, e, f, g] -> [t| Either7 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g)|]
+      [a, b, c, d, e, f, g, h] -> [t| Either8 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h)|]
+      [a, b, c, d, e, f, g, h, i] -> [t| Either9 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h) $(go i)|]
+      [a, b, c, d, e, f, g, h, i, j] -> [t| Either10 $(go a) $(go b) $(go c) $(go d) $(go e) $(go f) $(go g) $(go h) $(go i) $(go j)|]
+      ls              ->
+        error $ "Unions with more than 10 elements are not yet supported: Union has " <> (show . length) ls <> " elements"
 
 updateFirst :: (Text -> Text) -> Text -> Text
 updateFirst f t =
-  let (l, ls) = T.splitAt 1 t
+  let (l, ls) = Text.splitAt 1 t
   in f l <> ls
 
 decodeSchema :: FilePath -> IO (Either String Schema)
-decodeSchema p = eitherDecode <$> LBS.readFile p
+decodeSchema p = eitherDecode <$> Lazy.readFile p
 
 mkAdtCtorName :: NamespaceBehavior -> TypeName -> Text -> Name
 mkAdtCtorName namespaceBehavior prefix nm =
@@ -505,7 +512,7 @@ concatNames a b = mkName $ nameBase a <> nameBase b
 sanitiseName :: Text -> Text
 sanitiseName =
   let valid c = isAlphaNum c || c == '\'' || c == '_'
-  in T.concat . T.split (not . valid)
+  in Text.concat . Text.split (not . valid)
 
 -- | Renders a fully qualified Avro name to a valid Haskell
 -- identifier. This does not change capitalization—make sure to
@@ -526,7 +533,7 @@ renderName :: NamespaceBehavior
               -- ^ The name to transform into a valid Haskell
               -- identifier.
            -> Text
-renderName namespaceBehavior (TN name namespace) = case namespaceBehavior of
+renderName namespaceBehavior (Schema.TN name namespace) = case namespaceBehavior of
   HandleNamespaces -> Text.intercalate "'" $ namespace <> [name]
   IgnoreNamespaces -> name
   Custom f         -> f name namespace
@@ -540,11 +547,11 @@ mkDataTypeName namespaceBehavior = mkDataTypeName' . renderName namespaceBehavio
 
 mkDataTypeName' :: Text -> Name
 mkDataTypeName' =
-  mkTextName . sanitiseName . updateFirst T.toUpper . T.takeWhileEnd (/='.')
+  mkTextName . sanitiseName . updateFirst Text.toUpper . Text.takeWhileEnd (/='.')
 
 mkField :: DeriveOptions -> TypeName -> Field -> Q VarStrictType
 mkField opts typeName field = do
-  ftype <- mkFieldTypeName (namespaceBehavior opts) (fldType field)
+  ftype <- mkFieldTypeName (namespaceBehavior opts) (Schema.fldType field)
   let prefix = renderName (namespaceBehavior opts) typeName
       fName = mkTextName $ fieldNameBuilder opts prefix field
       (fieldStrictness, fieldUnpackedness) =
@@ -624,10 +631,7 @@ strict NonUnpackedField = IsStrict
 #endif
 
 mkTextName :: Text -> Name
-mkTextName = mkName . T.unpack
+mkTextName = mkName . Text.unpack
 
-mkLit :: String -> ExpQ
-mkLit = litE . StringL
-
-mkTextLit :: Text -> ExpQ
-mkTextLit = litE . StringL . T.unpack
+mkTextLit :: Text -> TH.ExpQ
+mkTextLit = TH.litE . StringL . Text.unpack

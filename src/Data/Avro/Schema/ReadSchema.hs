@@ -21,10 +21,8 @@ where
 import           Control.DeepSeq         (NFData)
 import           Data.Avro.Schema.Schema (LogicalTypeBytes, LogicalTypeFixed, LogicalTypeInt, LogicalTypeLong, LogicalTypeString, Order, TypeName)
 import qualified Data.Avro.Schema.Schema as S
-import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Text               (Text)
-import qualified Data.Text               as T
 import qualified Data.Vector             as V
 import           GHC.Generics            (Generic)
 
