@@ -306,7 +306,7 @@ getKVBlocks env t = do
   if lengthIndicator == 0 then
     return []
   else do
-    when (lengthIndicator < 0) $ void $ Get.getLong  -- number of bytes in block
+    when (lengthIndicator < 0) $ void Get.getLong  -- number of bytes in block
     let blockLength = abs lengthIndicator
     vs <- replicateM (fromIntegral blockLength) ((,) <$> Get.getString <*> getField env t)
     (vs:) <$> getKVBlocks env t
@@ -314,10 +314,12 @@ getKVBlocks env t = do
 
 getBlocksOf :: HashMap Schema.TypeName ReadSchema -> ReadSchema -> Get [[Value]]
 getBlocksOf env t = do
-  blockLength <- abs <$> Get.getLong
-  if blockLength == 0 then
+  lengthIndicator <- Get.getLong
+  if lengthIndicator == 0 then
     return []
   else do
+    when (lengthIndicator < 0) $ void Get.getLong  -- number of bytes in block
+    let blockLength = abs lengthIndicator
     vs <- replicateM (fromIntegral blockLength) (getField env t)
     (vs:) <$> getBlocksOf env t
 
