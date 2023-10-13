@@ -300,25 +300,32 @@ getField env sch = case sch of
     v <- getField env t
     pure $ Union sch ix v
 
+
+-- | Read a Map from blocks of KV pairs
 getKVBlocks :: HashMap Schema.TypeName ReadSchema -> ReadSchema -> Get [[(Text, Value)]]
 getKVBlocks env t = do
   lengthIndicator <- Get.getLong
   if lengthIndicator == 0 then
     return []
   else do
-    when (lengthIndicator < 0) $ void Get.getLong  -- number of bytes in block
+    -- When the block's count is negative, its absolute value is used, and the count is followed immediately by a
+    -- long block size indicating the number of bytes in the block.
+    when (lengthIndicator < 0) $ void Get.getLong -- number of bytes in block (ignored)
     let blockLength = abs lengthIndicator
     vs <- replicateM (fromIntegral blockLength) ((,) <$> Get.getString <*> getField env t)
     (vs:) <$> getKVBlocks env t
 {-# INLINE getKVBlocks #-}
 
+-- | Read an array from blocks.
 getBlocksOf :: HashMap Schema.TypeName ReadSchema -> ReadSchema -> Get [[Value]]
 getBlocksOf env t = do
   lengthIndicator <- Get.getLong
   if lengthIndicator == 0 then
     return []
   else do
-    when (lengthIndicator < 0) $ void Get.getLong  -- number of bytes in block
+    -- When the block's count is negative, its absolute value is used, and the count is followed immediately by a
+    -- long block size indicating the number of bytes in the block.
+    when (lengthIndicator < 0) $ void Get.getLong -- number of bytes in block (ignored)
     let blockLength = abs lengthIndicator
     vs <- replicateM (fromIntegral blockLength) (getField env t)
     (vs:) <$> getBlocksOf env t
