@@ -16,17 +16,16 @@ module Bench.Encoding
 where
 
 import           Control.DeepSeq
-import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeContainer, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
+import           Data.Avro               (decodeContainerWithEmbeddedSchema, encodeValueWithSchema, nullCodec)
 import qualified Data.Avro               as Avro
 import           Data.Avro.Deriving      (deriveAvroFromByteString, r)
-import           Data.ByteString         (ByteString)
-import           Data.ByteString.Builder
 import qualified Data.ByteString.Lazy    as BL
 import           Data.List               (unfoldr)
 import qualified Data.Vector             as Vector
 import qualified System.Random           as Random
 
-import Gauge
+-- import Gauge
+import Criterion.Main
 
 deriveAvroFromByteString [r|
 {
