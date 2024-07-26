@@ -8,7 +8,7 @@ module Bench.Deconflict
 )
 where
 
-import Data.Avro                   (decodeContainerWithReaderSchema, decodeValue, decodeValueWithSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
+import Data.Avro                   (decodeContainerWithReaderSchema, decodeValueWithSchema, encodeContainerWithSchema, encodeValueWithSchema, nullCodec)
 import Data.Avro.Schema.ReadSchema (fromSchema)
 import Data.Vector                 (Vector)
 
@@ -17,7 +17,8 @@ import qualified Bench.Deconflict.Writer as W
 import qualified Data.Vector             as Vector
 import qualified System.Random           as Random
 
-import Gauge
+-- import Gauge
+import Criterion.Main
 
 newOuter :: IO W.Outer
 newOuter = do
@@ -29,12 +30,12 @@ many :: Int -> IO a -> IO (Vector a)
 many = Vector.replicateM
 
 values :: Benchmark
-values = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ values ->
+values = env (many 1e5 $ encodeValueWithSchema W.schema'Outer <$> newOuter) $ \ vs ->
   let
     readSchema = fromSchema W.schema'Outer
   in bgroup "Encoded: ByteString"
       [ bgroup "No Deconflict"
-          [ bench "Read via FromAvro" $ nf (fmap (decodeValueWithSchema @W.Outer readSchema)) values
+          [ bench "Read via FromAvro" $ nf (fmap (decodeValueWithSchema @W.Outer readSchema)) vs
           ]
       ]
 
