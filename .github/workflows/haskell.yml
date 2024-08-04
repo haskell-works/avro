@@ -20,6 +20,10 @@ jobs:
         ghc: ["9.10.1", "9.8.2", "9.6.6"]
         os: [ubuntu-latest, macOS-latest, windows-latest]
 
+    env:
+      # Modify this value to "invalidate" the cabal cache.
+      CABAL_CACHE_VERSION: "avro/2024-08-05"
+
     steps:
       - uses: actions/checkout@v2
 
@@ -48,7 +52,7 @@ jobs:
           dist-dir: dist-newstyle
           store-path: ${{ steps.setup-haskell.outputs.cabal-store }}
           threads: 16
-          archive-uri: ${{ secrets.BINARY_CACHE_URI }}/${{ env.CABAL_CACHE_VERSION }}/${{ runner.os }}/${{ matrix.cabal }}/${{ matrix.ghc }}
+          archive-uri: ${{ secrets.BINARY_CACHE_URI }}/${{ env.CABAL_CACHE_VERSION }}/${{ runner.os }}
           skip: "${{ secrets.BINARY_CACHE_URI == '' }}"
 
       - name: Cabal cache over HTTPS
@@ -57,7 +61,7 @@ jobs:
           dist-dir: dist-newstyle
           store-path: ${{ steps.setup-haskell.outputs.cabal-store }}
           threads: 16
-          archive-uri: https://cache.haskellworks.io/${{ env.CABAL_CACHE_VERSION }}/${{ runner.os }}/${{ matrix.cabal }}/${{ matrix.ghc }}
+          archive-uri: https://cache.haskellworks.io/${{ env.CABAL_CACHE_VERSION }}/${{ runner.os }}
           skip: "${{ secrets.BINARY_CACHE_URI != '' }}"
 
       - name: Build
