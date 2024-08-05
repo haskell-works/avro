@@ -163,6 +163,14 @@ jobs:
             fi
           done
 
+      - name: "Build Changelog"
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          toTag: "{{ github.ref }}"
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -171,6 +179,6 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ needs.check.outputs.tag }}
-          body: Undocumented
+          body: ${{ steps.build_changelog.outputs.changelog }}
           draft: true
           prerelease: false
